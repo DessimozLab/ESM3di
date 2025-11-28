@@ -1,0 +1,176 @@
+# ESM3Di
+
+ESM + PEFT LoRA for 3Di per-residue prediction. Train an ESM-2 model with LoRA adapters to predict 3Di structural sequences from amino acid sequences.
+
+## Features
+
+- 🧬 Train ESM-2 models for 3Di structure prediction
+- 🎯 Memory-efficient training using LoRA (Low-Rank Adaptation)
+- 🔧 Support for masking low-confidence positions
+- 📊 Per-residue token classification
+- 🚀 Inference on new sequences
+
+## Installation
+
+### Option 1: Using Conda (Recommended)
+
+1. Create and activate the conda environment:
+```bash
+conda env create -f environment.yml
+conda activate esm3di
+```
+
+### Option 2: Using pip
+
+1. Create a virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+pip install -e .
+```
+
+## Usage
+
+### Training
+
+Train a model using FASTA files with amino acid sequences and corresponding 3Di labels:
+
+```bash
+python -m esm3di.esmretrain \
+    --aa-fasta data/sequences.fasta \
+    --three-di-fasta data/3di_labels.fasta \
+    --hf-model facebook/esm2_t33_650M_UR50D \
+    --mask-label-chars "X" \
+    --batch-size 4 \
+    --epochs 10 \
+    --lr 1e-4 \
+    --out-dir checkpoints/
+```
+
+#### Key Arguments
+
+- `--aa-fasta`: FASTA file with amino acid sequences
+- `--three-di-fasta`: FASTA file with matching 3Di sequences (same order and length)
+- `--hf-model`: HuggingFace ESM model name (default: `facebook/esm2_t33_650M_UR50D`)
+- `--mask-label-chars`: Characters to treat as masked (e.g., low pLDDT positions)
+- `--lora-r`: LoRA rank (default: 8)
+- `--lora-alpha`: LoRA scaling factor (default: 16.0)
+- `--batch-size`: Training batch size
+- `--epochs`: Number of training epochs
+- `--lr`: Learning rate
+- `--out-dir`: Directory to save checkpoints
+
+### Inference
+
+Use the trained model to predict 3Di sequences:
+
+```python
+from esm3di import predict_3di_for_fasta
+
+results = predict_3di_for_fasta(
+    model_ckpt="checkpoints/epoch_10.pt",
+    aa_fasta="data/test_sequences.fasta",
+    device="cuda"  # or "cpu"
+)
+
+for header, aa_seq, pred_3di in results:
+    print(f">{header}")
+    print(f"AA:  {aa_seq}")
+    print(f"3Di: {pred_3di}")
+```
+
+### Creating FoldSeek Database
+
+Generate a FoldSeek-compatible database from amino acid sequences:
+
+```bash
+python -m esm3di.fastas2foldseekdb \
+    --aa-fasta data/proteins.fasta \
+    --model-ckpt checkpoints/epoch_10.pt \
+    --output-db my_foldseek_db
+```
+
+This will:
+1. Run ESM inference to predict 3Di sequences
+2. Create intermediate AA and 3Di FASTA files
+3. Build a FoldSeek database with both sequence and structure information
+
+#### Using Pre-computed 3Di Sequences
+
+If you already have 3Di predictions:
+
+```bash
+python -m esm3di.fastas2foldseekdb \
+    --aa-fasta data/proteins.fasta \
+    --three-di-fasta data/proteins_3di.fasta \
+    --output-db my_foldseek_db \
+    --skip-inference
+```
+
+#### FoldSeek Database Options
+
+- `--keep-fastas`: Keep intermediate FASTA files after database creation
+- `--output-aa-fasta`: Specify path for AA FASTA output
+- `--output-3di-fasta`: Specify path for 3Di FASTA output
+- `--foldseek-bin`: Custom path to foldseek binary
+
+**Note**: FoldSeek must be installed and available in your PATH. Download from [https://github.com/steineggerlab/foldseek](https://github.com/steineggerlab/foldseek)
+
+## Data Format
+
+### Input FASTA Files
+
+Both amino acid and 3Di FASTA files should have:
+- Matching number of sequences
+- Sequences in the same order
+- Equal length for corresponding AA and 3Di sequences
+
+Example `sequences.fasta`:
+```
+>protein1
+MKTAYIAKQRQISFVKSHFSRQLEERLGLIEVQAPILSRVGDGTQDNLSGAEK
+>protein2
+KALTARQQEVFDLIRDHISQTGMPPTRAEIAQRLGFRSPNAAEEHLKALARKGVIE
+```
+
+Example `3di_labels.fasta`:
+```
+>protein1
+acbdACBDacbdACBDacbdACBDacbdACBDacbdACBDacbdACBDacbdA
+>protein2
+XbdACBDacbdACBDacbdACBDacbdACBDacbdACBDacbdACBDacbdACB
+```
+
+Note: Characters specified in `--mask-label-chars` (e.g., 'X') will be ignored during training.
+
+## Model Checkpoints
+
+Checkpoints are saved after each epoch and contain:
+- Model state dict (including LoRA adapters)
+- Label vocabulary
+- Masked label characters
+- Training arguments
+
+## Requirements
+
+- Python ≥ 3.8
+- PyTorch ≥ 2.0.0
+- transformers ≥ 4.30.0
+- peft ≥ 0.5.0
+- CUDA-capable GPU (recommended)
+
+## License
+
+MIT License
+
+## Citation
+
+If you use this code, please cite the relevant papers:
+- ESM-2: [Lin et al., 2022]
+- LoRA: [Hu et al., 2021]
+- 3Di: [van Kempen et al., 2023]

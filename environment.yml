@@ -1,0 +1,21 @@
+name: esm3di
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  # PyTorch with CUDA support (adjust cuda version as needed)
+  - pytorch>=2.0.0
+  - pytorch-cuda=11.8
+  - cudatoolkit=11.8
+  # Pip dependencies
+  - pip:
+      - transformers>=4.30.0
+      - peft>=0.5.0
+      - accelerate>=0.20.0
+      - sentencepiece  # for ESM tokenizer
+      - protobuf
+      - -e .  # Install package in editable mode

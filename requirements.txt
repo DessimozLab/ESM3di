@@ -1,0 +1,12 @@
+# Core dependencies
+torch>=2.0.0
+transformers>=4.30.0
+peft>=0.5.0
+accelerate>=0.20.0
+
+# ESM tokenizer dependencies
+sentencepiece
+protobuf
+
+# Optional: for better performance
+bitsandbytes  # For 8-bit optimization
