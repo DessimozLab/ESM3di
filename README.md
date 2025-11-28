@@ -36,6 +36,38 @@ pip install -e .
 
 ## Usage
 
+### Building Training Dataset from PDB Files
+
+Generate training data from PDB structures with pLDDT-based masking:
+
+```bash
+python -m esm3di.build_trainingset \
+    --pdb-dir alphafold_structures/ \
+    --output-prefix training_data \
+    --plddt-threshold 70 \
+    --mask-char X
+```
+
+This will:
+1. Parse PDB files to extract sequences and pLDDT scores (from B-factor column)
+2. Use FoldSeek to generate 3Di sequences
+3. Mask low-confidence positions (pLDDT < threshold) in 3Di sequences
+4. Output AA and masked 3Di FASTA files ready for training
+
+#### Building Training Set Options
+
+- `--pdb-dir`: Directory containing PDB files (or use `--pdb-files` for specific files)
+- `--output-prefix`: Prefix for output files
+- `--plddt-threshold`: pLDDT threshold below which to mask (default: 70)
+- `--mask-char`: Character for masking low-confidence positions (default: X)
+- `--split-chains`: Split multi-chain structures into separate entries
+- `--chain`: Extract specific chain only
+
+**Output files:**
+- `{prefix}_aa.fasta`: Amino acid sequences
+- `{prefix}_3di_masked.fasta`: 3Di sequences with masked positions
+- `{prefix}_stats.txt`: Statistics about masking
+
 ### Training
 
 Train a model using FASTA files with amino acid sequences and corresponding 3Di labels:
