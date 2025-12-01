@@ -19,7 +19,6 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 import warnings
@@ -118,90 +117,87 @@ def check_foldseek_installed(foldseek_bin: str = "foldseek") -> bool:
         return False
 
 
+
+def read_dbfiles3di(  AADB , threeDidb):
+    #find positions 
+    threeDiseq = [ l.strip().replace('\x00','') for l in open(threeDidb)]
+    lookup = AADB+'.lookup'
+    ids = [ l.split()[1].strip().replace('.pdb', '').split('/')[-1] for l in open(lookup)]
+    AAs = [ l.strip().replace('\x00','') for l in open(AADB)]
+    mapper3di = dict(zip(ids,threeDiseq))
+    mapperAA = dict(zip(ids,AAs))
+    return mapper3di, mapperAA
+
+def mapper2fasta(mapper3di, mapperAA, output_prefix):
+    """
+    Write the 3Di and AA sequences to FASTA files.
+    
+    Args:
+        mapper3di: Dictionary mapping IDs to 3Di sequences
+        mapperAA: Dictionary mapping IDs to AA sequences
+        output_prefix: Prefix for output files
+    """
+
+    aa_fasta_path = f"{output_prefix}_aa.fasta"
+    three_di_fasta_path = f"{output_prefix}_3di.fasta"
+    
+    # Write AA sequences
+    with open(aa_fasta_path, 'w') as aa_fasta:
+        for id, seq in mapperAA.items():
+            aa_fasta.write(f">{id}\n{seq}\n")
+    
+    # Write 3Di sequences
+    with open(three_di_fasta_path, 'w') as three_di_fasta:
+        for id, seq in mapper3di.items():
+            three_di_fasta.write(f">{id}\n{seq}\n")
+    
+    return aa_fasta_path, three_di_fasta_path
+
+
 def run_foldseek_struct2profile(
-    pdb_files: List[str],
+    structure_dir: str,
     output_prefix: str,
     foldseek_bin: str = "foldseek"
 ) -> Tuple[str, str]:
     """
     Run FoldSeek to convert PDB structures to 3Di sequences.
     
+    Args:
+        structure_dir: Directory containing PDB structure files
+        output_prefix: Prefix for output files
+        foldseek_bin: Path to foldseek binary
+    
     Returns:
         Tuple of (aa_fasta_path, three_di_fasta_path)
     """
-    # Create temporary directory for FoldSeek database
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Create list file with PDB paths
-        list_file = os.path.join(tmpdir, "pdb_list.txt")
-        with open(list_file, 'w') as f:
-            for pdb_path in pdb_files:
-                f.write(f"{os.path.abspath(pdb_path)}\n")
-        
-        # Create FoldSeek database from structures
-        db_path = os.path.join(tmpdir, "struct_db")
-        
-        print(f"Creating FoldSeek database from {len(pdb_files)} PDB files...")
-        cmd_createdb = [
-            foldseek_bin,
-            "createdb",
-            list_file,
-            db_path,
-        ]
-        
-        result = subprocess.run(
-            cmd_createdb,
-            capture_output=True,
-            text=True,
-            check=False
-        )
-        
-        if result.returncode != 0:
-            print(f"Error creating database: {result.stderr}", file=sys.stderr)
-            raise RuntimeError("FoldSeek createdb failed")
-        
-        # Convert to profile (generates 3Di sequences)
-        print("Generating 3Di sequences...")
-        
-        # Use convert2fasta to get both AA and 3Di
-        aa_fasta = f"{output_prefix}_aa.fasta"
-        cmd_aa = [
-            foldseek_bin,
-            "convert2fasta",
-            db_path,
-            aa_fasta,
-        ]
-        
-        result = subprocess.run(
-            cmd_aa,
-            capture_output=True,
-            text=True,
-            check=False
-        )
-        
-        if result.returncode != 0:
-            print(f"Error converting to AA FASTA: {result.stderr}", file=sys.stderr)
-            raise RuntimeError("FoldSeek convert2fasta failed")
-        
-        # Get 3Di sequences from _ss database
-        three_di_fasta = f"{output_prefix}_3di.fasta"
-        cmd_3di = [
-            foldseek_bin,
-            "convert2fasta",
-            db_path + "_ss",
-            three_di_fasta,
-        ]
-        
-        result = subprocess.run(
-            cmd_3di,
-            capture_output=True,
-            text=True,
-            check=False
-        )
-        
-        if result.returncode != 0:
-            print(f"Error converting to 3Di FASTA: {result.stderr}", file=sys.stderr)
-            raise RuntimeError("FoldSeek convert2fasta failed for 3Di")
+    # Create FoldSeek database from structure directory
+    db_path = f"{output_prefix}_db"
     
+    print(f"Creating FoldSeek database from structures in {structure_dir}...")
+    cmd_createdb = [
+        foldseek_bin,
+        "createdb",
+        structure_dir,
+        db_path,
+    ]
+    
+    result = subprocess.run(
+        cmd_createdb,
+        capture_output=True,
+        text=True,
+        check=False
+    )
+    
+    if result.returncode != 0:
+        print(f"Error creating database: {result.stderr}", file=sys.stderr)
+        raise RuntimeError("FoldSeek createdb failed")
+    
+    # Convert to profile (generates 3Di sequences)
+    print("Generating fasta files...")
+    mapper3di, mapperAA = read_dbfiles3di(db_path , db_path + '_ss')
+    aa_fasta, three_di_fasta = mapper2fasta(mapper3di, mapperAA, output_prefix)
+    print(f"✓ Generated AA FASTA: {aa_fasta}")
+    print(f"✓ Generated 3Di FASTA: {three_di_fasta}")
     return aa_fasta, three_di_fasta
 
 
@@ -295,6 +291,7 @@ def main():
         epilog="""
 Examples:
   # Process directory of AlphaFold PDB files
+  # FoldSeek will use the directory directly to create a database
   python build_trainingset.py \\
       --pdb-dir alphafold_structures/ \\
       --output-prefix training_data \\
@@ -312,6 +309,10 @@ Examples:
       --pdb-dir structures/ \\
       --output-prefix data \\
       --foldseek-bin /path/to/foldseek
+
+Note:
+  FoldSeek creates a database directly from the folder of structures,
+  no temporary directories or PDB lists are created.
 
 Output files:
   - {prefix}_aa.fasta: Amino acid sequences
@@ -472,8 +473,16 @@ Output files:
         write_fasta(aa_sequences, aa_fasta)
         print(f"✓ Wrote AA FASTA to {aa_fasta}")
     else:
+        # Use the directory containing structures
+        if args.pdb_dir:
+            structure_dir = args.pdb_dir
+        else:
+            # If individual files were provided, use parent directory of first file
+            structure_dir = os.path.dirname(os.path.abspath(pdb_files[0]))
+            print(f"Using structure directory: {structure_dir}")
+        
         aa_fasta, three_di_fasta = run_foldseek_struct2profile(
-            pdb_files,
+            structure_dir,
             args.output_prefix,
             args.foldseek_bin
         )
