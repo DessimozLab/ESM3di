@@ -36,6 +36,36 @@ pip install -e .
 
 ## Usage
 
+### Downloading Test Structures from AlphaFold Database
+
+Download random AlphaFold structures for testing or training:
+
+```bash
+python -m esm3di.testdataset \
+    --count 10 \
+    --output-dir test_structures \
+    --seed 42
+```
+
+Or download specific proteins by UniProt accession:
+
+```bash
+python -m esm3di.testdataset \
+    --accessions P04637 P01112 P42574 \
+    --output-dir structures
+```
+
+#### Download Options
+
+- `--count`: Number of random structures to download
+- `--accessions`: Specific UniProt accessions to download
+- `--output-dir`: Output directory (default: alphafold_structures)
+- `--delay`: Delay between downloads in seconds (default: 0.5)
+- `--seed`: Random seed for reproducible sampling
+- `--version`: AlphaFold model version (default: 4)
+
+**Note**: Downloaded structures are from the [AlphaFold Protein Structure Database](https://alphafold.ebi.ac.uk/)
+
 ### Building Training Dataset from PDB Files
 
 Generate training data from PDB structures with pLDDT-based masking:

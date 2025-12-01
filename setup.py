@@ -39,6 +39,7 @@ setup(
             "esm3di-train=esm3di.esmretrain:main",
             "esm3di-makefoldseekdb=esm3di.fastas2foldseekdb:main",
             "esm3di-buildtrainingset=esm3di.build_trainingset:main",
+            "esm3di-download-alphafold=esm3di.testdataset:main",
         ],
     },
 )
