@@ -22,6 +22,10 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 import warnings
+from tqdm import tqdm
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from pebble import ProcessPool
+import multiprocessing as mp
 
 
 class PDBParser:
@@ -143,12 +147,12 @@ def mapper2fasta(mapper3di, mapperAA, output_prefix):
     
     # Write AA sequences
     with open(aa_fasta_path, 'w') as aa_fasta:
-        for id, seq in mapperAA.items():
+        for id, seq in tqdm(mapperAA.items(), desc="Writing AA sequences", unit="seq"):
             aa_fasta.write(f">{id}\n{seq}\n")
     
     # Write 3Di sequences
     with open(three_di_fasta_path, 'w') as three_di_fasta:
-        for id, seq in mapper3di.items():
+        for id, seq in tqdm(mapper3di.items(), desc="Writing 3Di sequences", unit="seq"):
             three_di_fasta.write(f">{id}\n{seq}\n")
     
     return aa_fasta_path, three_di_fasta_path
@@ -201,14 +205,24 @@ def run_foldseek_struct2profile(
     return aa_fasta, three_di_fasta
 
 
-def read_fasta(fasta_path: str) -> Dict[str, str]:
+def read_fasta(fasta_path: str, show_progress: bool = False) -> Dict[str, str]:
     """Read FASTA file and return dict of header -> sequence."""
     sequences = {}
     current_header = None
     current_seq = []
     
-    with open(fasta_path, 'r') as f:
-        for line in f:
+    # Count lines for progress bar
+    if show_progress:
+        with open(fasta_path, 'r') as f:
+            total_lines = sum(1 for _ in f)
+        file_iter = open(fasta_path, 'r')
+        line_iter = tqdm(file_iter, total=total_lines, desc="Reading FASTA", unit="line")
+    else:
+        file_iter = open(fasta_path, 'r')
+        line_iter = file_iter
+    
+    with file_iter:
+        for line in line_iter:
             line = line.strip()
             if not line:
                 continue
@@ -263,16 +277,41 @@ def mask_3di_by_plddt(
         min_len = min(len(three_di_seq), len(plddt_scores))
         three_di_seq = three_di_seq[:min_len]
         plddt_scores = plddt_scores[:min_len]
+    masked_seq = [ mask_char if plddt < plddt_threshold else three_di_char for three_di_char, plddt in zip(three_di_seq, plddt_scores) ]
+    return ''.join(masked_seq)  
     
-    masked_seq = []
-    for three_di_char, plddt in zip(three_di_seq, plddt_scores):
-        if plddt < plddt_threshold:
-            masked_seq.append(mask_char)
-        else:
-            masked_seq.append(three_di_char)
-    
-    return ''.join(masked_seq)
 
+def mask_sequence_worker(header, three_di_seq, pdb_data, plddt_threshold, mask_char):
+    """Worker function to mask a single sequence."""    
+    # Find corresponding pLDDT data
+    found = False
+    
+    for struct_id, chains in pdb_data.items():
+        for chain_id, (aa_seq, plddts) in chains.items():
+            # Try various header formats
+            possible_headers = [
+                struct_id,
+                f"{struct_id}_{chain_id}",
+                f"{struct_id} {chain_id}",
+            ]
+            
+            if any(h in header for h in possible_headers):
+                # Mask the sequence
+                masked_seq = mask_3di_by_plddt(
+                    three_di_seq,
+                    plddts,
+                    plddt_threshold,
+                    mask_char
+                )
+                
+                # Return results for stats
+                return header, masked_seq, len(masked_seq), masked_seq.count(mask_char), True
+        
+            if found:
+                break
+    
+    # No pLDDT data found
+    return header, three_di_seq, 0, 0, False
 
 def extract_structure_id(pdb_path: str, chain: str = None) -> str:
     """Extract structure identifier from PDB filename."""
@@ -436,7 +475,7 @@ Output files:
     print("\nParsing PDB files to extract sequences and pLDDT scores...")
     pdb_data = {}  # structure_id -> {chain -> (sequence, plddts)}
     
-    for pdb_file in pdb_files:
+    for pdb_file in tqdm(pdb_files, desc="Parsing PDB files", unit="file"):
         try:
             chains = PDBParser.parse_pdb(pdb_file)
             struct_id = extract_structure_id(pdb_file)
@@ -446,12 +485,12 @@ Output files:
                 if args.chain in chains:
                     pdb_data[struct_id] = {args.chain: chains[args.chain]}
                 else:
-                    print(f"Warning: Chain {args.chain} not found in {pdb_file}")
+                    tqdm.write(f"Warning: Chain {args.chain} not found in {pdb_file}")
             else:
                 pdb_data[struct_id] = chains
                 
         except Exception as e:
-            print(f"Warning: Error parsing {pdb_file}: {e}", file=sys.stderr)
+            tqdm.write(f"Warning: Error parsing {pdb_file}: {e}")
     
     total_chains = sum(len(chains) for chains in pdb_data.values())
     print(f"✓ Parsed {len(pdb_data)} structures with {total_chains} chains")
@@ -492,7 +531,7 @@ Output files:
     
     # Step 3: Read 3Di sequences
     print("\nReading 3Di sequences...")
-    three_di_sequences = read_fasta(three_di_fasta)
+    three_di_sequences = read_fasta(three_di_fasta, show_progress=True)
     print(f"✓ Read {len(three_di_sequences)} 3Di sequences")
     
     # Step 4: Mask 3Di sequences based on pLDDT
@@ -505,45 +544,51 @@ Output files:
         'sequences_skipped': 0,
     }
     
+   
+    # Prepare arguments for multiprocessing
+    # Prepare arguments for multiprocessing using dictionary and kwargs
+    mask_args = []
     for header, three_di_seq in three_di_sequences.items():
-        # Find corresponding pLDDT data
-        # FoldSeek headers might be formatted differently
-        found = False
+        mask_args.append({
+            'header': header,
+            'three_di_seq': three_di_seq,
+            'pdb_data': { header: pdb_data[header] },
+            'plddt_threshold': args.plddt_threshold,
+            'mask_char': args.mask_char
+        })
+    
+    # Use pebble ProcessPool for robust multiprocessing
+    num_workers = min(mp.cpu_count(), len(mask_args))
+    
+    with ProcessPool(max_workers=num_workers) as pool:
+        # Submit all tasks using kwargs
+        future_to_args = {
+            pool.schedule(mask_sequence_worker, kwargs=arg_dict): arg_dict['header'] 
+            for arg_dict in mask_args
+        }
         
-        for struct_id, chains in pdb_data.items():
-            for chain_id, (aa_seq, plddts) in chains.items():
-                # Try various header formats
-                possible_headers = [
-                    struct_id,
-                    f"{struct_id}_{chain_id}",
-                    f"{struct_id} {chain_id}",
-                ]
-                
-                if any(h in header for h in possible_headers):
-                    # Mask the sequence
-                    masked_seq = mask_3di_by_plddt(
-                        three_di_seq,
-                        plddts,
-                        args.plddt_threshold,
-                        args.mask_char
-                    )
+        # Process results with progress bar
+        with tqdm(total=len(mask_args), desc="Masking sequences", unit="seq") as pbar:
+            for future in as_completed(future_to_args):
+                try:
+                    header, masked_seq, total_res, masked_res, found = future.result()
                     
                     masked_sequences[header] = masked_seq
                     
-                    # Update stats
-                    stats['total_residues'] += len(masked_seq)
-                    stats['masked_residues'] += masked_seq.count(args.mask_char)
-                    stats['sequences_processed'] += 1
-                    found = True
-                    break
-            
-            if found:
-                break
-        
-        if not found:
-            print(f"Warning: No pLDDT data found for {header}, skipping masking")
-            masked_sequences[header] = three_di_seq
-            stats['sequences_skipped'] += 1
+                    if found:
+                        stats['total_residues'] += total_res
+                        stats['masked_residues'] += masked_res
+                        stats['sequences_processed'] += 1
+                    else:
+                        tqdm.write(f"Warning: No pLDDT data found for {header}, skipping masking")
+                        stats['sequences_skipped'] += 1
+                        
+                except Exception as e:
+                    header = future_to_args[future]
+                    tqdm.write(f"Error processing {header}: {e}")
+                    stats['sequences_skipped'] += 1
+                
+                pbar.update(1)
     
     # Step 5: Write masked 3Di FASTA
     output_3di_masked = f"{args.output_prefix}_3di_masked.fasta"

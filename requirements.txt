@@ -10,3 +10,5 @@ protobuf
 
 # Optional: for better performance
 bitsandbytes  # For 8-bit optimization
+pebble
+pandas
