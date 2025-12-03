@@ -321,79 +321,120 @@ def train(args):
         weight_decay=args.weight_decay,
     )
 
-    # 8) Training loop
-    print(f"\nStarting training for {args.epochs} epochs...\n")
-    model.train()
-    global_step = 0
-    
-    for epoch in range(1, args.epochs + 1):
-        print(f"{'='*60}")
-        print(f"EPOCH {epoch}/{args.epochs}")
-        print(f"{'='*60}")
-        
-        running_loss = 0.0
-        running_tokens = 0
-        epoch_loss = 0.0
-        epoch_tokens = 0
-
-        # Create progress bar for batches
-        progress_bar = tqdm(loader, desc=f"Epoch {epoch}", unit="batch")
-
-        for step, batch in enumerate(progress_bar, start=1):
-            global_step += 1
-            batch = {k: v.to(device) for k, v in batch.items()}
-            outputs = model(**batch)
-            loss = outputs.loss
-
-            token_count = (batch["labels"] != -100).sum().item()
-
-            loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
-
-            running_loss += loss.item() * max(token_count, 1)
-            running_tokens += max(token_count, 1)
-            epoch_loss += loss.item() * max(token_count, 1)
-            epoch_tokens += max(token_count, 1)
-
-            # Update progress bar with current loss
-            avg_loss = running_loss / max(running_tokens, 1)
-            progress_bar.set_postfix({"loss/residue": f"{avg_loss:.4f}"})
-            
-            # Log to TensorBoard every step
-            writer.add_scalar('Loss/train_step', loss.item(), global_step)
-            writer.add_scalar('Loss/train_per_residue_step', 
-                            loss.item() / max(token_count, 1), global_step)
-
-            if step % args.log_every == 0:
-                # Log running average to TensorBoard
-                writer.add_scalar('Loss/train_running_avg', avg_loss, global_step)
-                writer.add_scalar('Training/tokens_processed', running_tokens, global_step)
-                running_loss = 0.0
-                running_tokens = 0
-
-        # Log epoch-level metrics to TensorBoard
-        epoch_avg_loss = epoch_loss / max(epoch_tokens, 1)
-        writer.add_scalar('Loss/train_epoch', epoch_avg_loss, epoch)
-        writer.add_scalar('Training/epoch_tokens', epoch_tokens, epoch)
-        
-        print(f"\nEpoch {epoch} Average Loss (per residue): {epoch_avg_loss:.4f}")
-        
-        # Save checkpoint each epoch
-        os.makedirs(args.out_dir, exist_ok=True)
-        ckpt_path = os.path.join(args.out_dir, f"epoch_{epoch}.pt")
-        torch.save(
-            {
-                "model_state_dict": model.state_dict(),
-                "label_vocab": dataset.label_vocab,
-                "mask_label_chars": args.mask_label_chars,
-                "lora_target_modules": target_modules,
-                "args": vars(args),
-            },
-            ckpt_path,
+        # 8) Learning rate scheduler setup
+        # We'll use ReduceLROnPlateau based on a rolling window of losses
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, 
+            mode='min', 
+            factor=0.5, 
+            patience=getattr(args, 'scheduler_patience', 3),
+            verbose=True,
+            min_lr=1e-7
         )
-        print(f"Saved checkpoint to {ckpt_path}")
-        print()
+        
+        # Rolling window for loss tracking
+        window_size = getattr(args, 'scheduler_window_size', 200)
+        loss_window = []
+        
+        # 8) Training loop
+        print(f"\nStarting training for {args.epochs} epochs...\n")
+        print(f"Learning rate scheduling: ReduceLROnPlateau with window size {window_size}")
+        model.train()
+        global_step = 0
+        
+        for epoch in range(1, args.epochs + 1):
+            print(f"{'='*60}")
+            print(f"EPOCH {epoch}/{args.epochs}")
+            print(f"{'='*60}")
+            
+            running_loss = 0.0
+            running_tokens = 0
+            epoch_loss = 0.0
+            epoch_tokens = 0
+
+            # Create progress bar for batches
+            progress_bar = tqdm(loader, desc=f"Epoch {epoch}", unit="batch")
+
+            for step, batch in enumerate(progress_bar, start=1):
+                global_step += 1
+                batch = {k: v.to(device) for k, v in batch.items()}
+                outputs = model(**batch)
+                loss = outputs.loss
+
+                token_count = (batch["labels"] != -100).sum().item()
+
+                loss.backward()
+                optimizer.step()
+                optimizer.zero_grad()
+
+                # Calculate per-residue loss for this batch
+                per_residue_loss = loss.item() / max(token_count, 1)
+                
+                # Add to rolling window
+                loss_window.append(per_residue_loss)
+                if len(loss_window) > window_size:
+                    loss_window.pop(0)
+                
+                # Update scheduler based on window average
+                if len(loss_window) >= min(50, window_size):  # Start scheduling after some warmup
+                    window_avg_loss = sum(loss_window) / len(loss_window)
+                    scheduler.step(window_avg_loss)
+                    
+                    # Log current learning rate
+                    current_lr = optimizer.param_groups[0]['lr']
+                    writer.add_scalar('Training/learning_rate', current_lr, global_step)
+                    writer.add_scalar('Loss/window_average', window_avg_loss, global_step)
+
+                running_loss += loss.item() * max(token_count, 1)
+                running_tokens += max(token_count, 1)
+                epoch_loss += loss.item() * max(token_count, 1)
+                epoch_tokens += max(token_count, 1)
+
+                # Update progress bar with current loss and LR
+                avg_loss = running_loss / max(running_tokens, 1)
+                current_lr = optimizer.param_groups[0]['lr']
+                progress_bar.set_postfix({
+                    "loss/residue": f"{avg_loss:.4f}",
+                    "lr": f"{current_lr:.2e}"
+                })
+                
+                # Log to TensorBoard every step
+                writer.add_scalar('Loss/train_step', loss.item(), global_step)
+                writer.add_scalar('Loss/train_per_residue_step', per_residue_loss, global_step)
+
+                if step % args.log_every == 0:
+                    # Log running average to TensorBoard
+                    writer.add_scalar('Loss/train_running_avg', avg_loss, global_step)
+                    writer.add_scalar('Training/tokens_processed', running_tokens, global_step)
+                    running_loss = 0.0
+                    running_tokens = 0
+
+            # Log epoch-level metrics to TensorBoard
+            epoch_avg_loss = epoch_loss / max(epoch_tokens, 1)
+            writer.add_scalar('Loss/train_epoch', epoch_avg_loss, epoch)
+            writer.add_scalar('Training/epoch_tokens', epoch_tokens, epoch)
+            
+            current_lr = optimizer.param_groups[0]['lr']
+            print(f"\nEpoch {epoch} Average Loss (per residue): {epoch_avg_loss:.4f}")
+            print(f"Current Learning Rate: {current_lr:.2e}")
+            
+            # Save checkpoint each epoch
+            os.makedirs(args.out_dir, exist_ok=True)
+            ckpt_path = os.path.join(args.out_dir, f"epoch_{epoch}.pt")
+            torch.save(
+                {
+                    "model_state_dict": model.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "scheduler_state_dict": scheduler.state_dict(),
+                    "label_vocab": dataset.label_vocab,
+                    "mask_label_chars": args.mask_label_chars,
+                    "lora_target_modules": target_modules,
+                    "args": vars(args),
+                },
+                ckpt_path,
+            )
+            print(f"Saved checkpoint to {ckpt_path}")
+            print()
     
     # Close TensorBoard writer and print final instructions
     writer.close()
