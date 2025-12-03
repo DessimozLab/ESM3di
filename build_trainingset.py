@@ -241,8 +241,11 @@ def read_fasta(fasta_path: str, show_progress: bool = False) -> Dict[str, str]:
     return sequences
 
 
-def write_fasta(sequences: Dict[str, str], output_path: str):
+def write_fasta(sequences: Dict[str, str], output_path: str , order: Optional[List[str]] = None):
     """Write sequences to FASTA file."""
+    if order is not None:
+        sequences = {k: sequences[k] for k in order if k in sequences}
+    
     with open(output_path, 'w') as f:
         for header, seq in sequences.items():
             f.write(f">{header}\n")
@@ -587,12 +590,12 @@ Output files:
                     header = future_to_args[future]
                     tqdm.write(f"Error processing {header}: {e}")
                     stats['sequences_skipped'] += 1
-                
                 pbar.update(1)
     
     # Step 5: Write masked 3Di FASTA
     output_3di_masked = f"{args.output_prefix}_3di_masked.fasta"
-    write_fasta(masked_sequences, output_3di_masked)
+    write_fasta(masked_sequences, output_3di_masked , order= list(three_di_sequences.keys()))
+    
     print(f"✓ Wrote masked 3Di FASTA to {output_3di_masked}")
     
     # Step 6: Write statistics

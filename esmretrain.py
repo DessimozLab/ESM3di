@@ -2,13 +2,17 @@
 import argparse
 import json
 import os
+import socket
 from typing import List, Tuple
+from datetime import datetime
 
 import torch
 from torch.utils.data import Dataset, DataLoader
 
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 from peft import LoraConfig, get_peft_model, TaskType
+from tqdm import tqdm
+from torch.utils.tensorboard import SummaryWriter
 
 
 # -----------------------------
@@ -177,7 +181,7 @@ def discover_lora_target_modules(model) -> List[str]:
     """
     target_modules = []
     for name, module in model.named_modules():
-        if isinstance(module, torch.nn.Linear) and 'attention' in name:
+        if isinstance(module, torch.nn.Linear) and ('attention' in name or 'dense' in name):
             # Extract the base module name (e.g., 'self_attn.q_proj' -> 'q_proj')
             module_name = name.split('.')[-1]
             if module_name not in target_modules:
@@ -218,6 +222,25 @@ def train(args):
         device = "cpu"
     
     print(f"Using device: {device}")
+    
+    # Setup TensorBoard logging
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_dir = os.path.join(args.tensorboard_log_dir, f"run_{timestamp}")
+    writer = SummaryWriter(log_dir=log_dir)
+    
+    print(f"\n{'='*60}")
+    print(f"TensorBoard Logging Setup")
+    print(f"{'='*60}")
+    print(f"Log directory: {log_dir}")
+    print(f"\nTo view training progress in real-time, run:")
+    print(f"  tensorboard --logdir={args.tensorboard_log_dir}")
+    print(f"\nTensorBoard will be available at:")
+    print(f"  http://localhost:6006")
+    print(f"\nTo use a different port (e.g., 6007):")
+    print(f"  tensorboard --logdir={args.tensorboard_log_dir} --port=6007")
+    print(f"\nTo access from a remote machine, use SSH tunneling:")
+    print(f"  ssh -L 6006:localhost:6006 user@{socket.gethostname()}")
+    print(f"{'='*60}\n")
 
     # 1) Data (with mask_label_chars)
     dataset = Seq3DiDataset(
@@ -301,6 +324,8 @@ def train(args):
     # 8) Training loop
     print(f"\nStarting training for {args.epochs} epochs...\n")
     model.train()
+    global_step = 0
+    
     for epoch in range(1, args.epochs + 1):
         print(f"{'='*60}")
         print(f"EPOCH {epoch}/{args.epochs}")
@@ -308,8 +333,14 @@ def train(args):
         
         running_loss = 0.0
         running_tokens = 0
+        epoch_loss = 0.0
+        epoch_tokens = 0
 
-        for step, batch in enumerate(loader, start=1):
+        # Create progress bar for batches
+        progress_bar = tqdm(loader, desc=f"Epoch {epoch}", unit="batch")
+
+        for step, batch in enumerate(progress_bar, start=1):
+            global_step += 1
             batch = {k: v.to(device) for k, v in batch.items()}
             outputs = model(**batch)
             loss = outputs.loss
@@ -322,14 +353,32 @@ def train(args):
 
             running_loss += loss.item() * max(token_count, 1)
             running_tokens += max(token_count, 1)
+            epoch_loss += loss.item() * max(token_count, 1)
+            epoch_tokens += max(token_count, 1)
+
+            # Update progress bar with current loss
+            avg_loss = running_loss / max(running_tokens, 1)
+            progress_bar.set_postfix({"loss/residue": f"{avg_loss:.4f}"})
+            
+            # Log to TensorBoard every step
+            writer.add_scalar('Loss/train_step', loss.item(), global_step)
+            writer.add_scalar('Loss/train_per_residue_step', 
+                            loss.item() / max(token_count, 1), global_step)
 
             if step % args.log_every == 0:
-                avg_loss = running_loss / max(running_tokens, 1)
-                print(f"Epoch {epoch} Step {step} | "
-                      f"Loss/residue: {avg_loss:.4f}")
+                # Log running average to TensorBoard
+                writer.add_scalar('Loss/train_running_avg', avg_loss, global_step)
+                writer.add_scalar('Training/tokens_processed', running_tokens, global_step)
                 running_loss = 0.0
                 running_tokens = 0
 
+        # Log epoch-level metrics to TensorBoard
+        epoch_avg_loss = epoch_loss / max(epoch_tokens, 1)
+        writer.add_scalar('Loss/train_epoch', epoch_avg_loss, epoch)
+        writer.add_scalar('Training/epoch_tokens', epoch_tokens, epoch)
+        
+        print(f"\nEpoch {epoch} Average Loss (per residue): {epoch_avg_loss:.4f}")
+        
         # Save checkpoint each epoch
         os.makedirs(args.out_dir, exist_ok=True)
         ckpt_path = os.path.join(args.out_dir, f"epoch_{epoch}.pt")
@@ -345,6 +394,17 @@ def train(args):
         )
         print(f"Saved checkpoint to {ckpt_path}")
         print()
+    
+    # Close TensorBoard writer and print final instructions
+    writer.close()
+    print(f"\n{'='*60}")
+    print(f"Training Complete!")
+    print(f"{'='*60}")
+    print(f"\nTensorBoard logs saved to: {log_dir}")
+    print(f"\nTo view training results:")
+    print(f"  tensorboard --logdir={args.tensorboard_log_dir}")
+    print(f"\nCheckpoints saved to: {args.out_dir}")
+    print(f"{'='*60}\n")
 
 
 # -----------------------------
@@ -519,6 +579,8 @@ def parse_args():
     # Output
     p.add_argument("--out-dir", type=str, default="esm_hf_peft_3di_ckpts",
                    help="Directory to save model checkpoints")
+    p.add_argument("--tensorboard-log-dir", type=str, default="tensorboard_logs",
+                   help="Directory to save TensorBoard logs")
     
     args = p.parse_args()
     
