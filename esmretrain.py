@@ -15,6 +15,66 @@ from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
 
+class ESM3DiModel:
+    """
+    Wrapper class for ESM model with LoRA adaptation for 3Di prediction.
+    """
+    def __init__(self, hf_model_name: str, num_labels: int, lora_r: int = 8, 
+                    lora_alpha: float = 16.0, lora_dropout: float = 0.05, 
+                    target_modules: List[str] = None):
+        """
+        Initialize ESM model with LoRA configuration.
+        
+        Args:
+            hf_model_name: HuggingFace model identifier
+            num_labels: Number of 3Di labels in vocabulary
+            lora_r: LoRA rank parameter
+            lora_alpha: LoRA alpha parameter  
+            lora_dropout: LoRA dropout rate
+            target_modules: List of module names for LoRA. If None, auto-discover.
+        """
+        self.hf_model_name = hf_model_name
+        self.num_labels = num_labels
+        self.lora_r = lora_r
+        self.lora_alpha = lora_alpha
+        self.lora_dropout = lora_dropout
+        
+        # Load base model
+        print(f"\nLoading base model: {hf_model_name}")
+        self.base_model = AutoModelForTokenClassification.from_pretrained(
+            hf_model_name,
+            num_labels=num_labels,
+        )
+        print("✓ Base model loaded")
+        
+        # Determine target modules
+        if target_modules:
+            self.target_modules = target_modules
+            print(f"\nUsing specified LoRA target modules: {target_modules}")
+        else:
+            print("\nAuto-discovering LoRA target modules...")
+            self.target_modules = discover_lora_target_modules(self.base_model)
+            print(f"Discovered target modules: {self.target_modules}")
+        
+        # Configure and apply LoRA
+        self._setup_lora()
+        
+    def _setup_lora(self):
+        """Setup LoRA configuration and wrap the base model."""
+        lora_config = LoraConfig(
+            task_type=TaskType.TOKEN_CLS,
+            r=self.lora_r,
+            lora_alpha=self.lora_alpha,
+            lora_dropout=self.lora_dropout,
+            target_modules=self.target_modules,
+        )
+        
+        self.model = get_peft_model(self.base_model, lora_config)
+        
+    def get_model(self):
+        """Return the LoRA-wrapped model."""
+        return self.model
+
 # -----------------------------
 # FASTA utilities
 # -----------------------------
@@ -259,33 +319,20 @@ def train(args):
     tokenizer = AutoTokenizer.from_pretrained(args.hf_model)
     print("✓ Tokenizer loaded")
 
-    print(f"\nLoading base model: {args.hf_model}")
-    base_model = AutoModelForTokenClassification.from_pretrained(
-        args.hf_model,
-        num_labels=len(dataset.label_vocab),
-    )
-    print("✓ Base model loaded")
-
-    # 3) Discover or use specified LoRA target modules
+    # Create ESM3Di model wrapper
+    target_modules = None
     if args.lora_target_modules:
-        target_modules = args.lora_target_modules.split(",")
-        print(f"\nUsing specified LoRA target modules: {target_modules}")
-    else:
-        print("\nAuto-discovering LoRA target modules...")
-        target_modules = discover_lora_target_modules(base_model)
-        print(f"Discovered target modules: {target_modules}")
-
-    # 4) PEFT LoRA config
-    lora_config = LoraConfig(
-        task_type=TaskType.TOKEN_CLS,
-        r=args.lora_r,
+        target_modules = [m.strip() for m in args.lora_target_modules.split(",")]
+    
+    esm_model = ESM3DiModel(
+        hf_model_name=args.hf_model,
+        num_labels=len(dataset.label_vocab),
+        lora_r=args.lora_r,
         lora_alpha=args.lora_alpha,
         lora_dropout=args.lora_dropout,
-        target_modules=target_modules,
+        target_modules=target_modules
     )
-
-    # 5) Wrap with PEFT and freeze base weights
-    model = get_peft_model(base_model, lora_config)
+    model = esm_model.get_model()
     print("✓ LoRA adapters applied")
     
     freeze_all_but_lora_and_classifier(model)
