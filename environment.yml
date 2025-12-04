@@ -22,4 +22,5 @@ dependencies:
       - protobuf
       - pandas
       - pebble
+      - tensorboard
       - -e .  # Install package in editable mode

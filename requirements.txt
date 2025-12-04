@@ -12,3 +12,4 @@ protobuf
 bitsandbytes  # For 8-bit optimization
 pebble
 pandas
+tensorboard
