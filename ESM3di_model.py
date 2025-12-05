@@ -1,11 +1,130 @@
 
 import torch
+import torch.nn as nn
 from transformers import AutoModelForTokenClassification
+from transformers.modeling_outputs import TokenClassifierOutput
 from peft import get_peft_model, LoraConfig, TaskType
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer
 from peft import LoraConfig, get_peft_model, TaskType
+
+
+# -----------------------------
+# CNN Classification Head
+# -----------------------------
+
+class CNNClassificationHead(nn.Module):
+    """
+    Multi-layer CNN classification head for per-token classification.
+    Applies 1D convolutions over the sequence dimension.
+    """
+    def __init__(self, hidden_size: int, num_labels: int, 
+                 num_layers: int = 2, kernel_size: int = 3,
+                 dropout: float = 0.1):
+        """
+        Args:
+            hidden_size: Input dimension from encoder
+            num_labels: Number of output classes
+            num_layers: Number of CNN layers (default: 2)
+            kernel_size: Convolution kernel size (default: 3)
+            dropout: Dropout rate between layers (default: 0.1)
+        """
+        super().__init__()
+        self.num_layers = num_layers
+        
+        layers = []
+        for i in range(num_layers):
+            in_channels = hidden_size if i == 0 else hidden_size
+            out_channels = hidden_size
+            
+            # Conv1d expects (batch, channels, length)
+            layers.append(nn.Conv1d(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel_size=kernel_size,
+                padding=kernel_size // 2  # Same padding
+            ))
+            layers.append(nn.ReLU())
+            if dropout > 0:
+                layers.append(nn.Dropout(dropout))
+        
+        self.cnn_layers = nn.Sequential(*layers)
+        self.classifier = nn.Linear(hidden_size, num_labels)
+    
+    def forward(self, hidden_states):
+        """
+        Args:
+            hidden_states: (batch_size, seq_len, hidden_size)
+        Returns:
+            logits: (batch_size, seq_len, num_labels)
+        """
+        # Transpose for Conv1d: (batch, hidden, seq_len)
+        x = hidden_states.transpose(1, 2)
+        
+        # Apply CNN layers
+        x = self.cnn_layers(x)
+        
+        # Transpose back: (batch, seq_len, hidden)
+        x = x.transpose(1, 2)
+        
+        # Final classification
+        logits = self.classifier(x)
+        return logits
+
+
+class ESMWithCNNHead(nn.Module):
+    """
+    Wrapper that replaces the standard classifier with a CNN head.
+    """
+    def __init__(self, base_model, cnn_head):
+        super().__init__()
+        self.base_model = base_model
+        self.cnn_head = cnn_head
+        
+        # Store config for compatibility
+        self.config = base_model.config
+        
+    def forward(self, input_ids, attention_mask=None, labels=None, 
+                **kwargs):
+        # Get encoder outputs (without classification head)
+        outputs = self.base_model.esm(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            **kwargs
+        )
+        
+        sequence_output = outputs[0]  # (batch, seq_len, hidden_size)
+        
+        # Apply CNN classification head
+        logits = self.cnn_head(sequence_output)
+        
+        loss = None
+        if labels is not None:
+            loss_fct = nn.CrossEntropyLoss()
+            loss = loss_fct(
+                logits.view(-1, self.config.num_labels),
+                labels.view(-1)
+            )
+        
+        return TokenClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
+    
+    def named_parameters(self, *args, **kwargs):
+        return super().named_parameters(*args, **kwargs)
+    
+    def parameters(self, *args, **kwargs):
+        return super().parameters(*args, **kwargs)
+    
+    def state_dict(self, *args, **kwargs):
+        return super().state_dict(*args, **kwargs)
+    
+    def load_state_dict(self, *args, **kwargs):
+        return super().load_state_dict(*args, **kwargs)
 
 
 # -----------------------------
@@ -61,12 +180,13 @@ def freeze_all_but_lora_and_classifier(model):
     Explicitly freeze everything except:
       - LoRA parameters (names contain 'lora_')
       - classifier head (names contain 'classifier')
+      - CNN head (names contain 'cnn_head')
     """
     for name, p in model.named_parameters():
         p.requires_grad = False
 
     for name, p in model.named_parameters():
-        if "lora_" in name or "classifier" in name:
+        if "lora_" in name or "classifier" in name or "cnn_head" in name:
             p.requires_grad = True
 
 
@@ -77,7 +197,9 @@ class ESM3DiModel:
     """
     def __init__(self, hf_model_name: str, num_labels: int, lora_r: int = 8, 
                     lora_alpha: float = 16.0, lora_dropout: float = 0.05, 
-                    target_modules: List[str] = None):
+                    target_modules: List[str] = None,
+                    use_cnn_head: bool = False, cnn_num_layers: int = 2,
+                    cnn_kernel_size: int = 3, cnn_dropout: float = 0.1):
         """
         Initialize ESM model with LoRA configuration.
         
@@ -88,12 +210,20 @@ class ESM3DiModel:
             lora_alpha: LoRA alpha parameter  
             lora_dropout: LoRA dropout rate
             target_modules: List of module names for LoRA. If None, auto-discover.
+            use_cnn_head: Whether to use CNN classification head instead of linear
+            cnn_num_layers: Number of CNN layers (if use_cnn_head=True)
+            cnn_kernel_size: CNN kernel size (if use_cnn_head=True)
+            cnn_dropout: Dropout rate for CNN layers (if use_cnn_head=True)
         """
         self.hf_model_name = hf_model_name
         self.num_labels = num_labels
         self.lora_r = lora_r
         self.lora_alpha = lora_alpha
         self.lora_dropout = lora_dropout
+        self.use_cnn_head = use_cnn_head
+        self.cnn_num_layers = cnn_num_layers
+        self.cnn_kernel_size = cnn_kernel_size
+        self.cnn_dropout = cnn_dropout
         
         # Load base model
         print(f"\nLoading base model: {hf_model_name}")
@@ -114,6 +244,12 @@ class ESM3DiModel:
         
         # Configure and apply LoRA
         self._setup_lora()
+        
+        # Optionally add CNN classification head
+        if self.use_cnn_head:
+            self._setup_cnn_head()
+            print(f"✓ CNN classification head added ({cnn_num_layers} layers)")
+        
         self.freeze_base_model()
         print("✓ LoRA setup complete\n")
         
@@ -128,6 +264,23 @@ class ESM3DiModel:
         )
         
         self.model = get_peft_model(self.base_model, lora_config)
+    
+    def _setup_cnn_head(self):
+        """Replace standard classifier with CNN classification head."""
+        # Get hidden size from base model config
+        hidden_size = self.base_model.config.hidden_size
+        
+        # Create CNN head
+        cnn_head = CNNClassificationHead(
+            hidden_size=hidden_size,
+            num_labels=self.num_labels,
+            num_layers=self.cnn_num_layers,
+            kernel_size=self.cnn_kernel_size,
+            dropout=self.cnn_dropout
+        )
+        
+        # Wrap model with CNN head
+        self.model = ESMWithCNNHead(self.model, cnn_head)
     
     def freeze_base_model(self):
         """Freeze all base model parameters except LoRA and classifier."""

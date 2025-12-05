@@ -78,7 +78,11 @@ def train(args):
         lora_r=args.lora_r,
         lora_alpha=args.lora_alpha,
         lora_dropout=args.lora_dropout,
-        target_modules=target_modules
+        target_modules=target_modules,
+        use_cnn_head=args.use_cnn_head,
+        cnn_num_layers=args.cnn_num_layers,
+        cnn_kernel_size=args.cnn_kernel_size,
+        cnn_dropout=args.cnn_dropout
     )
     model = esm_model.get_model()
     model.to(device)
@@ -114,8 +118,11 @@ def train(args):
     )
 
     # 8) Learning rate scheduler setup
-    # Calculate total training steps
-    total_steps = len(loader) * args.epochs
+    # Calculate total training steps (accounting for gradient accumulation)
+    steps_per_epoch = len(loader) // args.gradient_accumulation_steps
+    if len(loader) % args.gradient_accumulation_steps != 0:
+        steps_per_epoch += 1
+    total_steps = steps_per_epoch * args.epochs
     
     # Determine warmup steps (default: 10% of total steps, or user-specified)
     if args.warmup_steps is not None:
@@ -155,12 +162,16 @@ def train(args):
     
     # 8) Training loop
     print(f"\nStarting training for {args.epochs} epochs...\n")
+    print(f"Batch size: {args.batch_size}")
+    print(f"Gradient accumulation steps: {args.gradient_accumulation_steps}")
+    print(f"Effective batch size: {args.batch_size * args.gradient_accumulation_steps}")
     print(f"Learning rate scheduling: {scheduler_name}")
-    print(f"  Total steps: {total_steps}")
+    print(f"  Total optimization steps: {total_steps}")
     print(f"  Warmup steps: {warmup_steps} ({warmup_steps/total_steps*100:.1f}%)")
     print(f"  Initial LR: {args.lr:.2e}")
     model.train()
     global_step = 0
+    accumulation_step = 0
     
     for epoch in range(1, args.epochs + 1):
         print(f"{'='*60}")
@@ -176,51 +187,69 @@ def train(args):
         progress_bar = tqdm(loader, desc=f"Epoch {epoch}", unit="batch")
 
         for step, batch in enumerate(progress_bar, start=1):
-            global_step += 1
             batch = {k: v.to(device) for k, v in batch.items()}
             outputs = model(**batch)
             loss = outputs.loss
 
             token_count = (batch["labels"] != -100).sum().item()
 
-            loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
+            # Scale loss by accumulation steps for proper gradient averaging
+            scaled_loss = loss / args.gradient_accumulation_steps
+            scaled_loss.backward()
             
-            # Step the learning rate scheduler
-            if scheduler is not None:
-                scheduler.step()
+            accumulation_step += 1
 
             # Calculate per-residue loss for this batch
             per_residue_loss = loss.item() / max(token_count, 1)
-            
-            # Log current learning rate
-            current_lr = optimizer.param_groups[0]['lr']
-            writer.add_scalar('Training/learning_rate', current_lr, global_step)
 
             running_loss += loss.item() * max(token_count, 1)
             running_tokens += max(token_count, 1)
             epoch_loss += loss.item() * max(token_count, 1)
             epoch_tokens += max(token_count, 1)
 
-            # Update progress bar with current loss and LR
-            avg_loss = running_loss / max(running_tokens, 1)
-            current_lr = optimizer.param_groups[0]['lr']
-            progress_bar.set_postfix({
-                "loss/residue": f"{avg_loss:.4f}",
-                "lr": f"{current_lr:.2e}"
-            })
+            # Perform optimization step after accumulating enough gradients
+            if accumulation_step % args.gradient_accumulation_steps == 0:
+                global_step += 1
+                
+                optimizer.step()
+                optimizer.zero_grad()
+                
+                # Step the learning rate scheduler
+                if scheduler is not None:
+                    scheduler.step()
+                
+                # Log current learning rate
+                current_lr = optimizer.param_groups[0]['lr']
+                writer.add_scalar('Training/learning_rate', current_lr, global_step)
+                
+                # Update progress bar with current loss and LR
+                avg_loss = running_loss / max(running_tokens, 1)
+                progress_bar.set_postfix({
+                    "loss/residue": f"{avg_loss:.4f}",
+                    "lr": f"{current_lr:.2e}",
+                    "step": global_step
+                })
+                
+                # Log to TensorBoard
+                writer.add_scalar('Loss/train_step', avg_loss, global_step)
+                
+                if global_step % args.log_every == 0:
+                    # Log running average to TensorBoard
+                    writer.add_scalar('Loss/train_running_avg', avg_loss, global_step)
+                    writer.add_scalar('Training/tokens_processed', running_tokens, global_step)
+                    running_loss = 0.0
+                    running_tokens = 0
+            else:
+                # Just update progress bar during accumulation
+                avg_loss = running_loss / max(running_tokens, 1)
+                progress_bar.set_postfix({
+                    "loss/residue": f"{avg_loss:.4f}",
+                    "accum": f"{accumulation_step % args.gradient_accumulation_steps}/{args.gradient_accumulation_steps}"
+                })
             
-            # Log to TensorBoard every step
-            writer.add_scalar('Loss/train_step', loss.item(), global_step)
-            writer.add_scalar('Loss/train_per_residue_step', per_residue_loss, global_step)
-
-            if step % args.log_every == 0:
-                # Log running average to TensorBoard
-                writer.add_scalar('Loss/train_running_avg', avg_loss, global_step)
-                writer.add_scalar('Training/tokens_processed', running_tokens, global_step)
-                running_loss = 0.0
-                running_tokens = 0
+            # Always log per-batch loss (before accumulation)
+            writer.add_scalar('Loss/train_batch', loss.item(), step + (epoch - 1) * len(loader))
+            writer.add_scalar('Loss/train_per_residue_batch', per_residue_loss, step + (epoch - 1) * len(loader))
 
         # Log epoch-level metrics to TensorBoard
         epoch_avg_loss = epoch_loss / max(epoch_tokens, 1)
@@ -411,9 +440,28 @@ def parse_args():
              "Example: 'q_proj,k_proj,v_proj,o_proj,fc1,fc2'",
     )
 
+    # CNN Classification Head
+    p.add_argument("--use-cnn-head", action="store_true",
+                   help="Use multi-layer CNN classification head instead of "
+                        "linear classifier. Adds learnable convolutional layers "
+                        "before final classification for better local context.")
+    p.add_argument("--cnn-num-layers", type=int, default=2,
+                   help="Number of CNN layers in classification head "
+                        "(only used if --use-cnn-head is set)")
+    p.add_argument("--cnn-kernel-size", type=int, default=3,
+                   help="Kernel size for CNN layers "
+                        "(only used if --use-cnn-head is set)")
+    p.add_argument("--cnn-dropout", type=float, default=0.1,
+                   help="Dropout rate for CNN layers "
+                        "(only used if --use-cnn-head is set)")
+
     # Training
     p.add_argument("--batch-size", type=int, default=2,
-                   help="Training batch size")
+                   help="Training batch size per GPU")
+    p.add_argument("--gradient-accumulation-steps", type=int, default=1,
+                   help="Number of gradient accumulation steps. Effective batch size = "
+                        "batch_size * gradient_accumulation_steps. Use to simulate larger "
+                        "batch sizes when GPU memory is limited.")
     p.add_argument("--epochs", type=int, default=3,
                    help="Number of training epochs")
     p.add_argument("--lr", type=float, default=1e-4,
@@ -423,7 +471,7 @@ def parse_args():
     p.add_argument("--num-workers", type=int, default=0,
                    help="Number of DataLoader workers")
     p.add_argument("--log-every", type=int, default=10,
-                   help="Log training progress every N steps")
+                   help="Log training progress every N optimization steps")
     
     # Learning rate scheduler
     p.add_argument("--scheduler-type", type=str, default='cosine',
