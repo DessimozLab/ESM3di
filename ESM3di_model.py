@@ -1,4 +1,5 @@
 
+import os
 import torch
 import torch.nn as nn
 from transformers import AutoModelForTokenClassification
@@ -251,6 +252,125 @@ def freeze_all_but_lora_and_classifier(model):
     for name, p in model.named_parameters():
         if "lora_" in name or "classifier" in name or "cnn_head" in name:
             p.requires_grad = True
+
+
+def merge_lora_weights(
+    checkpoint_path: str,
+    output_path: str = None,
+    device: str = None
+):
+    """
+    Merge LoRA weights into base model weights and return a model with
+    the original architecture (no LoRA adapters).
+    
+    This creates a standalone model that can be used without PEFT library.
+    
+    Args:
+        checkpoint_path: Path to checkpoint with LoRA weights
+        output_path: Optional path to save merged model. If None, doesn't save.
+        device: Device to load model on. Auto-detect if None.
+    
+    Returns:
+        Merged model (standard transformers model without LoRA)
+    """
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    
+    print(f"Loading checkpoint from: {checkpoint_path}")
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    
+    # Extract configuration from checkpoint
+    args_dict = checkpoint.get('args', {})
+    hf_model_name = args_dict.get('hf_model_name',
+                                   'facebook/esm2_t33_650M_UR50D')
+    num_labels = len(checkpoint.get('label_vocab', []))
+    use_cnn_head = args_dict.get('use_cnn_head', False)
+    lora_r = args_dict.get('lora_r', 8)
+    lora_alpha = args_dict.get('lora_alpha', 16)
+    lora_dropout = args_dict.get('lora_dropout', 0.05)
+    target_modules = checkpoint.get('lora_target_modules', None)
+    
+    print(f"Base model: {hf_model_name}")
+    print(f"Number of labels: {num_labels}")
+    print(f"LoRA configuration: r={lora_r}, alpha={lora_alpha}")
+    
+    # Initialize model with LoRA
+    esm_model = ESM3DiModel(
+        hf_model_name=hf_model_name,
+        num_labels=num_labels,
+        lora_r=lora_r,
+        lora_alpha=lora_alpha,
+        lora_dropout=lora_dropout,
+        target_modules=target_modules,
+        use_cnn_head=use_cnn_head,
+        cnn_num_layers=args_dict.get('cnn_num_layers', 2),
+        cnn_kernel_size=args_dict.get('cnn_kernel_size', 3),
+        cnn_dropout=args_dict.get('cnn_dropout', 0.1)
+    )
+    
+    # Load LoRA weights
+    model_with_lora = esm_model.get_model()
+    model_with_lora.load_state_dict(checkpoint['model_state_dict'])
+    model_with_lora = model_with_lora.to(device)
+    
+    print("✓ LoRA model loaded")
+    
+    # Merge LoRA weights into base model
+    print("Merging LoRA weights into base model...")
+    
+    # Access the base model depending on whether CNN head is used
+    if use_cnn_head:
+        # Model structure: ESMWithCNNHead -> PeftModel -> base_model
+        peft_model = model_with_lora.base_model
+        merged_model = peft_model.merge_and_unload()
+        
+        # Now we need to recreate the CNN head structure
+        # but with the merged base model
+        base_esm = merged_model
+        cnn_head = model_with_lora.cnn_head
+        
+        # Create wrapper with merged model
+        merged_with_cnn = ESMWithCNNHead(base_esm, cnn_head)
+        final_model = merged_with_cnn
+    else:
+        # Model structure: PeftModel -> base_model
+        final_model = model_with_lora.merge_and_unload()
+    
+    print("✓ LoRA weights merged")
+    
+    # Save if output path provided
+    if output_path:
+        print(f"Saving merged model to: {output_path}")
+        
+        # Save full merged model state
+        save_dict = {
+            'model_state_dict': final_model.state_dict(),
+            'config': {
+                'hf_model_name': hf_model_name,
+                'num_labels': num_labels,
+                'use_cnn_head': use_cnn_head,
+                'label_vocab': checkpoint.get('label_vocab'),
+                'mask_label_chars': checkpoint.get('mask_label_chars', ''),
+            },
+            'training_info': {
+                'epoch': checkpoint.get('epoch'),
+                'loss': checkpoint.get('loss'),
+                'global_step': checkpoint.get('global_step'),
+            },
+            'merged': True,  # Flag to indicate this is a merged model
+        }
+        
+        torch.save(save_dict, output_path)
+        print(f"✓ Merged model saved to {output_path}")
+        
+        # Calculate size reduction
+        original_size = os.path.getsize(checkpoint_path) / (1024 * 1024)
+        merged_size = os.path.getsize(output_path) / (1024 * 1024)
+        print(f"\nFile sizes:")
+        print(f"  Original (with LoRA): {original_size:.2f} MB")
+        print(f"  Merged: {merged_size:.2f} MB")
+    
+    return final_model
 
 
 
