@@ -160,6 +160,41 @@ def train(args):
         scheduler = None
         scheduler_name = "None (constant LR)"
     
+    # Load checkpoint if resuming training
+    start_epoch = 1
+    global_step = 0
+    accumulation_step = 0
+    
+    if args.resume_from_checkpoint:
+        print(f"\n{'='*60}")
+        print(f"Resuming from checkpoint: {args.resume_from_checkpoint}")
+        print(f"{'='*60}")
+        
+        checkpoint = torch.load(args.resume_from_checkpoint, map_location=device)
+        
+        # Load model state
+        model.load_state_dict(checkpoint["model_state_dict"])
+        print("✓ Model state loaded")
+        
+        # Load optimizer state
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        print("✓ Optimizer state loaded")
+        
+        # Load scheduler state if available
+        if scheduler is not None and checkpoint.get("scheduler_state_dict") is not None:
+            scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+            print("✓ Scheduler state loaded")
+        
+        # Resume from next epoch
+        start_epoch = checkpoint.get("epoch", 0) + 1
+        global_step = checkpoint.get("global_step", 0)
+        
+        print(f"\nResuming from:")
+        print(f"  Epoch: {checkpoint.get('epoch', 0)} (will start at {start_epoch})")
+        print(f"  Global step: {global_step}")
+        print(f"  Previous loss: {checkpoint.get('loss', 'N/A'):.4f}" if isinstance(checkpoint.get('loss'), (int, float)) else f"  Previous loss: N/A")
+        print(f"{'='*60}\n")
+    
     # 8) Training loop
     print(f"\nStarting training for {args.epochs} epochs...\n")
     print(f"Batch size: {args.batch_size}")
@@ -170,10 +205,8 @@ def train(args):
     print(f"  Warmup steps: {warmup_steps} ({warmup_steps/total_steps*100:.1f}%)")
     print(f"  Initial LR: {args.lr:.2e}")
     model.train()
-    global_step = 0
-    accumulation_step = 0
     
-    for epoch in range(1, args.epochs + 1):
+    for epoch in range(start_epoch, args.epochs + 1):
         print(f"{'='*60}")
         print(f"EPOCH {epoch}/{args.epochs}")
         print(f"{'='*60}")
@@ -474,6 +507,8 @@ def parse_args():
                    help="Number of DataLoader workers")
     p.add_argument("--log-every", type=int, default=10,
                    help="Log training progress every N optimization steps")
+    p.add_argument("--resume-from-checkpoint", type=str, default=None,
+                   help="Path to checkpoint (.pt file) to resume training from. ")
     
     # Learning rate scheduler
     p.add_argument("--scheduler-type", type=str, default='cosine',

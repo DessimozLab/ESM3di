@@ -419,6 +419,135 @@ class ESM3DiModel:
     def get_model(self):
         """Return the LoRA-wrapped model."""
         return self.model
+    
+    def predict_from_fasta(self,
+                          input_fasta_path: str,
+                          output_fasta_path: str,
+                          model_checkpoint_path: str = None,
+                          batch_size: int = 4,
+                          device: str = None):
+        """
+        Predict 3Di sequences from amino acid FASTA file.
+        
+        Args:
+            input_fasta_path: Path to input amino acid FASTA file
+            output_fasta_path: Path to save predicted 3Di FASTA file
+            model_checkpoint_path: Path to checkpoint to load. If None,
+                                   uses current model state.
+            batch_size: Batch size for inference
+            device: Device to run on ('cuda' or 'cpu'). Auto-detect if None.
+        
+        Returns:
+            None. Writes predictions to output_fasta_path.
+        """
+        # Auto-detect device
+        if device is None:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+        
+        print(f"Using device: {device}")
+        
+        # Load checkpoint if provided
+        if model_checkpoint_path:
+            print(f"Loading model from: {model_checkpoint_path}")
+            checkpoint = torch.load(model_checkpoint_path,
+                                   map_location=device)
+            if isinstance(checkpoint, dict) and \
+               'model_state_dict' in checkpoint:
+                self.model.load_state_dict(checkpoint['model_state_dict'])
+                epoch = checkpoint.get('epoch', 'unknown')
+                print(f"✓ Loaded model from epoch {epoch}")
+            else:
+                self.model.load_state_dict(checkpoint)
+                print("✓ Loaded model checkpoint")
+        
+        self.model = self.model.to(device)
+        self.model.eval()
+        
+        # Initialize tokenizer
+        tokenizer = AutoTokenizer.from_pretrained(self.hf_model_name)
+        
+        # Create label vocabulary mapping
+        label_vocab = list("ACDEFGHIKLMNPQRSTVWY")
+        if self.num_labels != len(label_vocab):
+            # Create generic vocab if mismatch
+            label_vocab = [chr(65 + i) for i in range(self.num_labels)]
+        idx2char = {i: ch for i, ch in enumerate(label_vocab)}
+        
+        # Read input FASTA
+        print(f"Reading input FASTA: {input_fasta_path}")
+        aa_records = read_fasta(input_fasta_path)
+        print(f"Found {len(aa_records)} sequences")
+        
+        # Process sequences in batches
+        predictions = []
+        
+        with torch.no_grad():
+            for i in range(0, len(aa_records), batch_size):
+                batch_records = aa_records[i:i+batch_size]
+                headers, seqs = zip(*batch_records)
+                
+                # Tokenize batch
+                enc = tokenizer(
+                    list(seqs),
+                    return_tensors="pt",
+                    padding=True,
+                    truncation=True,
+                    add_special_tokens=True,
+                    return_special_tokens_mask=True,
+                )
+                
+                input_ids = enc["input_ids"].to(device)
+                attention_mask = enc["attention_mask"].to(device)
+                special_mask = enc["special_tokens_mask"]
+                
+                # Get predictions
+                outputs = self.model(input_ids=input_ids,
+                                    attention_mask=attention_mask)
+                logits = outputs.logits
+                
+                # Get predicted labels
+                pred_labels = torch.argmax(logits, dim=-1)
+                
+                # Convert predictions to 3Di sequences
+                for j, (header, seq) in enumerate(zip(headers, seqs)):
+                    pred_3di = []
+                    k = 0  # Index into original sequence
+                    
+                    for pos in range(pred_labels.shape[1]):
+                        # Skip special tokens
+                        if special_mask[j, pos] == 0:
+                            if k < len(seq):
+                                label_idx = pred_labels[j, pos].item()
+                                pred_char = idx2char.get(label_idx, 'X')
+                                pred_3di.append(pred_char)
+                                k += 1
+                    
+                    pred_3di_seq = "".join(pred_3di)
+                    
+                    # Verify length matches input
+                    if len(pred_3di_seq) != len(seq):
+                        print(f"Warning: Length mismatch for {header}: "
+                              f"AA={len(seq)}, 3Di={len(pred_3di_seq)}")
+                    
+                    predictions.append((header, pred_3di_seq))
+                
+                if (i + batch_size) % (batch_size * 10) == 0 or \
+                   (i + batch_size) >= len(aa_records):
+                    processed = min(i + batch_size, len(aa_records))
+                    print(f"Processed {processed}/{len(aa_records)} "
+                          f"sequences")
+        
+        # Write output FASTA
+        print(f"Writing predictions to: {output_fasta_path}")
+        with open(output_fasta_path, 'w') as f:
+            for header, pred_seq in predictions:
+                f.write(f">{header}\n")
+                # Write sequence in lines of 80 characters
+                for i in range(0, len(pred_seq), 80):
+                    f.write(pred_seq[i:i+80] + "\n")
+        
+        print(f"✓ Prediction complete! {len(predictions)} sequences "
+              f"written to {output_fasta_path}")
 
 # -----------------------------
 # Dataset
@@ -544,4 +673,5 @@ def make_collate_fn(tokenizer, char2idx, mask_label_chars: str = ""):
         return batch_out
 
     return collate
+
 
