@@ -114,11 +114,47 @@ python -m esm3di.esmretrain \
     --out-dir checkpoints/
 ```
 
+#### Using ESMC Models
+
+The newer ESMC models from EvolutionaryScale are now supported and offer improved performance:
+
+```bash
+# First install the esm library
+pip install esm
+
+# Train with ESMC-300M
+python -m esm3di.esmretrain \
+    --aa-fasta data/sequences.fasta \
+    --three-di-fasta data/3di_labels.fasta \
+    --hf-model esmc-300m-2024-12 \
+    --mask-label-chars "X" \
+    --batch-size 4 \
+    --epochs 10 \
+    --lr 1e-4 \
+    --out-dir checkpoints/
+
+# Or use ESMC-600M for better quality
+python -m esm3di.esmretrain \
+    --hf-model esmc-600m-2024-12 \
+    # ... other args
+```
+
+**Available ESMC Models:**
+- `esmc-300m-2024-12`: 300M parameters, 30 layers
+- `esmc-600m-2024-12`: 600M parameters, 36 layers
+
+ESMC models provide:
+- Better protein representations than ESM-2
+- Faster inference
+- Improved scaling and performance
+
+**Note:** ESMC models require the `esm` library from EvolutionaryScale. Install with `pip install esm`.
+
 #### Key Arguments
 
 - `--aa-fasta`: FASTA file with amino acid sequences
 - `--three-di-fasta`: FASTA file with matching 3Di sequences (same order and length)
-- `--hf-model`: HuggingFace ESM model name (default: `facebook/esm2_t33_650M_UR50D`)
+- `--hf-model`: Model identifier. ESM-2 options: `facebook/esm2_t12_35M_UR50D` (35M), `facebook/esm2_t30_150M_UR50D` (150M), `facebook/esm2_t33_650M_UR50D` (650M). ESMC options: `esmc-300m-2024-12` (300M), `esmc-600m-2024-12` (600M)
 - `--mask-label-chars`: Characters to treat as masked (e.g., low pLDDT positions)
 - `--lora-r`: LoRA rank (default: 8)
 - `--lora-alpha`: LoRA scaling factor (default: 16.0)
@@ -225,6 +261,14 @@ Checkpoints are saved after each epoch and contain:
 - transformers ≥ 4.30.0
 - peft ≥ 0.5.0
 - CUDA-capable GPU (recommended)
+- esm (optional, for ESMC models): `pip install esm`
+
+For ESMC model support, install the EvolutionaryScale ESM library:
+```bash
+pip install esm
+```
+
+This enables training with the newer ESMC-300M and ESMC-600M models.
 
 ## License
 

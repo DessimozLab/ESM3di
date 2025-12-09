@@ -8,6 +8,9 @@ accelerate>=0.20.0
 sentencepiece
 protobuf
 
+# Optional: ESMC model support (EvolutionaryScale models)
+# esm  # Uncomment to enable ESMC-300M and ESMC-600M models
+
 # Optional: for better performance
 bitsandbytes  # For 8-bit optimization
 pebble

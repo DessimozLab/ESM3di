@@ -9,6 +9,69 @@ from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer
 from peft import LoraConfig, get_peft_model, TaskType
 
+# Try to import ESMC for EvolutionaryScale ESMC models
+try:
+    from esm.models.esmc import ESMC
+    from esm.tokenization import get_esmc_model_tokenizers
+    ESMC_AVAILABLE = True
+except ImportError:
+    ESMC_AVAILABLE = False
+
+
+class ESMCModelWrapper(nn.Module):
+    """
+    Wrapper for ESMC models to provide TokenClassification interface.
+    ESMC models use a different architecture from ESM-2.
+    """
+    def __init__(self, esmc_model, num_labels):
+        super().__init__()
+        self.esmc = esmc_model
+        self.num_labels = num_labels
+
+        # Add classification head on top of ESMC embeddings
+        hidden_size = esmc_model.transformer.d_model
+        self.classifier = nn.Linear(hidden_size, num_labels)
+
+        # Create a minimal config for compatibility
+        class Config:
+            def __init__(self, hidden_size, num_labels):
+                self.hidden_size = hidden_size
+                self.num_labels = num_labels
+
+        self.config = Config(hidden_size, num_labels)
+
+    def forward(self, input_ids, attention_mask=None, labels=None, **kwargs):
+        # ESMC forward expects sequence_tokens and sequence_id
+        # sequence_id is a boolean mask (True = valid token)
+        sequence_id = attention_mask.bool() if attention_mask is not None else None
+
+        # Get ESMC embeddings
+        esmc_output = self.esmc(
+            sequence_tokens=input_ids,
+            sequence_id=sequence_id
+        )
+
+        # esmc_output.embeddings has shape (batch, seq_len, hidden_size)
+        sequence_output = esmc_output.embeddings
+
+        # Apply classification head
+        logits = self.classifier(sequence_output)
+
+        loss = None
+        if labels is not None:
+            loss_fct = nn.CrossEntropyLoss()
+            loss = loss_fct(
+                logits.view(-1, self.num_labels),
+                labels.view(-1)
+            )
+
+        return TokenClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=None,
+            attentions=None,
+        )
+
 
 # -----------------------------
 # CNN Classification Head
@@ -194,20 +257,21 @@ def freeze_all_but_lora_and_classifier(model):
 class ESM3DiModel:
     """
     Wrapper class for ESM model with LoRA adaptation for 3Di prediction.
+    Supports both ESM-2 (HuggingFace) and ESMC (EvolutionaryScale) models.
     """
-    def __init__(self, hf_model_name: str, num_labels: int, lora_r: int = 8, 
-                    lora_alpha: float = 16.0, lora_dropout: float = 0.05, 
+    def __init__(self, hf_model_name: str, num_labels: int, lora_r: int = 8,
+                    lora_alpha: float = 16.0, lora_dropout: float = 0.05,
                     target_modules: List[str] = None,
                     use_cnn_head: bool = False, cnn_num_layers: int = 2,
                     cnn_kernel_size: int = 3, cnn_dropout: float = 0.1):
         """
         Initialize ESM model with LoRA configuration.
-        
+
         Args:
-            hf_model_name: HuggingFace model identifier
+            hf_model_name: HuggingFace model identifier or ESMC model name
             num_labels: Number of 3Di labels in vocabulary
             lora_r: LoRA rank parameter
-            lora_alpha: LoRA alpha parameter  
+            lora_alpha: LoRA alpha parameter
             lora_dropout: LoRA dropout rate
             target_modules: List of module names for LoRA. If None, auto-discover.
             use_cnn_head: Whether to use CNN classification head instead of linear
@@ -224,34 +288,100 @@ class ESM3DiModel:
         self.cnn_num_layers = cnn_num_layers
         self.cnn_kernel_size = cnn_kernel_size
         self.cnn_dropout = cnn_dropout
-        
-        # Load base model
-        print(f"\nLoading base model: {hf_model_name}")
-        self.base_model = AutoModelForTokenClassification.from_pretrained(
-            hf_model_name,
-            num_labels=num_labels,
-        )
-        print("✓ Base model loaded")
-        
-        # Determine target modules
-        if target_modules:
-            self.target_modules = target_modules
-            print(f"\nUsing specified LoRA target modules: {target_modules}")
+
+        # Detect model type and load accordingly
+        self.is_esmc = self._is_esmc_model(hf_model_name)
+
+        if self.is_esmc:
+            self._load_esmc_model()
         else:
-            print("\nAuto-discovering LoRA target modules...")
-            self.target_modules = discover_lora_target_modules(self.base_model)
-            print(f"Discovered target modules: {self.target_modules}")
-        
+            self._load_esm2_model()
+
+        # Determine target modules
+        if self.is_esmc:
+            # ESMC models have different architecture
+            if target_modules:
+                self.target_modules = target_modules
+            else:
+                # Default ESMC attention modules
+                self.target_modules = ['attn.q_proj', 'attn.k_proj',
+                                       'attn.v_proj', 'attn.out_proj']
+            print(f"\nUsing LoRA target modules for ESMC: "
+                  f"{self.target_modules}")
+        else:
+            # ESM-2 models
+            if target_modules:
+                self.target_modules = target_modules
+                print(f"\nUsing specified LoRA target modules: "
+                      f"{target_modules}")
+            else:
+                print("\nAuto-discovering LoRA target modules...")
+                self.target_modules = discover_lora_target_modules(
+                    self.base_model)
+                print(f"Discovered target modules: {self.target_modules}")
+
         # Configure and apply LoRA
         self._setup_lora()
-        
+
         # Optionally add CNN classification head
         if self.use_cnn_head:
             self._setup_cnn_head()
-            print(f"✓ CNN classification head added ({cnn_num_layers} layers)")
-        
+            print(f"✓ CNN classification head added "
+                  f"({cnn_num_layers} layers)")
+
         self.freeze_base_model()
         print("✓ LoRA setup complete\n")
+
+    def _is_esmc_model(self, model_name: str) -> bool:
+        """
+        Check if the model name refers to an ESMC model.
+        """
+        esmc_identifiers = ['esmc-300m', 'esmc-600m', 'esmc_300m',
+                            'esmc_600m', 'esmc-6b', 'esmc_6b']
+        return any(identifier in model_name.lower()
+                   for identifier in esmc_identifiers)
+
+    def _load_esmc_model(self):
+        """
+        Load ESMC model from EvolutionaryScale.
+        """
+        if not ESMC_AVAILABLE:
+            raise ImportError(
+                "ESMC models require the 'esm' library from "
+                "EvolutionaryScale. Install it with: pip install esm"
+            )
+
+        print(f"\nLoading ESMC model: {self.hf_model_name}")
+
+        # Map common names to ESMC model names
+        model_name_map = {
+            'esmc-300m-2024-12': 'esmc_300m',
+            'esmc-600m-2024-12': 'esmc_600m',
+            'esmc-300m': 'esmc_300m',
+            'esmc-600m': 'esmc_600m',
+        }
+
+        esmc_model_name = model_name_map.get(self.hf_model_name, 'esmc_300m')
+
+        # Load ESMC base model
+        esmc_base = ESMC.from_pretrained(esmc_model_name)
+        print("✓ ESMC base model loaded")
+
+        # Wrap in our interface
+        self.base_model = ESMCModelWrapper(esmc_base, self.num_labels)
+        print("✓ ESMC wrapper initialized")
+
+    def _load_esm2_model(self):
+        """
+        Load ESM-2 model from HuggingFace.
+        """
+        # Load base model
+        print(f"\nLoading ESM-2 model: {self.hf_model_name}")
+        self.base_model = AutoModelForTokenClassification.from_pretrained(
+            self.hf_model_name,
+            num_labels=self.num_labels,
+        )
+        print("✓ Base model loaded")
         
     def _setup_lora(self):
         """Setup LoRA configuration and wrap the base model."""

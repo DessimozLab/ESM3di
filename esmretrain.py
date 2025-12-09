@@ -408,10 +408,12 @@ def parse_args():
     # Model
     p.add_argument("--hf-model", type=str,
                    default="facebook/esm2_t12_35M_UR50D",
-                   help="HuggingFace model name for ESM-2. Options: "
-                        "esm2_t12_35M_UR50D (35M params, fast), "
-                        "esm2_t30_150M_UR50D (150M params), "
-                        "esm2_t33_650M_UR50D (650M params, best quality)")
+                   help="HuggingFace model name or ESMC model identifier. "
+                        "ESM-2 options: esm2_t12_35M_UR50D (35M params), "
+                        "esm2_t30_150M_UR50D (150M), esm2_t33_650M_UR50D (650M). "
+                        "ESMC options: esmc-300m-2024-12 (300M params), "
+                        "esmc-600m-2024-12 (600M params). "
+                        "Note: ESMC models require 'pip install esm'")
 
     # Masking
     p.add_argument(

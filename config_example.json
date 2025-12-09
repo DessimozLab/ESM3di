@@ -7,7 +7,7 @@
   "lora_alpha": 16.0,
   "lora_dropout": 0.05,
   "lora_target_modules": "",
-  "use_cnn_head": false,
+  "use_cnn_head": true,
   "cnn_num_layers": 2,
   "cnn_kernel_size": 3,
   "cnn_dropout": 0.1,
