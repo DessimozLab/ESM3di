@@ -24,7 +24,7 @@ from typing import List, Tuple, Optional
 import torch
 
 # Import from our package
-from esm3di import predict_3di_for_fasta
+from ESM3di_model import ESM3DiModel
 
 
 def write_fasta(records: List[Tuple[str, str]], output_path: str):
@@ -51,14 +51,14 @@ def check_foldseek_installed() -> bool:
         return False
 
 
-def create_foldseek_db(
+def create_foldseek_db_from_fastas(
     aa_fasta: str,
     three_di_fasta: str,
     output_db: str,
     foldseek_bin: str = "foldseek"
 ) -> bool:
     """
-    Create a FoldSeek database from AA and 3Di FASTA files.
+    Create a FoldSeek database from AA and 3Di FASTA files using TSV intermediate format.
     
     Args:
         aa_fasta: Path to amino acid FASTA
@@ -70,55 +70,85 @@ def create_foldseek_db(
         True if successful, False otherwise
     """
     try:
-        # FoldSeek createdb expects: foldseek createdb input output
-        # For structure databases with 3Di, we use the special format
-        cmd = [
-            foldseek_bin,
-            "createdb",
-            aa_fasta,
-            output_db,
-            "--chain-name-mode", "0",
-            "--write-lookup", "1"
-        ]
+        from Bio import SeqIO
+        import tempfile
         
-        print(f"Running: {' '.join(cmd)}")
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True
-        )
+        # Read amino acid sequences
+        sequences_aa = {}
+        for record in SeqIO.parse(aa_fasta, "fasta"):
+            sequences_aa[record.id] = str(record.seq)
         
-        print(result.stdout)
-        if result.stderr:
-            print(result.stderr, file=sys.stderr)
+        # Read 3Di sequences
+        sequences_3di = {}
+        for record in SeqIO.parse(three_di_fasta, "fasta"):
+            if record.id not in sequences_aa.keys():
+                print(f"Warning: ignoring 3Di entry {record.id}, since it is not in the amino-acid FASTA file")
+            else:
+                sequences_3di[record.id] = str(record.seq).upper()
+        
+        # Validate that all AA sequences have corresponding 3Di sequences
+        missing_3di = []
+        for seq_id in sequences_aa.keys():
+            if seq_id not in sequences_3di.keys():
+                missing_3di.append(seq_id)
+        
+        if missing_3di:
+            print(f"Error: {len(missing_3di)} entries in amino-acid FASTA have no corresponding 3Di string:")
+            for seq_id in missing_3di[:5]:  # Show first 5
+                print(f"  - {seq_id}")
+            if len(missing_3di) > 5:
+                print(f"  ... and {len(missing_3di) - 5} more")
+            return False
+        
+        # Create temporary TSV files
+        with tempfile.NamedTemporaryFile(mode='w', suffix='_aa.tsv', delete=False) as aa_tsv:
+            with tempfile.NamedTemporaryFile(mode='w', suffix='_3di.tsv', delete=False) as three_di_tsv:
+                with tempfile.NamedTemporaryFile(mode='w', suffix='_header.tsv', delete=False) as header_tsv:
+                    
+                    # Generate TSV content
+                    for i, seq_id in enumerate(sequences_aa.keys(), 1):
+                        aa_tsv.write(f"{i}\t{sequences_aa[seq_id]}\n")
+                        three_di_tsv.write(f"{i}\t{sequences_3di[seq_id]}\n")
+                        header_tsv.write(f"{i}\t{seq_id}\n")
+                    
+                    aa_tsv_path = aa_tsv.name
+                    three_di_tsv_path = three_di_tsv.name
+                    header_tsv_path = header_tsv.name
+        
+        try:
+            # Create FoldSeek databases using tsv2db
+            commands = [
+                [foldseek_bin, "tsv2db", aa_tsv_path, output_db, "--output-dbtype", "0"],
+                [foldseek_bin, "tsv2db", three_di_tsv_path, f"{output_db}_ss", "--output-dbtype", "0"],
+                [foldseek_bin, "tsv2db", header_tsv_path, f"{output_db}_h", "--output-dbtype", "12"]
+            ]
             
-        # Now add 3Di information using tsv2db or similar
-        # FoldSeek expects 3Di as a separate column/database
-        three_di_db = output_db + "_ss"
-        cmd_3di = [
-            foldseek_bin,
-            "createdb",
-            three_di_fasta,
-            three_di_db,
-            "--chain-name-mode", "0",
-            "--write-lookup", "1"
-        ]
-        
-        print(f"Running: {' '.join(cmd_3di)}")
-        result = subprocess.run(
-            cmd_3di,
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        
-        print(result.stdout)
-        if result.stderr:
-            print(result.stderr, file=sys.stderr)
-        
-        return True
-        
+            for cmd in commands:
+                print(f"Running: {' '.join(cmd)}")
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    check=True
+                )
+                
+                if result.stdout:
+                    print(result.stdout)
+                if result.stderr:
+                    print(result.stderr, file=sys.stderr)
+            
+            print(f"✓ Successfully created FoldSeek database with {len(sequences_aa)} sequences")
+            return True
+            
+        finally:
+            # Clean up temporary TSV files
+            for temp_file in [aa_tsv_path, three_di_tsv_path, header_tsv_path]:
+                if os.path.exists(temp_file):
+                    os.unlink(temp_file)
+                    
+    except ImportError:
+        print("Error: BioPython is required. Install with: pip install biopython", file=sys.stderr)
+        return False
     except subprocess.CalledProcessError as e:
         print(f"Error running foldseek: {e}", file=sys.stderr)
         print(f"stdout: {e.stdout}", file=sys.stderr)
@@ -127,7 +157,6 @@ def create_foldseek_db(
     except Exception as e:
         print(f"Unexpected error: {e}", file=sys.stderr)
         return False
-
 
 def main():
     parser = argparse.ArgumentParser(
@@ -281,16 +310,7 @@ Examples:
             print(f"Using model: {args.model_ckpt}")
             print(f"Device: {device}")
             
-            # Run inference
-            results = predict_3di_for_fasta(
-                model_ckpt=args.model_ckpt,
-                aa_fasta=args.aa_fasta,
-                device=device
-            )
-            
-            print(f"✓ Predicted 3Di for {len(results)} sequences")
-            
-            # Prepare output
+            # Prepare output paths
             if use_temp:
                 # Create temporary files
                 temp_aa = tempfile.NamedTemporaryFile(
@@ -311,20 +331,59 @@ Examples:
                 aa_fasta_path = aa_fasta_out
                 three_di_fasta_path = three_di_fasta_out
             
-            # Write FASTAs
-            print(f"\nWriting AA FASTA to: {aa_fasta_path}")
-            aa_records = [(header, aa_seq) for header, aa_seq, _ in results]
-            write_fasta(aa_records, aa_fasta_path)
+            # Load checkpoint to extract model configuration
+            print("Loading model configuration from checkpoint...")
+            checkpoint = torch.load(args.model_ckpt, map_location="cpu")
+            args_dict = checkpoint.get('args', {})
+            hf_model_name = args_dict.get(
+                'hf_model_name',
+                args_dict.get('hf_model', 'facebook/esm2_t33_650M_UR50D')
+            )
+            num_labels = len(checkpoint.get('label_vocab', []))
+            use_cnn_head = args_dict.get('use_cnn_head', False)
+            lora_r = args_dict.get('lora_r', 8)
+            lora_alpha = args_dict.get('lora_alpha', 16)
+            lora_dropout = args_dict.get('lora_dropout', 0.05)
+            target_modules = checkpoint.get('lora_target_modules', None)
             
-            print(f"Writing 3Di FASTA to: {three_di_fasta_path}")
-            three_di_records = [(header, three_di_seq) for header, _, three_di_seq in results]
-            write_fasta(three_di_records, three_di_fasta_path)
+            # Initialize model
+            print(f"Initializing ESM3DiModel with {hf_model_name}...")
+            model = ESM3DiModel(
+                hf_model_name=hf_model_name,
+                num_labels=num_labels,
+                lora_r=lora_r,
+                lora_alpha=lora_alpha,
+                lora_dropout=lora_dropout,
+                target_modules=target_modules,
+                use_cnn_head=use_cnn_head,
+                cnn_num_layers=args_dict.get('cnn_num_layers', 2),
+                cnn_kernel_size=args_dict.get('cnn_kernel_size', 3),
+                cnn_dropout=args_dict.get('cnn_dropout', 0.1)
+            )
             
-            print("✓ FASTA files written")
+            # Copy input AA FASTA to output location (for database creation)
+            if aa_fasta_path != args.aa_fasta:
+                import shutil
+                print(f"\nCopying AA FASTA to: {aa_fasta_path}")
+                shutil.copy2(args.aa_fasta, aa_fasta_path)
+            else:
+                print(f"\nUsing input AA FASTA: {aa_fasta_path}")
+            
+            # Run inference using the model's predict_from_fasta method
+            print("Predicting 3Di sequences...")
+            model.predict_from_fasta(
+                input_fasta_path=args.aa_fasta,
+                output_fasta_path=three_di_fasta_path,
+                model_checkpoint_path=args.model_ckpt,
+                batch_size=4,
+                device=device
+            )
+            
+            print("✓ FASTA files ready")
         
         # Step 2: Create FoldSeek database
         print(f"\nCreating FoldSeek database: {args.output_db}")
-        success = create_foldseek_db(
+        success = create_foldseek_db_from_fastas(
             aa_fasta=aa_fasta_path,
             three_di_fasta=three_di_fasta_path,
             output_db=args.output_db,
@@ -332,12 +391,15 @@ Examples:
         )
         
         if success:
-            print(f"\n✓ Successfully created FoldSeek database: {args.output_db}")
+            print(f"\n✓ Successfully created FoldSeek database: "
+                  f"{args.output_db}")
             print(f"  - Main database: {args.output_db}")
             print(f"  - 3Di database: {args.output_db}_ss")
-            
+
             # List created files
-            db_files = list(Path(args.output_db).parent.glob(f"{Path(args.output_db).name}*"))
+            db_name = Path(args.output_db).name
+            db_parent = Path(args.output_db).parent
+            db_files = list(db_parent.glob(f"{db_name}*"))
             if db_files:
                 print(f"\nCreated {len(db_files)} database files:")
                 for f in sorted(db_files)[:10]:  # Show first 10
