@@ -13,7 +13,7 @@ from peft import LoraConfig, get_peft_model, TaskType
 # Try to import ESMC for EvolutionaryScale ESMC models
 try:
     from esm.models.esmc import ESMC
-    from esm.tokenization import get_esmc_model_tokenizers
+    from esm.sdk.api import ESMProtein, LogitsConfig
     ESMC_AVAILABLE = True
 except ImportError:
     ESMC_AVAILABLE = False
@@ -22,15 +22,16 @@ except ImportError:
 class ESMCModelWrapper(nn.Module):
     """
     Wrapper for ESMC models to provide TokenClassification interface.
-    ESMC models use a different architecture from ESM-2.
+    Uses the ESM library's native API.
     """
-    def __init__(self, esmc_model, num_labels):
+    def __init__(self, esmc_model, num_labels, tokenizer):
         super().__init__()
         self.esmc = esmc_model
         self.num_labels = num_labels
+        self.tokenizer = tokenizer
 
         # Add classification head on top of ESMC embeddings
-        hidden_size = esmc_model.transformer.d_model
+        hidden_size = esmc_model.d_model
         self.classifier = nn.Linear(hidden_size, num_labels)
 
         # Create a minimal config for compatibility
@@ -42,17 +43,18 @@ class ESMCModelWrapper(nn.Module):
         self.config = Config(hidden_size, num_labels)
 
     def forward(self, input_ids, attention_mask=None, labels=None, **kwargs):
-        # ESMC forward expects sequence_tokens and sequence_id
-        # sequence_id is a boolean mask (True = valid token)
-        sequence_id = attention_mask.bool() if attention_mask is not None else None
-
+        # ESMC forward pass using native ESM library API
+        # input_ids contains the tokenized sequences
+        batch_size = input_ids.shape[0]
+        
         # Get ESMC embeddings
-        esmc_output = self.esmc(
+        # The ESMC model expects tokens directly
+        esmc_output = self.esmc.forward(
             sequence_tokens=input_ids,
-            sequence_id=sequence_id
         )
 
-        # esmc_output.embeddings has shape (batch, seq_len, hidden_size)
+        # esmc_output is a ForwardOutput with embeddings field
+        # Shape: (batch, seq_len, hidden_size)
         sequence_output = esmc_output.embeddings
 
         # Apply classification head
@@ -408,6 +410,9 @@ class ESM3DiModel:
         self.cnn_num_layers = cnn_num_layers
         self.cnn_kernel_size = cnn_kernel_size
         self.cnn_dropout = cnn_dropout
+        
+        # Initialize tokenizer attribute
+        self.esmc_tokenizer = None
 
         # Detect model type and load accordingly
         self.is_esmc = self._is_esmc_model(hf_model_name)
@@ -464,6 +469,8 @@ class ESM3DiModel:
     def _load_esmc_model(self):
         """
         Load ESMC model from EvolutionaryScale.
+        Downloads automatically if not present locally.
+        Uses ESM library's native tokenizer.
         """
         if not ESMC_AVAILABLE:
             raise ImportError(
@@ -483,25 +490,49 @@ class ESM3DiModel:
 
         esmc_model_name = model_name_map.get(self.hf_model_name, 'esmc_300m')
 
-        # Load ESMC base model
-        esmc_base = ESMC.from_pretrained(esmc_model_name)
+        # Load ESMC base model (automatically downloads if not cached)
+        print("Checking for model in cache, will download if needed...")
+        esmc_client = ESMC.from_pretrained(esmc_model_name)
         print("✓ ESMC base model loaded")
+        
+        # Store tokenizer for ESMC
+        self.esmc_tokenizer = esmc_client.tokenizer
+        print("✓ ESMC tokenizer initialized")
 
         # Wrap in our interface
-        self.base_model = ESMCModelWrapper(esmc_base, self.num_labels)
+        self.base_model = ESMCModelWrapper(
+            esmc_client, 
+            self.num_labels,
+            self.esmc_tokenizer
+        )
         print("✓ ESMC wrapper initialized")
 
     def _load_esm2_model(self):
         """
         Load ESM-2 model from HuggingFace.
+        Downloads automatically if not present locally.
         """
         # Load base model
         print(f"\nLoading ESM-2 model: {self.hf_model_name}")
-        self.base_model = AutoModelForTokenClassification.from_pretrained(
-            self.hf_model_name,
-            num_labels=self.num_labels,
-        )
-        print("✓ Base model loaded")
+        print("Checking for model in cache, will download if needed...")
+        
+        try:
+            self.base_model = AutoModelForTokenClassification.from_pretrained(
+                self.hf_model_name,
+                num_labels=self.num_labels,
+            )
+            print("✓ Base model loaded")
+        except Exception as e:
+            print(f"Error loading model: {e}")
+            print(f"\nAttempting to download {self.hf_model_name} from "
+                  f"Hugging Face Hub...")
+            self.base_model = AutoModelForTokenClassification.from_pretrained(
+                self.hf_model_name,
+                num_labels=self.num_labels,
+                force_download=False,  # Use cache if available
+                resume_download=True,  # Resume interrupted downloads
+            )
+            print("✓ Base model downloaded and loaded")
         
     def _setup_lora(self):
         """Setup LoRA configuration and wrap the base model."""
@@ -539,6 +570,18 @@ class ESM3DiModel:
     def get_model(self):
         """Return the LoRA-wrapped model."""
         return self.model
+    
+    def get_tokenizer(self):
+        """Return the appropriate tokenizer for this model."""
+        if self.is_esmc:
+            return self.esmc_tokenizer
+        else:
+            from transformers import AutoTokenizer
+            return AutoTokenizer.from_pretrained(self.hf_model_name)
+    
+    def is_esmc_model(self):
+        """Return whether this is an ESMC model."""
+        return self.is_esmc
     
     def predict_from_fasta(self,
                           input_fasta_path: str,
@@ -583,8 +626,13 @@ class ESM3DiModel:
         self.model = self.model.to(device)
         self.model.eval()
         
-        # Initialize tokenizer
-        tokenizer = AutoTokenizer.from_pretrained(self.hf_model_name)
+        # Initialize tokenizer (different for ESMC vs ESM-2)
+        if self.is_esmc:
+            tokenizer = self.esmc_tokenizer
+            print("Using ESMC native tokenizer")
+        else:
+            tokenizer = AutoTokenizer.from_pretrained(self.hf_model_name)
+            print("Using HuggingFace tokenizer")
         
         # Create label vocabulary mapping
         label_vocab = list("ACDEFGHIKLMNPQRSTVWY")
@@ -606,19 +654,52 @@ class ESM3DiModel:
                 batch_records = aa_records[i:i+batch_size]
                 headers, seqs = zip(*batch_records)
                 
-                # Tokenize batch
-                enc = tokenizer(
-                    list(seqs),
-                    return_tensors="pt",
-                    padding=True,
-                    truncation=True,
-                    add_special_tokens=True,
-                    return_special_tokens_mask=True,
-                )
-                
-                input_ids = enc["input_ids"].to(device)
-                attention_mask = enc["attention_mask"].to(device)
-                special_mask = enc["special_tokens_mask"]
+                # Tokenize batch (different for ESMC vs ESM-2)
+                if self.is_esmc:
+                    # ESMC uses its native tokenizer
+                    tokens_list = [tokenizer.encode(seq) for seq in seqs]
+                    max_len = max(len(t) for t in tokens_list)
+                    
+                    # Pad sequences
+                    input_ids = torch.full(
+                        (len(seqs), max_len),
+                        tokenizer.pad_token_id,
+                        dtype=torch.long
+                    )
+                    attention_mask = torch.zeros(
+                        (len(seqs), max_len),
+                        dtype=torch.long
+                    )
+                    special_mask = torch.ones(
+                        (len(seqs), max_len),
+                        dtype=torch.long
+                    )
+                    
+                    for j, tokens in enumerate(tokens_list):
+                        input_ids[j, :len(tokens)] = torch.tensor(tokens)
+                        # Mark non-pad tokens
+                        attention_mask[j, :len(tokens)] = 1
+                        # Mark special tokens (first and last)
+                        special_mask[j, 0] = 1  # BOS
+                        special_mask[j, len(tokens)-1] = 1  # EOS
+                        special_mask[j, 1:len(tokens)-1] = 0  # actual sequence
+                    
+                    input_ids = input_ids.to(device)
+                    attention_mask = attention_mask.to(device)
+                else:
+                    # ESM-2 uses HuggingFace tokenizer
+                    enc = tokenizer(
+                        list(seqs),
+                        return_tensors="pt",
+                        padding=True,
+                        truncation=True,
+                        add_special_tokens=True,
+                        return_special_tokens_mask=True,
+                    )
+                    
+                    input_ids = enc["input_ids"].to(device)
+                    attention_mask = enc["attention_mask"].to(device)
+                    special_mask = enc["special_tokens_mask"]
                 
                 # Get predictions
                 outputs = self.model(input_ids=input_ids,
@@ -723,30 +804,65 @@ class Seq3DiDataset(Dataset):
 # Collate with HF tokenizer
 # -----------------------------
 
-def make_collate_fn(tokenizer, char2idx, mask_label_chars: str = ""):
+def make_collate_fn(tokenizer, char2idx, mask_label_chars: str = "", is_esmc: bool = False):
     """
-    - Tokenizes AA sequences with HF ESM tokenizer.
+    - Tokenizes AA sequences with ESM tokenizer (HF or ESMC).
     - Uses special_tokens_mask to align per-residue 3Di labels
       to non-special tokens.
     - Positions whose 3Di label is in mask_label_chars are set to -100
       (ignored in the loss) and do NOT belong to label_vocab.
+    
+    Args:
+        tokenizer: HuggingFace tokenizer or ESMC tokenizer
+        char2idx: Dictionary mapping label characters to indices
+        mask_label_chars: Characters to mask in labels
+        is_esmc: Whether using ESMC model (uses different tokenization)
     """
     mask_set = set(mask_label_chars) if mask_label_chars else set()
 
     def collate(batch):
         headers, aa_seqs, label_seqs = zip(*batch)
 
-        enc = tokenizer(
-            list(aa_seqs),
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-            add_special_tokens=True,
-            return_special_tokens_mask=True,
-        )
-        input_ids = enc["input_ids"]              # [B, T]
-        attention_mask = enc["attention_mask"]    # [B, T]
-        special_mask = enc["special_tokens_mask"] # [B, T]
+        if is_esmc:
+            # ESMC tokenization
+            tokens_list = [tokenizer.encode(seq) for seq in aa_seqs]
+            max_len = max(len(t) for t in tokens_list)
+            
+            batch_size = len(aa_seqs)
+            input_ids = torch.full(
+                (batch_size, max_len),
+                tokenizer.pad_token_id,
+                dtype=torch.long
+            )
+            attention_mask = torch.zeros(
+                (batch_size, max_len),
+                dtype=torch.long
+            )
+            special_mask = torch.ones(
+                (batch_size, max_len),
+                dtype=torch.long
+            )
+            
+            for i, tokens in enumerate(tokens_list):
+                input_ids[i, :len(tokens)] = torch.tensor(tokens)
+                attention_mask[i, :len(tokens)] = 1
+                # Mark special tokens (first=BOS, last=EOS)
+                special_mask[i, 0] = 1
+                special_mask[i, len(tokens)-1] = 1
+                special_mask[i, 1:len(tokens)-1] = 0  # actual sequence
+        else:
+            # HuggingFace tokenization
+            enc = tokenizer(
+                list(aa_seqs),
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                add_special_tokens=True,
+                return_special_tokens_mask=True,
+            )
+            input_ids = enc["input_ids"]              # [B, T]
+            attention_mask = enc["attention_mask"]    # [B, T]
+            special_mask = enc["special_tokens_mask"] # [B, T]
 
         batch_size, max_len = input_ids.shape
         labels = torch.full(

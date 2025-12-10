@@ -11,10 +11,10 @@ from torch.utils.data import Dataset, DataLoader
 
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 from transformers import get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
-from peft import LoraConfig, get_peft_model, TaskType
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 from ESM3di_model import ESM3DiModel, read_fasta, Seq3DiDataset, make_collate_fn
+from esm.models.esmc import ESMC
 
 # -----------------------------
 # Training
@@ -64,7 +64,13 @@ def train(args):
 
     # 2) HF tokenizer + model
     print(f"\nLoading tokenizer: {args.hf_model}")
-    tokenizer = AutoTokenizer.from_pretrained(args.hf_model)
+    if args.hf_model.__contains__('esmc'):
+        # For ESMC models, use the ESM library tokenizer
+        esm_model = ESMC.from_pretrained("esmc_300m")  # This loads both model and tokenizer
+        tokenizer = esm_model.tokenizer
+    else:
+        # For ESM-2 and other HuggingFace models
+        tokenizer = AutoTokenizer.from_pretrained(args.hf_model)
     print("✓ Tokenizer loaded")
 
     # Create ESM3Di model wrapper
