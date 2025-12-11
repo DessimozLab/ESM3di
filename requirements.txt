@@ -4,6 +4,10 @@ transformers>=4.46.0,<4.48.2
 peft>=0.10.0,<0.12.0
 accelerate>=0.20.0
 
+# Fix scipy/numpy compatibility issue
+numpy==1.26.4
+scipy==1.13.1
+
 # ESM tokenizer dependencies
 sentencepiece
 protobuf

@@ -1,0 +1,42 @@
+{
+    "aa_fasta": "proteomes/all_ribo.fasta",
+    "three_di_fasta": "proteomes/all_ribo_db_3di.fasta",
+    "val_split": 0.05,
+    
+    "hf_model": "facebook/esm2_t30_150M_UR50D",
+    "mask_label_chars": "X",
+    
+    "lora_r": 16,
+    "lora_alpha": 32,
+    "lora_dropout": 0.05,
+    "lora_target_modules": "q_proj,k_proj,v_proj,o_proj",
+    
+    "use_cnn_head": false,
+    "cnn_num_layers": 2,
+    "cnn_kernel_size": 3,
+    "cnn_dropout": 0.1,
+    
+    "batch_size": 8,
+    "accumulate_grad_batches": 2,
+    "epochs": 10,
+    "lr": 5e-5,
+    "weight_decay": 0.01,
+    "max_grad_norm": 1.0,
+    "num_workers": 4,
+    
+    "scheduler_type": "cosine",
+    "warmup_ratio": 0.1,
+    
+    "devices": 4,
+    "num_nodes": 1,
+    "strategy": "ddp",
+    "precision": "bf16-mixed",
+    
+    "check_val_every_n_epoch": 1,
+    "log_every_n_steps": 10,
+    "save_top_k": 3,
+    
+    "out_dir": "checkpoints_lightning",
+    "tensorboard_log_dir": "lightning_logs",
+    "experiment_name": "esm2_150m_ribosomal"
+}

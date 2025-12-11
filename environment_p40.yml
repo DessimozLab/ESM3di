@@ -1,0 +1,39 @@
+name: esm3di_p40
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+  - bioconda
+dependencies:
+  - python=3.10
+  - pip
+  # PyTorch with CUDA 12.1 (compatible with P40 compute capability 6.1)
+  - pytorch=2.1.0
+  - pytorch-cuda=12.1
+  - foldseek
+  # Pip dependencies
+  - pip:
+      - transformers>=4.46.0,<4.48.2
+      - peft>=0.10.0,<0.12.0
+      - accelerate>=0.20.0
+      - numpy==1.26.4
+      - scipy==1.13.1
+      - sentencepiece  # for ESM tokenizer
+      - protobuf
+      - pandas
+      - pebble
+      - tensorboard
+      - esm
+      - -e .  # Install package in editable mode
+
+# Tesla P40 notes:
+# - Compute capability: 6.1
+# - 24GB memory
+# - Uses CUDA 12.1 which has better kernel support
+# - PyTorch 2.1.0 is pinned for stability with this CUDA version
+# 
+# If you still get kernel errors, you may need to reinstall PyTorch from source
+# or ensure CUDA is properly installed on your system with:
+#   nvidia-smi (to check driver)
+#   nvcc --version (to check CUDA toolkit)
