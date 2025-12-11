@@ -82,6 +82,9 @@ checkpoints/
 
 # PyTorch
 *.tar.gz
+
+**.fa
+
 dongwook_proteos/all_clades_db
 dongwook_proteos/all_clades_db_3di.fasta
 dongwook_proteos/all_clades_db_aa.fasta
