@@ -1,7 +1,7 @@
 # Core dependencies
 torch>=2.0.0
-transformers>=4.30.0
-peft>=0.5.0
+transformers>=4.30.0,<4.48.2  # Compatible with esm 3.2.1.post1
+peft>=0.5.0,<0.13.0  # Compatible with transformers <4.48.2
 accelerate>=0.20.0
 
 # ESM tokenizer dependencies

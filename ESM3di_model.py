@@ -2,76 +2,14 @@
 import os
 import torch
 import torch.nn as nn
-from transformers import AutoModelForTokenClassification
+from transformers import AutoModelForTokenClassification, AutoModel
 from transformers.modeling_outputs import TokenClassifierOutput
 from peft import get_peft_model, LoraConfig, TaskType
 from typing import List, Tuple, Optional
 from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer
 from peft import LoraConfig, get_peft_model, TaskType
-
-# Try to import ESMC for EvolutionaryScale ESMC models
-try:
-    from esm.models.esmc import ESMC
-    from esm.tokenization import get_esmc_model_tokenizers
-    ESMC_AVAILABLE = True
-except ImportError:
-    ESMC_AVAILABLE = False
-
-
-class ESMCModelWrapper(nn.Module):
-    """
-    Wrapper for ESMC models to provide TokenClassification interface.
-    ESMC models use a different architecture from ESM-2.
-    """
-    def __init__(self, esmc_model, num_labels):
-        super().__init__()
-        self.esmc = esmc_model
-        self.num_labels = num_labels
-
-        # Add classification head on top of ESMC embeddings
-        hidden_size = esmc_model.transformer.d_model
-        self.classifier = nn.Linear(hidden_size, num_labels)
-
-        # Create a minimal config for compatibility
-        class Config:
-            def __init__(self, hidden_size, num_labels):
-                self.hidden_size = hidden_size
-                self.num_labels = num_labels
-
-        self.config = Config(hidden_size, num_labels)
-
-    def forward(self, input_ids, attention_mask=None, labels=None, **kwargs):
-        # ESMC forward expects sequence_tokens and sequence_id
-        # sequence_id is a boolean mask (True = valid token)
-        sequence_id = attention_mask.bool() if attention_mask is not None else None
-
-        # Get ESMC embeddings
-        esmc_output = self.esmc(
-            sequence_tokens=input_ids,
-            sequence_id=sequence_id
-        )
-
-        # esmc_output.embeddings has shape (batch, seq_len, hidden_size)
-        sequence_output = esmc_output.embeddings
-
-        # Apply classification head
-        logits = self.classifier(sequence_output)
-
-        loss = None
-        if labels is not None:
-            loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(
-                logits.view(-1, self.num_labels),
-                labels.view(-1)
-            )
-
-        return TokenClassifierOutput(
-            loss=loss,
-            logits=logits,
-            hidden_states=None,
-            attentions=None,
-        )
+from transformers.pytorch_utils import Conv1D
 
 
 # -----------------------------
@@ -116,7 +54,7 @@ class CNNClassificationHead(nn.Module):
         self.cnn_layers = nn.Sequential(*layers)
         self.classifier = nn.Linear(hidden_size, num_labels)
     
-    def forward(self, hidden_states):
+    def forward(self, hidden_states ):
         """
         Args:
             hidden_states: (batch_size, seq_len, hidden_size)
@@ -132,7 +70,6 @@ class CNNClassificationHead(nn.Module):
         # Transpose back: (batch, seq_len, hidden)
         x = x.transpose(1, 2)
         
-        # Final classification
         logits = self.classifier(x)
         return logits
 
@@ -152,13 +89,21 @@ class ESMWithCNNHead(nn.Module):
     def forward(self, input_ids, attention_mask=None, labels=None, 
                 **kwargs):
         # Get encoder outputs (without classification head)
-        outputs = self.base_model.esm(
+        # Use output_hidden_states to get the last hidden state
+        outputs = self.base_model(
             input_ids=input_ids,
             attention_mask=attention_mask,
+            output_hidden_states=True,
             **kwargs
         )
         
-        sequence_output = outputs[0]  # (batch, seq_len, hidden_size)
+        # Get the last hidden state from the model
+        # For standard HuggingFace models like ESM2/ESM++
+        if hasattr(outputs, 'hidden_states') and outputs.hidden_states is not None:
+            sequence_output = outputs.hidden_states[-1]  # (batch, seq_len, hidden_size)
+        else:
+            # Fallback to last_hidden_state if available
+            sequence_output = outputs.last_hidden_state  # (batch, seq_len, hidden_size)
         
         # Apply CNN classification head
         logits = self.cnn_head(sequence_output)
@@ -174,8 +119,8 @@ class ESMWithCNNHead(nn.Module):
         return TokenClassifierOutput(
             loss=loss,
             logits=logits,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
+            hidden_states=outputs.hidden_states if hasattr(outputs, 'hidden_states') else None,
+            attentions=outputs.attentions if hasattr(outputs, 'attentions') else None,
         )
     
     def named_parameters(self, *args, **kwargs):
@@ -221,21 +166,24 @@ def read_fasta(path: str) -> List[Tuple[str, str]]:
 
 def discover_lora_target_modules(model) -> List[str]:
     """
-    Automatically discover LoRA target modules by finding Linear layers in attention.
-    This matches the notebook's approach of dynamically discovering modules.
+    Automatically discover LoRA target modules by finding supported layer types.
+    Recursively searches for Linear, Embedding, Conv2d, and Conv1D layers.
     """
-    target_modules = []
-    for name, module in model.named_modules():
-        if isinstance(module, torch.nn.Linear) and ('attention' in name or 'dense' in name):
-            # Extract the base module name (e.g., 'self_attn.q_proj' -> 'q_proj')
-            module_name = name.split('.')[-1]
-            if module_name not in target_modules:
-                target_modules.append(module_name)
     
-    # Fallback to common ESM attention modules if discovery fails
-    if not target_modules:
-        target_modules = ['q_proj', 'k_proj', 'v_proj', 'o_proj', 'fc1', 'fc2']
+    target_modules = set()
+    def recurse_modules(module, parent_name=""):
+        for name, child in module.named_children():
+            full_name = f"{parent_name}.{name}" if parent_name else name
+            # Check if this module is a supported type
+            if isinstance(child, (torch.nn.Linear, torch.nn.Embedding, 
+                                    torch.nn.Conv2d, Conv1D)):
+                target_modules.add(full_name)
+            
+            # Recurse into children
+            recurse_modules(child, full_name)
     
+    recurse_modules(model)
+    target_modules = sorted(list(target_modules))
     return target_modules
 
 
@@ -377,7 +325,7 @@ def merge_lora_weights(
 class ESM3DiModel:
     """
     Wrapper class for ESM model with LoRA adaptation for 3Di prediction.
-    Supports both ESM-2 (HuggingFace) and ESMC (EvolutionaryScale) models.
+    Supports ESM-2, ESM++, and other HuggingFace models.
     """
     def __init__(self, hf_model_name: str, num_labels: int, lora_r: int = 8,
                     lora_alpha: float = 16.0, lora_dropout: float = 0.05,
@@ -388,7 +336,7 @@ class ESM3DiModel:
         Initialize ESM model with LoRA configuration.
 
         Args:
-            hf_model_name: HuggingFace model identifier or ESMC model name
+            hf_model_name: HuggingFace model identifier (e.g., 'Synthyra/ESMplusplus_small')
             num_labels: Number of 3Di labels in vocabulary
             lora_r: LoRA rank parameter
             lora_alpha: LoRA alpha parameter
@@ -409,36 +357,17 @@ class ESM3DiModel:
         self.cnn_kernel_size = cnn_kernel_size
         self.cnn_dropout = cnn_dropout
 
-        # Detect model type and load accordingly
-        self.is_esmc = self._is_esmc_model(hf_model_name)
+        # Load model using standard HuggingFace approach
+        self._load_model()
 
-        if self.is_esmc:
-            self._load_esmc_model()
+        # Determine target modules for LoRA
+        if target_modules:
+            self.target_modules = target_modules
+            print(f"\nUsing specified LoRA target modules: {target_modules}")
         else:
-            self._load_esm2_model()
-
-        # Determine target modules
-        if self.is_esmc:
-            # ESMC models have different architecture
-            if target_modules:
-                self.target_modules = target_modules
-            else:
-                # Default ESMC attention modules
-                self.target_modules = ['attn.q_proj', 'attn.k_proj',
-                                       'attn.v_proj', 'attn.out_proj']
-            print(f"\nUsing LoRA target modules for ESMC: "
-                  f"{self.target_modules}")
-        else:
-            # ESM-2 models
-            if target_modules:
-                self.target_modules = target_modules
-                print(f"\nUsing specified LoRA target modules: "
-                      f"{target_modules}")
-            else:
-                print("\nAuto-discovering LoRA target modules...")
-                self.target_modules = discover_lora_target_modules(
-                    self.base_model)
-                print(f"Discovered target modules: {self.target_modules}")
+            print("\nAuto-discovering LoRA target modules...")
+            self.target_modules = discover_lora_target_modules(self.base_model)
+            print(f"Discovered target modules: {self.target_modules}")
 
         # Configure and apply LoRA
         self._setup_lora()
@@ -446,62 +375,35 @@ class ESM3DiModel:
         # Optionally add CNN classification head
         if self.use_cnn_head:
             self._setup_cnn_head()
-            print(f"✓ CNN classification head added "
-                  f"({cnn_num_layers} layers)")
+            print(f"✓ CNN classification head added ({cnn_num_layers} layers)")
 
         self.freeze_base_model()
         print("✓ LoRA setup complete\n")
 
-    def _is_esmc_model(self, model_name: str) -> bool:
+    def _load_model(self):
         """
-        Check if the model name refers to an ESMC model.
+        Load model from HuggingFace using standard AutoModel approach.
+        Supports ESM2, ESM++, and other transformer models.
         """
-        esmc_identifiers = ['esmc-300m', 'esmc-600m', 'esmc_300m',
-                            'esmc_600m', 'esmc-6b', 'esmc_6b']
-        return any(identifier in model_name.lower()
-                   for identifier in esmc_identifiers)
-
-    def _load_esmc_model(self):
-        """
-        Load ESMC model from EvolutionaryScale.
-        """
-        if not ESMC_AVAILABLE:
-            raise ImportError(
-                "ESMC models require the 'esm' library from "
-                "EvolutionaryScale. Install it with: pip install esm"
+        print(f"\nLoading model: {self.hf_model_name}")
+        
+        try:
+            # Try loading as TokenClassification model directly
+            self.base_model = AutoModelForTokenClassification.from_pretrained(
+                self.hf_model_name,
+                num_labels=self.num_labels,
+                trust_remote_code=True,  # Required for ESM++ custom code
             )
-
-        print(f"\nLoading ESMC model: {self.hf_model_name}")
-
-        # Map common names to ESMC model names
-        model_name_map = {
-            'esmc-300m-2024-12': 'esmc_300m',
-            'esmc-600m-2024-12': 'esmc_600m',
-            'esmc-300m': 'esmc_300m',
-            'esmc-600m': 'esmc_600m',
-        }
-
-        esmc_model_name = model_name_map.get(self.hf_model_name, 'esmc_300m')
-
-        # Load ESMC base model
-        esmc_base = ESMC.from_pretrained(esmc_model_name)
-        print("✓ ESMC base model loaded")
-
-        # Wrap in our interface
-        self.base_model = ESMCModelWrapper(esmc_base, self.num_labels)
-        print("✓ ESMC wrapper initialized")
-
-    def _load_esm2_model(self):
-        """
-        Load ESM-2 model from HuggingFace.
-        """
-        # Load base model
-        print(f"\nLoading ESM-2 model: {self.hf_model_name}")
-        self.base_model = AutoModelForTokenClassification.from_pretrained(
-            self.hf_model_name,
-            num_labels=self.num_labels,
-        )
-        print("✓ Base model loaded")
+            print("✓ Base model loaded (TokenClassification)")
+        except Exception as e:
+            print(f"  Failed to load as TokenClassification: {e}")
+            print("  Falling back to AutoModel and adding classification head...")
+            # Load base model
+            self.base_model = AutoModel.from_pretrained(
+                self.hf_model_name,
+                trust_remote_code=True,  # Required for ESM++ custom code
+            )
+            print("✓ Base model loaded (AutoModel)")
         
     def _setup_lora(self):
         """Setup LoRA configuration and wrap the base model."""
@@ -718,14 +620,12 @@ class Seq3DiDataset(Dataset):
         # (header, aa_seq, 3di_seq)
         return self.items[idx]
 
-
 # -----------------------------
 # Collate with HF tokenizer
 # -----------------------------
-
 def make_collate_fn(tokenizer, char2idx, mask_label_chars: str = ""):
     """
-    - Tokenizes AA sequences with HF ESM tokenizer.
+    - Tokenizes AA sequences with HF tokenizer (ESM-2, ESM++, etc.).
     - Uses special_tokens_mask to align per-residue 3Di labels
       to non-special tokens.
     - Positions whose 3Di label is in mask_label_chars are set to -100
@@ -736,6 +636,7 @@ def make_collate_fn(tokenizer, char2idx, mask_label_chars: str = ""):
     def collate(batch):
         headers, aa_seqs, label_seqs = zip(*batch)
 
+        # Standard HuggingFace tokenization
         enc = tokenizer(
             list(aa_seqs),
             return_tensors="pt",
@@ -790,8 +691,7 @@ def make_collate_fn(tokenizer, char2idx, mask_label_chars: str = ""):
             "attention_mask": attention_mask,
             "labels": labels,
         }
+        
         return batch_out
 
     return collate
-
-

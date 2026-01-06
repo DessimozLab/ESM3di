@@ -11,8 +11,8 @@
   "cnn_num_layers": 2,
   "cnn_kernel_size": 3,
   "cnn_dropout": 0.1,
-  "batch_size": 16,
-  "gradient_accumulation_steps": 1,
+  "batch_size": 5,
+  "gradient_accumulation_steps": 2,
   "epochs": 3,
   "lr": 0.0002,
   "weight_decay": 0.01,
@@ -22,5 +22,5 @@
   "warmup_ratio": 0.01,
   "warmup_steps": null,
   "device": "cuda:1",
-  "out_dir": "checkpoints_mk2"
+  "out_dir": "checkpoints_ESM2big"
 }

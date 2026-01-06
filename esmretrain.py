@@ -5,10 +5,8 @@ import os
 import socket
 from typing import List, Tuple
 from datetime import datetime
-
 import torch
 from torch.utils.data import Dataset, DataLoader
-
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 from transformers import get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
 from peft import LoraConfig, get_peft_model, TaskType
@@ -29,7 +27,28 @@ def train(args):
     else:
         device = "cpu"
     
+    # Multi-GPU setup
+    if args.multi_gpu and torch.cuda.device_count() > 1:
+        print(f"Using {torch.cuda.device_count()} GPUs for training")
+        multi_gpu = True
+    else:
+        multi_gpu = False
+    
+    #set device
+    torch.device(device)
     print(f"Using device: {device}")
+    if multi_gpu:
+        print(f"Multi-GPU training enabled with {torch.cuda.device_count()} GPUs")
+    
+    # Setup mixed precision training
+    use_amp = args.mixed_precision and device != "cpu"
+    if use_amp:
+        print("Mixed precision training enabled (FP16)")
+        scaler = torch.cuda.amp.GradScaler()
+    else:
+        scaler = None
+        if args.mixed_precision and device == "cpu":
+            print("Warning: Mixed precision requested but not available on CPU")
     
     # Setup TensorBoard logging
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -60,13 +79,9 @@ def train(args):
     print(f"3Di vocab ({len(dataset.label_vocab)}): {dataset.label_vocab}")
     if args.mask_label_chars:
         print(f"Masked 3Di chars (ignored in loss): "
-              f"{list(set(args.mask_label_chars))}")
-
-    # 2) HF tokenizer + model
-    print(f"\nLoading tokenizer: {args.hf_model}")
-    tokenizer = AutoTokenizer.from_pretrained(args.hf_model)
-    print("✓ Tokenizer loaded")
-
+                f"{list(set(args.mask_label_chars))}")
+    
+    
     # Create ESM3Di model wrapper
     target_modules = None
     if args.lora_target_modules:
@@ -84,9 +99,25 @@ def train(args):
         cnn_kernel_size=args.cnn_kernel_size,
         cnn_dropout=args.cnn_dropout
     )
+
+    #if esm2 use the tokenizer from hf
+    if "esm2" in args.hf_model.lower():
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.hf_model,
+            trust_remote_code=True  # Required for ESM++ custom code
+        )
+    else:
+        tokenizer = esm_model.base_model.tokenizer
+
     model = esm_model.get_model()
     model.to(device)
-    print("✓ Model with LoRA loaded")
+    
+    # Wrap with DataParallel for multi-GPU training
+    if multi_gpu:
+        model = torch.nn.DataParallel(model)
+        print(f"✓ Model with LoRA loaded and wrapped with DataParallel ({torch.cuda.device_count()} GPUs)")
+    else:
+        print("✓ Model with LoRA loaded")
 
     # Print trainable parameters
     try:
@@ -220,15 +251,32 @@ def train(args):
         progress_bar = tqdm(loader, desc=f"Epoch {epoch}", unit="batch")
 
         for step, batch in enumerate(progress_bar, start=1):
+            
             batch = {k: v.to(device) for k, v in batch.items()}
-            outputs = model(**batch)
-            loss = outputs.loss
+            
+            # Mixed precision forward pass
+            if use_amp:
+                with torch.cuda.amp.autocast():
+                    outputs = model(**batch)
+                    loss = outputs.loss
+            else:
+                outputs = model(**batch)
+                loss = outputs.loss
+
+            # DataParallel returns loss per GPU, need to take mean
+            if multi_gpu and loss.dim() > 0:
+                loss = loss.mean()
 
             token_count = (batch["labels"] != -100).sum().item()
 
             # Scale loss by accumulation steps for proper gradient averaging
             scaled_loss = loss / args.gradient_accumulation_steps
-            scaled_loss.backward()
+            
+            # Mixed precision backward pass
+            if use_amp:
+                scaler.scale(scaled_loss).backward()
+            else:
+                scaled_loss.backward()
             
             accumulation_step += 1
 
@@ -244,8 +292,14 @@ def train(args):
             if accumulation_step % args.gradient_accumulation_steps == 0:
                 global_step += 1
                 
-                optimizer.step()
-                optimizer.zero_grad()
+                # Mixed precision optimizer step
+                if use_amp:
+                    scaler.step(optimizer)
+                    scaler.update()
+                    optimizer.zero_grad()
+                else:
+                    optimizer.step()
+                    optimizer.zero_grad()
                 
                 # Step the learning rate scheduler
                 if scheduler is not None:
@@ -296,9 +350,16 @@ def train(args):
         # Save checkpoint each epoch
         os.makedirs(args.out_dir, exist_ok=True)
         ckpt_path = os.path.join(args.out_dir, f"epoch_{epoch}.pt")
+        
+        # Get model state dict (handle DataParallel wrapper)
+        if multi_gpu:
+            model_state_dict = model.module.state_dict()
+        else:
+            model_state_dict = model.state_dict()
+        
         torch.save(
             {
-            "model_state_dict": model.state_dict(),
+            "model_state_dict": model_state_dict,
             "optimizer_state_dict": optimizer.state_dict(),
             "scheduler_state_dict": scheduler.state_dict() if scheduler is not None else None,
             "label_vocab": dataset.label_vocab,
@@ -356,10 +417,14 @@ def predict_3di_for_fasta(model_ckpt: str, aa_fasta: str, device: str = None):
             target_modules = ['q_proj', 'k_proj', 'v_proj', 'o_proj',
                               'fc1', 'fc2']
 
-    tokenizer = AutoTokenizer.from_pretrained(args["hf_model"])
+    tokenizer = AutoTokenizer.from_pretrained(
+        args["hf_model"],
+        trust_remote_code=True  # Required for ESM++ custom code
+    )
     base_model = AutoModelForTokenClassification.from_pretrained(
         args["hf_model"],
         num_labels=len(label_vocab),
+        trust_remote_code=True  # Required for ESM++ custom code
     )
 
     lora_config = LoraConfig(
@@ -441,12 +506,11 @@ def parse_args():
     # Model
     p.add_argument("--hf-model", type=str,
                    default="facebook/esm2_t12_35M_UR50D",
-                   help="HuggingFace model name or ESMC model identifier. "
-                        "ESM-2 options: esm2_t12_35M_UR50D (35M params), "
-                        "esm2_t30_150M_UR50D (150M), esm2_t33_650M_UR50D (650M). "
-                        "ESMC options: esmc-300m-2024-12 (300M params), "
-                        "esmc-600m-2024-12 (600M params). "
-                        "Note: ESMC models require 'pip install esm'")
+                   help="HuggingFace model name. "
+                        "ESM-2 options: facebook/esm2_t12_35M_UR50D (35M params), "
+                        "facebook/esm2_t30_150M_UR50D (150M), facebook/esm2_t33_650M_UR50D (650M). "
+                        "ESM++ options: Synthyra/ESMplusplus_small (333M params), "
+                        "Synthyra/ESMplusplus_large (575M params).")
 
     # Masking
     p.add_argument(
@@ -521,13 +585,19 @@ def parse_args():
     p.add_argument("--warmup-ratio", type=float, default=None,
                    help="Warmup ratio (fraction of total steps). Default: 0.1 (10%%)")
     
-    # Device
+    # Device and performance
     p.add_argument("--device", type=str, default=None,
                    help="Device to use (e.g., 'cuda:0', 'cuda:1', 'cpu'). "
                         "If not specified, uses CUDA if available.")
     p.add_argument("--cpu", action="store_true",
                    help="Force CPU even if CUDA is available "
                         "(ignored if --device is specified)")
+    p.add_argument("--mixed-precision", action="store_true",
+                   help="Enable mixed precision training (FP16) for faster training "
+                        "and reduced memory usage. Only works with CUDA.")
+    p.add_argument("--multi-gpu", action="store_true",
+                   help="Enable multi-GPU training using DataParallel. "
+                        "Automatically uses all available GPUs.")
     
     # Output
     p.add_argument("--out-dir", type=str, default="esm_hf_peft_3di_ckpts",
