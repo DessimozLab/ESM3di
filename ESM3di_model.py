@@ -486,7 +486,15 @@ class ESM3DiModel:
         self.model.eval()
         
         # Initialize tokenizer
-        tokenizer = AutoTokenizer.from_pretrained(self.hf_model_name)
+        #if the model uses a custom tokenizer, it should be handled here
+        if self.model.base_model.tokenizer is not None:
+            tokenizer = self.model.base_model.tokenizer
+        else:
+            tokenizer = AutoTokenizer.from_pretrained(
+                self.hf_model_name,
+                do_lower_case=False,
+                trust_remote_code=True,
+            )
         
         # Create label vocabulary mapping
         label_vocab = list("ACDEFGHIKLMNPQRSTVWY")
