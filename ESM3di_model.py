@@ -360,6 +360,7 @@ class ESM3DiModel:
         # Load model using standard HuggingFace approach
         self._load_model()
 
+
         # Determine target modules for LoRA
         if target_modules:
             self.target_modules = target_modules
@@ -395,6 +396,7 @@ class ESM3DiModel:
                 trust_remote_code=True,  # Required for ESM++ custom code
             )
             print("✓ Base model loaded (TokenClassification)")
+            
         except Exception as e:
             print(f"  Failed to load as TokenClassification: {e}")
             print("  Falling back to AutoModel and adding classification head...")
@@ -403,6 +405,7 @@ class ESM3DiModel:
                 self.hf_model_name,
                 trust_remote_code=True,  # Required for ESM++ custom code
             )
+            self.tokenizer = self.base_model.tokenizer
             print("✓ Base model loaded (AutoModel)")
         
     def _setup_lora(self):
