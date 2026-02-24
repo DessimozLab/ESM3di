@@ -372,6 +372,9 @@ def train(args):
             },
             ckpt_path,
         )
+        
+        torch.save( model if not multi_gpu else model.module, ckpt_path.replace(".pt", "_model.pt") )
+
         print(f"Saved checkpoint to {ckpt_path}")
         print()
     

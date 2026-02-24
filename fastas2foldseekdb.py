@@ -243,6 +243,12 @@ Examples:
         default=None,
         help="Path to save 3Di FASTA (default: temp file unless --keep-fastas)"
     )
+    parser.add_argument(
+        "--output-confidence-fasta",
+        type=str,
+        default=None,
+        help="Path to save confidence FASTA (optional, default: not saved)"
+    )
     
     # FoldSeek options
     parser.add_argument(
@@ -339,7 +345,12 @@ Examples:
                 'hf_model_name',
                 args_dict.get('hf_model', 'facebook/esm2_t33_650M_UR50D')
             )
+
+
             num_labels = len(checkpoint.get('label_vocab', []))
+            label_vocab = checkpoint.get('label_vocab', [])
+            idx2char = {i: c for i, c in enumerate(label_vocab)}
+            
             use_cnn_head = args_dict.get('use_cnn_head', False)
             lora_r = args_dict.get('lora_r', 8)
             lora_alpha = args_dict.get('lora_alpha', 16)
@@ -360,7 +371,7 @@ Examples:
                 cnn_kernel_size=args_dict.get('cnn_kernel_size', 3),
                 cnn_dropout=args_dict.get('cnn_dropout', 0.1)
             )
-            
+                        
             # Copy input AA FASTA to output location (for database creation)
             if aa_fasta_path != args.aa_fasta:
                 import shutil

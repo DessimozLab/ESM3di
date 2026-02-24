@@ -16,8 +16,13 @@ ESM + PEFT LoRA for 3Di per-residue prediction. Train an ESM-2 model with LoRA a
 
 1. Create and activate the conda environment:
 ```bash
+# For the full training environment:
 conda env create -f environment.yml
 conda activate esm3di
+
+# For the inference-only environment (includes FoldSeek):
+conda env create -f fastas2foldseekdb_env.yml
+conda activate fastas2foldseekdb
 ```
 
 ### Option 2: Using pip
@@ -253,6 +258,32 @@ Checkpoints are saved after each epoch and contain:
 - Label vocabulary
 - Masked label characters
 - Training arguments
+
+### Available Pre-trained Checkpoints
+
+| Checkpoint | Model | CNN Head | Loss | Predictions |
+|------------|-------|----------|------|-------------|
+| `checkpoints/epoch_3.pt` | ESM2 35M | No | ~N/A | **Working** |
+| `checkpoints_mk2/epoch_3.pt` | ESM2 | Yes | 1.51 | Untested |
+| `checkpoints_ESM2big/epoch_3.pt` | ESM2 | Yes | 1.51 | Untested |
+| `checkpoints_ESMplusplus_small/epoch_3.pt` | ESMplusplus | Yes | 1.28 | Uniform outputs* |
+
+*The ESMplusplus checkpoint produces near-uniform predictions (all "V") due to the model's layer-normalized hidden states having very low variance (~0.04), which makes it difficult for the CNN head to learn discriminative features.
+
+**Recommended checkpoint for inference:** `checkpoints/epoch_3.pt` (ESM2 35M, no CNN head)
+
+### Verifying Predictions
+
+Use the test script to verify that model outputs have sufficient diversity:
+
+```bash
+python test_output_diversity.py output_3di.fasta
+```
+
+This will check that:
+- Output contains multiple unique 3Di characters
+- No single character dominates more than 50% of predictions
+- Output is not effectively uniform (>90% one character)
 
 ## Requirements
 

@@ -408,6 +408,7 @@ class ESM3DiModel:
             self.tokenizer = self.base_model.tokenizer
             print("✓ Base model loaded (AutoModel)")
         
+
     def _setup_lora(self):
         """Setup LoRA configuration and wrap the base model."""
         lora_config = LoraConfig(
@@ -450,7 +451,10 @@ class ESM3DiModel:
                           output_fasta_path: str,
                           model_checkpoint_path: str = None,
                           batch_size: int = 4,
-                          device: str = None):
+                          device: str = None,
+                          output_confidence_fasta: str = None
+                          
+                          ):
         """
         Predict 3Di sequences from amino acid FASTA file.
         
@@ -476,35 +480,56 @@ class ESM3DiModel:
             print(f"Loading model from: {model_checkpoint_path}")
             checkpoint = torch.load(model_checkpoint_path,
                                    map_location=device)
+            print("✓ Checkpoint loaded")
+            print(type(checkpoint))
+            print( type(self.model))
             if isinstance(checkpoint, dict) and \
                'model_state_dict' in checkpoint:
-                self.model.load_state_dict(checkpoint['model_state_dict'])
+                
+                # Use strict=False to handle cases where checkpoint 
+                # doesn't include all weights (e.g., frozen embeddings)
+                result = self.model.load_state_dict(
+                    checkpoint['model_state_dict'], 
+                    strict=False
+                )
                 epoch = checkpoint.get('epoch', 'unknown')
                 print(f"✓ Loaded model from epoch {epoch}")
+                if result.missing_keys:
+                    print(f"  (Note: {len(result.missing_keys)} frozen weights "
+                          f"not in checkpoint - this is expected)")
             else:
-                self.model.load_state_dict(checkpoint)
+                result = self.model.load_state_dict(checkpoint, strict=False)
                 print("✓ Loaded model checkpoint")
-        
+                if result.missing_keys:
+                    print(f"  (Note: {len(result.missing_keys)} frozen weights "
+                          f"not in checkpoint - this is expected)")
+
+            label_vocab = checkpoint["label_vocab"]
+            idx2char = {i: c for i, c in enumerate(label_vocab)}
+            args = checkpoint["args"]
+        else:
+            print("No checkpoint provided, using current model state")
+            label_vocab = list("ACDEFGHIKLMNPQRSTVWY")[:self.num_labels]
+            idx2char = {i: c for i, c in enumerate(label_vocab)}
+
         self.model = self.model.to(device)
         self.model.eval()
         
         # Initialize tokenizer
-        #if the model uses a custom tokenizer, it should be handled here
-        if self.model.base_model.tokenizer is not None:
-            tokenizer = self.model.base_model.tokenizer
-        else:
+        # Try to get tokenizer from model, fallback to loading from HF
+        tokenizer = None
+        try:
+            if hasattr(self.model, 'base_model') and hasattr(self.model.base_model, 'tokenizer'):
+                tokenizer = self.model.base_model.tokenizer
+        except AttributeError:
+            pass
+        
+        if tokenizer is None:
             tokenizer = AutoTokenizer.from_pretrained(
                 self.hf_model_name,
                 do_lower_case=False,
                 trust_remote_code=True,
             )
-        
-        # Create label vocabulary mapping
-        label_vocab = list("ACDEFGHIKLMNPQRSTVWY")
-        if self.num_labels != len(label_vocab):
-            # Create generic vocab if mismatch
-            label_vocab = [chr(65 + i) for i in range(self.num_labels)]
-        idx2char = {i: ch for i, ch in enumerate(label_vocab)}
         
         # Read input FASTA
         print(f"Reading input FASTA: {input_fasta_path}")
@@ -536,11 +561,11 @@ class ESM3DiModel:
                 # Get predictions
                 outputs = self.model(input_ids=input_ids,
                                     attention_mask=attention_mask)
+                
                 logits = outputs.logits
                 
                 # Get predicted labels
                 pred_labels = torch.argmax(logits, dim=-1)
-                
                 # Convert predictions to 3Di sequences
                 for j, (header, seq) in enumerate(zip(headers, seqs)):
                     pred_3di = []
