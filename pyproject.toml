@@ -24,15 +24,15 @@ classifiers = [
 ]
 dependencies = [
     # Core ML dependencies
-    "torch>=2.5.0",
-    "transformers>=4.45.0,<4.49.0",  # Compatible with peft 0.12.x and ESM++
-    "peft>=0.12.0,<0.14.0",          # LoRA adapters, compatible with transformers 4.48.x
-    "accelerate>=1.0.0",              # Required by peft and transformers
+    "torch>=2.0.0",
+    "transformers>=4.40.0",           # Compatible with ESM++ and peft
+    "peft>=0.10.0",                   # LoRA adapters
+    "accelerate>=0.20.0",             # Required by peft and transformers
     "safetensors>=0.4.0",             # Fast model loading
     
     # Tokenizer dependencies
     "sentencepiece>=0.2.0",
-    "tokenizers>=0.20.0",
+    "tokenizers>=0.15.0",
     "protobuf>=4.0.0",
     
     # Scientific computing

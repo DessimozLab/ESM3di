@@ -168,12 +168,20 @@ def discover_lora_target_modules(model) -> List[str]:
     """
     Automatically discover LoRA target modules by finding supported layer types.
     Recursively searches for Linear, Embedding, Conv2d, and Conv1D layers.
+    Excludes classifier and head modules which should train fully, not via LoRA.
     """
+    # Modules to exclude from LoRA (these train fully)
+    exclude_patterns = ['classifier', 'head', 'lm_head', 'score', 'pooler']
     
     target_modules = set()
     def recurse_modules(module, parent_name=""):
         for name, child in module.named_children():
             full_name = f"{parent_name}.{name}" if parent_name else name
+            
+            # Skip modules that should train fully (not LoRA)
+            if any(pattern in full_name.lower() for pattern in exclude_patterns):
+                continue
+                
             # Check if this module is a supported type
             if isinstance(child, (torch.nn.Linear, torch.nn.Embedding, 
                                     torch.nn.Conv2d, Conv1D)):
@@ -411,12 +419,24 @@ class ESM3DiModel:
 
     def _setup_lora(self):
         """Setup LoRA configuration and wrap the base model."""
+        # Filter target modules to only include transformer layers (not heads/classifiers)
+        # This prevents conflicts with modules_to_save in newer peft versions
+        safe_target_modules = [
+            m for m in self.target_modules 
+            if not any(x in m.lower() for x in ['classifier', 'head', 'score', 'pooler', 'lm_head'])
+        ]
+        
+        if not safe_target_modules:
+            # Fallback to common transformer layer patterns
+            safe_target_modules = ["query", "key", "value", "dense", "attention"]
+            print(f"  Using fallback target modules: {safe_target_modules}")
+        
         lora_config = LoraConfig(
             task_type=TaskType.TOKEN_CLS,
             r=self.lora_r,
             lora_alpha=self.lora_alpha,
             lora_dropout=self.lora_dropout,
-            target_modules=self.target_modules,
+            target_modules=safe_target_modules,
         )
         
         self.model = get_peft_model(self.base_model, lora_config)
