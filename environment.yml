@@ -3,28 +3,44 @@ channels:
   - pytorch
   - nvidia
   - conda-forge
-  - defaults
   - bioconda
+  - defaults
 dependencies:
   - python=3.10
   - pip
-  # PyTorch with CUDA support (adjust cuda version as needed)
-  - pytorch>=2.0.0
+  # PyTorch with CUDA 11.8 support
+  - pytorch>=2.5.0
   - pytorch-cuda=11.8
   - cudatoolkit=11.8
+  # FoldSeek for database creation
   - foldseek
   # Pip dependencies
   - pip:
-      - transformers>=4.30.0,<4.48.2  # Compatible with esm 3.2.1.post1
-      - peft>=0.5.0,<0.13.0  # Compatible with transformers <4.48.2
-      - accelerate>=0.20.0
-      - sentencepiece  # for ESM tokenizer
-      - protobuf
-      - pandas
-      - pebble
-      - tensorboard
-      - biopython
-      - esm
-      - httpx
-      - flash-attn
-      - -e .  # Install package in editable mode
+      # Core ML - compatible with ESM++ (Synthyra) and PEFT
+      - transformers>=4.45.0,<4.49.0
+      - peft>=0.12.0,<0.14.0
+      - accelerate>=1.0.0
+      - safetensors>=0.4.0
+      # Tokenizers
+      - sentencepiece>=0.2.0
+      - tokenizers>=0.20.0
+      - protobuf>=4.0.0
+      # Scientific computing
+      - numpy>=1.24.0
+      - scipy>=1.10.0
+      - pandas>=2.0.0
+      - scikit-learn>=1.3.0
+      # Bioinformatics
+      - biopython>=1.80
+      # Utilities
+      - tqdm>=4.65.0
+      - huggingface-hub>=0.20.0
+      - einops>=0.7.0
+      - tensorboard>=2.14.0
+      - pyyaml>=6.0
+      - requests>=2.28.0
+      - fsspec>=2023.1.0
+      # GPU optimization
+      - bitsandbytes>=0.42.0
+      # Install package in editable mode
+      - -e .

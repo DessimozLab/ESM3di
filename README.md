@@ -1,6 +1,20 @@
 # ESM3Di
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/YOUR_USERNAME/ESM3di/blob/main/ESM3Di_Colab.ipynb)
+
 ESM + PEFT LoRA for 3Di per-residue prediction. Train ESM-2 or ESM++ models with LoRA adapters to predict 3Di structural sequences from amino acid sequences.
+
+## Try It Online
+
+**No installation required!** Run ESM3Di directly in Google Colab with GPU support:
+
+[**→ Open ESM3Di in Colab**](https://colab.research.google.com/github/YOUR_USERNAME/ESM3di/blob/main/ESM3Di_Colab.ipynb)
+
+The Colab notebook allows you to:
+- Predict 3Di sequences from amino acid FASTAs
+- Choose between ESM2 and ESM++ models
+- Download results as FASTA files
+- Create FoldSeek databases
 
 ## Features
 
@@ -9,6 +23,7 @@ ESM + PEFT LoRA for 3Di per-residue prediction. Train ESM-2 or ESM++ models with
 - 🔧 Support for masking low-confidence positions
 - ⚡ Multi-GPU training with DataParallel
 - 🔀 Multi-GPU inference with automatic sharding
+- 🌐 Google Colab notebook for online inference
 
 ## Installation
 
@@ -16,14 +31,16 @@ ESM + PEFT LoRA for 3Di per-residue prediction. Train ESM-2 or ESM++ models with
 
 1. Create and activate the conda environment:
 ```bash
-# For the full training environment:
+# Standard environment (CUDA 11.8, most GPUs):
 conda env create -f environment.yml
 conda activate esm3di
 
-# For the inference-only environment (includes FoldSeek):
-conda env create -f fastas2foldseekdb_env.yml
-conda activate fastas2foldseekdb
+# For Blackwell GPUs (RTX 5090, RTX PRO 4000, etc.):
+conda env create -f environment_blackwell.yml
+conda activate esm3di_blackwell
 ```
+
+**Note:** For exact reproducibility, use `environment_frozen.yml` which has pinned versions.
 
 ### Option 2: Using pip
 
@@ -340,18 +357,34 @@ Checkpoints are saved after each epoch and contain:
 - Masked label characters
 - Training arguments
 
+### Downloading Pre-trained Checkpoints
+
+Pre-trained checkpoints are hosted on HuggingFace Hub for easy access:
+
+```python
+from huggingface_hub import hf_hub_download
+
+# Download ESM2 35M checkpoint (~131MB)
+checkpoint = hf_hub_download(
+    repo_id="YOUR_USERNAME/esm3di-checkpoints",
+    filename="esm2_35m_epoch_3.pt"
+)
+
+# Or download ESM++ BFVD checkpoint (~1.4GB)
+checkpoint = hf_hub_download(
+    repo_id="YOUR_USERNAME/esm3di-checkpoints",
+    filename="esmpp_bfvd_epoch_3.pt"
+)
+```
+
 ### Available Pre-trained Checkpoints
 
-| Checkpoint | Model | CNN Head | Loss | Predictions |
-|------------|-------|----------|------|-------------|
-| `checkpoints/epoch_3.pt` | ESM2 35M | No | ~N/A | **Working** |
-| `checkpoints_mk2/epoch_3.pt` | ESM2 | Yes | 1.51 | Untested |
-| `checkpoints_ESM2big/epoch_3.pt` | ESM2 | Yes | 1.51 | Untested |
-| `checkpoints_esmpp_bfvd/epoch_3.pt` | ESM++ small | Yes | - | Trained on BFVD |
+| HuggingFace Filename | Model | Size | Description |
+|---------------------|-------|------|-------------|
+| `esm2_35m_epoch_3.pt` | ESM2 35M | ~131MB | Fast, well-tested, recommended |
+| `esmpp_bfvd_epoch_3.pt` | ESM++ small | ~1.4GB | Trained on BFVD, better accuracy |
 
-*Some ESM++ checkpoints may produce near-uniform predictions due to the model's layer-normalized hidden states having low variance.
-
-**Recommended checkpoint for inference:** `checkpoints/epoch_3.pt` (ESM2 35M, no CNN head) or the BFVD-trained ESM++ checkpoint.
+**Recommended for most users:** `esm2_35m_epoch_3.pt` (fast, small, reliable)
 
 ### Verifying Predictions
 

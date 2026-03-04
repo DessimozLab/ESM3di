@@ -1,18 +1,39 @@
-# Core dependencies
-torch>=2.0.0
-transformers>=4.30.0,<4.48.2  # Compatible with esm 3.2.1.post1
-peft>=0.5.0,<0.13.0  # Compatible with transformers <4.48.2
-accelerate>=0.20.0
+# ESM3Di Requirements
+# Compatible with ESM++ (Synthyra) models and PEFT LoRA training
+#
+# For GPU support with bitsandbytes, install with:
+#   pip install -r requirements.txt bitsandbytes triton
 
-# ESM tokenizer dependencies
-sentencepiece
-protobuf
+# Core ML dependencies
+torch>=2.5.0
+transformers>=4.45.0,<4.49.0      # Compatible with peft 0.12.x and ESM++ (Synthyra)
+peft>=0.12.0,<0.14.0              # LoRA adapters
+accelerate>=1.0.0                  # Required by peft and transformers
+safetensors>=0.4.0                 # Fast model loading
 
-# Optional: ESMC model support (EvolutionaryScale models)
-# esm  # Uncomment to enable ESMC-300M and ESMC-600M models
+# Tokenizer dependencies
+sentencepiece>=0.2.0
+tokenizers>=0.20.0
+protobuf>=4.0.0
 
-# Optional: for better performance
-bitsandbytes  # For 8-bit optimization
-pebble
-pandas
-tensorboard
+# Scientific computing
+numpy>=1.24.0
+scipy>=1.10.0
+pandas>=2.0.0
+scikit-learn>=1.3.0
+
+# Bioinformatics
+biopython>=1.80
+
+# Utilities
+tqdm>=4.65.0
+huggingface-hub>=0.20.0
+einops>=0.7.0
+tensorboard>=2.14.0
+pyyaml>=6.0
+requests>=2.28.0
+fsspec>=2023.1.0
+
+# Optional: GPU optimization (uncomment if needed)
+# bitsandbytes>=0.42.0    # 8-bit optimization
+# triton>=2.1.0           # Flash attention kernels
