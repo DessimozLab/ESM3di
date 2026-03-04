@@ -366,25 +366,25 @@ from huggingface_hub import hf_hub_download
 
 # Download ESM2 35M checkpoint (~131MB)
 checkpoint = hf_hub_download(
-    repo_id="DessimozLab/esm3di-checkpoints",
-    filename="esm2_35m_epoch_3.pt"
+    repo_id="cactuskid13/esm2small_3di",
+    filename="epoch_3.pt"
 )
 
 # Or download ESM++ BFVD checkpoint (~1.4GB)
 checkpoint = hf_hub_download(
-    repo_id="DessimozLab/esm3di-checkpoints",
-    filename="esmpp_bfvd_epoch_3.pt"
+    repo_id="cactuskid13/ESMpp_small_3Di",
+    filename="epoch_3.pt"
 )
 ```
 
 ### Available Pre-trained Checkpoints
 
-| HuggingFace Filename | Model | Size | Description |
-|---------------------|-------|------|-------------|
-| `esm2_35m_epoch_3.pt` | ESM2 35M | ~131MB | Fast, well-tested, recommended |
-| `esmpp_bfvd_epoch_3.pt` | ESM++ small | ~1.4GB | Trained on BFVD, better accuracy |
+| HuggingFace Repository | Model | Size | Description |
+|------------------------|-------|------|-------------|
+| [cactuskid13/esm2small_3di](https://huggingface.co/cactuskid13/esm2small_3di) | ESM2 35M | ~131MB | Fast, well-tested, recommended |
+| [cactuskid13/ESMpp_small_3Di](https://huggingface.co/cactuskid13/ESMpp_small_3Di) | ESM++ small | ~1.4GB | Trained on BFVD, better accuracy |
 
-**Recommended for most users:** `esm2_35m_epoch_3.pt` (fast, small, reliable)
+**Recommended for most users:** `cactuskid13/esm2small_3di` (fast, small, reliable)
 
 ### Verifying Predictions
 
