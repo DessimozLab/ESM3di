@@ -9,7 +9,10 @@ __pycache__/
 # Distribution / packaging
 .Python
 build/
+tensorboard_logs/
 develop-eggs/
+flavi_redo/
+proteomes/
 dist/
 downloads/
 eggs/
@@ -33,6 +36,7 @@ MANIFEST
 
 # Unit test / coverage reports
 htmlcov/
+.sisiphus/
 .tox/
 .nox/
 .coverage

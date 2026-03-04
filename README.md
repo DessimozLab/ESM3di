@@ -1,14 +1,14 @@
 # ESM3Di
 
-ESM + PEFT LoRA for 3Di per-residue prediction. Train an ESM-2 model with LoRA adapters to predict 3Di structural sequences from amino acid sequences.
+ESM + PEFT LoRA for 3Di per-residue prediction. Train ESM-2 or ESM++ models with LoRA adapters to predict 3Di structural sequences from amino acid sequences.
 
 ## Features
 
-- 🧬 Train ESM-2 models for 3Di structure prediction
+- 🧬 Train ESM-2 and ESM++ models for 3Di structure prediction
 - 🎯 Memory-efficient training using LoRA (Low-Rank Adaptation)
 - 🔧 Support for masking low-confidence positions
-- 📊 Per-residue token classification
-- 🚀 Inference on new sequences
+- ⚡ Multi-GPU training with DataParallel
+- 🔀 Multi-GPU inference with automatic sharding
 
 ## Installation
 
@@ -119,54 +119,112 @@ python -m esm3di.esmretrain \
     --out-dir checkpoints/
 ```
 
-#### Using ESMC Models
+#### Using ESM++ Models
 
-The newer ESMC models from EvolutionaryScale are now supported and offer improved performance:
+ESM++ models from Synthyra (via HuggingFace) are supported and offer improved performance:
 
 ```bash
-# First install the esm library
-pip install esm
-
-# Train with ESMC-300M
+# Train with ESM++ Small (333M params)
 python -m esm3di.esmretrain \
     --aa-fasta data/sequences.fasta \
     --three-di-fasta data/3di_labels.fasta \
-    --hf-model esmc-300m-2024-12 \
+    --hf-model Synthyra/ESMplusplus_small \
     --mask-label-chars "X" \
     --batch-size 4 \
     --epochs 10 \
-    --lr 1e-4 \
+    --lr 2e-4 \
     --out-dir checkpoints/
 
-# Or use ESMC-600M for better quality
+# Or use ESM++ Large for better quality
 python -m esm3di.esmretrain \
-    --hf-model esmc-600m-2024-12 \
+    --hf-model Synthyra/ESMplusplus_large \
     # ... other args
 ```
 
-**Available ESMC Models:**
-- `esmc-300m-2024-12`: 300M parameters, 30 layers
-- `esmc-600m-2024-12`: 600M parameters, 36 layers
+**Available ESM++ Models:**
+- `Synthyra/ESMplusplus_small`: 333M parameters
+- `Synthyra/ESMplusplus_large`: 575M parameters
 
-ESMC models provide:
+ESM++ models provide:
 - Better protein representations than ESM-2
 - Faster inference
 - Improved scaling and performance
-
-**Note:** ESMC models require the `esm` library from EvolutionaryScale. Install with `pip install esm`.
+- Native HuggingFace integration (no additional dependencies)
 
 #### Key Arguments
 
 - `--aa-fasta`: FASTA file with amino acid sequences
 - `--three-di-fasta`: FASTA file with matching 3Di sequences (same order and length)
-- `--hf-model`: Model identifier. ESM-2 options: `facebook/esm2_t12_35M_UR50D` (35M), `facebook/esm2_t30_150M_UR50D` (150M), `facebook/esm2_t33_650M_UR50D` (650M). ESMC options: `esmc-300m-2024-12` (300M), `esmc-600m-2024-12` (600M)
+- `--hf-model`: Model identifier. ESM-2 options: `facebook/esm2_t12_35M_UR50D` (35M), `facebook/esm2_t30_150M_UR50D` (150M), `facebook/esm2_t33_650M_UR50D` (650M). ESM++ options: `Synthyra/ESMplusplus_small` (333M), `Synthyra/ESMplusplus_large` (575M)
 - `--mask-label-chars`: Characters to treat as masked (e.g., low pLDDT positions)
 - `--lora-r`: LoRA rank (default: 8)
 - `--lora-alpha`: LoRA scaling factor (default: 16.0)
-- `--batch-size`: Training batch size
+- `--batch-size`: Training batch size per GPU
 - `--epochs`: Number of training epochs
 - `--lr`: Learning rate
 - `--out-dir`: Directory to save checkpoints
+- `--multi-gpu`: Enable multi-GPU training (uses all available GPUs)
+- `--mixed-precision`: Enable FP16 mixed precision training
+- `--gradient-accumulation-steps`: Accumulate gradients over N batches
+
+### Multi-GPU Training
+
+For training on multiple GPUs, use the `--multi-gpu` flag:
+
+```bash
+python -m esm3di.esmretrain \
+    --aa-fasta data/sequences.fasta \
+    --three-di-fasta data/3di_labels.fasta \
+    --hf-model Synthyra/ESMplusplus_small \
+    --batch-size 8 \
+    --multi-gpu \
+    --mixed-precision \
+    --epochs 10 \
+    --out-dir checkpoints/
+```
+
+This uses `torch.nn.DataParallel` to automatically distribute batches across all available GPUs. The effective batch size is `batch_size * num_gpus`.
+
+**Multi-GPU Training Options:**
+- `--multi-gpu`: Enable DataParallel multi-GPU training
+- `--mixed-precision`: Enable FP16 for faster training and reduced memory
+- `--gradient-accumulation-steps`: Simulate larger batches when GPU memory is limited
+- `--device`: Specify primary GPU (e.g., `cuda:0`)
+
+**Example with gradient accumulation:**
+```bash
+# Effective batch size = 4 * 4 * 2 GPUs = 32
+python -m esm3di.esmretrain \
+    --batch-size 4 \
+    --gradient-accumulation-steps 4 \
+    --multi-gpu \
+    # ... other args
+```
+
+### Using Config Files
+
+For reproducible experiments, use JSON config files:
+
+```bash
+python -m esm3di.esmretrain --config config_esmpp_large.json
+```
+
+Example config file:
+```json
+{
+  "aa_fasta": "data/sequences.fasta",
+  "three_di_fasta": "data/3di_labels.fasta",
+  "hf_model": "Synthyra/ESMplusplus_small",
+  "mask_label_chars": "X",
+  "use_cnn_head": true,
+  "batch_size": 8,
+  "epochs": 3,
+  "lr": 0.0002,
+  "multi_gpu": true,
+  "mixed_precision": true,
+  "out_dir": "checkpoints_esmpp"
+}
+```
 
 ### Inference
 
@@ -202,6 +260,29 @@ This will:
 1. Run ESM inference to predict 3Di sequences
 2. Create intermediate AA and 3Di FASTA files
 3. Build a FoldSeek database with both sequence and structure information
+
+#### Multi-GPU Inference
+
+For large datasets, enable multi-GPU inference to parallelize predictions:
+
+```bash
+python -m esm3di.fastas2foldseekdb \
+    --aa-fasta data/large_dataset.fasta \
+    --model-ckpt checkpoints/epoch_10.pt \
+    --output-db my_foldseek_db \
+    --multi-gpu \
+    --num-gpus 4
+```
+
+**How Multi-GPU Inference Works:**
+1. Input sequences are sharded across GPUs using round-robin distribution
+2. Each GPU runs as an isolated subprocess with its own CUDA context
+3. Predictions are merged back into original sequence order
+4. FoldSeek database is built from the merged results
+
+**Multi-GPU Inference Options:**
+- `--multi-gpu`: Enable multi-GPU inference
+- `--num-gpus`: Number of GPUs to use (default: all available)
 
 #### Using Pre-computed 3Di Sequences
 
@@ -266,11 +347,11 @@ Checkpoints are saved after each epoch and contain:
 | `checkpoints/epoch_3.pt` | ESM2 35M | No | ~N/A | **Working** |
 | `checkpoints_mk2/epoch_3.pt` | ESM2 | Yes | 1.51 | Untested |
 | `checkpoints_ESM2big/epoch_3.pt` | ESM2 | Yes | 1.51 | Untested |
-| `checkpoints_ESMplusplus_small/epoch_3.pt` | ESMplusplus | Yes | 1.28 | Uniform outputs* |
+| `checkpoints_esmpp_bfvd/epoch_3.pt` | ESM++ small | Yes | - | Trained on BFVD |
 
-*The ESMplusplus checkpoint produces near-uniform predictions (all "V") due to the model's layer-normalized hidden states having very low variance (~0.04), which makes it difficult for the CNN head to learn discriminative features.
+*Some ESM++ checkpoints may produce near-uniform predictions due to the model's layer-normalized hidden states having low variance.
 
-**Recommended checkpoint for inference:** `checkpoints/epoch_3.pt` (ESM2 35M, no CNN head)
+**Recommended checkpoint for inference:** `checkpoints/epoch_3.pt` (ESM2 35M, no CNN head) or the BFVD-trained ESM++ checkpoint.
 
 ### Verifying Predictions
 
@@ -292,14 +373,11 @@ This will check that:
 - transformers ≥ 4.30.0
 - peft ≥ 0.5.0
 - CUDA-capable GPU (recommended)
-- esm (optional, for ESMC models): `pip install esm`
+- biopython (for FoldSeek database creation)
 
-For ESMC model support, install the EvolutionaryScale ESM library:
-```bash
-pip install esm
-```
-
-This enables training with the newer ESMC-300M and ESMC-600M models.
+**For multi-GPU training/inference:**
+- Multiple CUDA-capable GPUs
+- Sufficient GPU memory (ESM++ small: ~4GB per GPU, ESM++ large: ~8GB per GPU)
 
 ## License
 
@@ -309,5 +387,13 @@ MIT License
 
 If you use this code, please cite the relevant papers:
 - ESM-2: [Lin et al., 2022]
+- ESM++: [Synthyra, 2024] - https://huggingface.co/Synthyra
 - LoRA: [Hu et al., 2021]
 - 3Di: [van Kempen et al., 2023]
+
+
+## Funding
+
+Funded by NIH through the [Pathogen Data Network](https://www.pathogendatanetwork.org).
+
+*This resource is supported by the National Institute Of Allergy And Infectious Diseases of the National Institutes of Health under Award Number U24AI183840. The content is solely the responsibility of the authors and does not necessarily represent the official views of the National Institutes of Health.
