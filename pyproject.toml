@@ -76,7 +76,9 @@ all = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/esm3di"
+Homepage = "https://github.com/DessimozLab/ESM3di"
+Repository = "https://github.com/DessimozLab/ESM3di"
+Issues = "https://github.com/DessimozLab/ESM3di/issues"
 
 [project.scripts]
 esm3di-train = "esm3di.esmretrain:main"

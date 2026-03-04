@@ -1,6 +1,6 @@
 # ESM3Di
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/YOUR_USERNAME/ESM3di/blob/main/ESM3Di_Colab.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/DessimozLab/ESM3di/blob/main/ESM3Di_Colab.ipynb)
 
 ESM + PEFT LoRA for 3Di per-residue prediction. Train ESM-2 or ESM++ models with LoRA adapters to predict 3Di structural sequences from amino acid sequences.
 
@@ -8,7 +8,7 @@ ESM + PEFT LoRA for 3Di per-residue prediction. Train ESM-2 or ESM++ models with
 
 **No installation required!** Run ESM3Di directly in Google Colab with GPU support:
 
-[**→ Open ESM3Di in Colab**](https://colab.research.google.com/github/YOUR_USERNAME/ESM3di/blob/main/ESM3Di_Colab.ipynb)
+[**→ Open ESM3Di in Colab**](https://colab.research.google.com/github/DessimozLab/ESM3di/blob/main/ESM3Di_Colab.ipynb)
 
 The Colab notebook allows you to:
 - Predict 3Di sequences from amino acid FASTAs
@@ -366,13 +366,13 @@ from huggingface_hub import hf_hub_download
 
 # Download ESM2 35M checkpoint (~131MB)
 checkpoint = hf_hub_download(
-    repo_id="YOUR_USERNAME/esm3di-checkpoints",
+    repo_id="DessimozLab/esm3di-checkpoints",
     filename="esm2_35m_epoch_3.pt"
 )
 
 # Or download ESM++ BFVD checkpoint (~1.4GB)
 checkpoint = hf_hub_download(
-    repo_id="YOUR_USERNAME/esm3di-checkpoints",
+    repo_id="DessimozLab/esm3di-checkpoints",
     filename="esmpp_bfvd_epoch_3.pt"
 )
 ```
