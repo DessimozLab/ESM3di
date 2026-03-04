@@ -87,4 +87,5 @@ esm3di-buildtrainingset = "esm3di.build_trainingset:main"
 esm3di-download-alphafold = "esm3di.testdataset:main"
 
 [tool.setuptools]
-packages = {find = {}}
+packages = ["esm3di"]
+package-dir = {"" = "."}
