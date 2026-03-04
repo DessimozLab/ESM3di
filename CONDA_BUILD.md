@@ -62,7 +62,7 @@ esm3di-download-alphafold --help
 
 4. Users can then install with:
    ```bash
-   conda install -c yourusername esm3di
+   conda install -c DessimozLab esm3di
    ```
 
 ## Build for Conda-Forge (Optional)

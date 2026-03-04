@@ -14,7 +14,7 @@ setup(
     description="ESM + PEFT LoRA for 3Di per-residue prediction",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/esm3di",
+    url="https://github.com/DessimozLab/ESM3di",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 3 - Alpha",
