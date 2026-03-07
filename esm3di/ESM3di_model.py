@@ -1,5 +1,6 @@
 
 import os
+from xml.parsers.expat import model
 import torch
 import torch.nn as nn
 from transformers import AutoModelForTokenClassification, AutoModel
@@ -10,6 +11,261 @@ from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer
 from peft import LoraConfig, get_peft_model, TaskType
 from transformers.pytorch_utils import Conv1D
+
+
+# -----------------------------
+# Optimizers
+# -----------------------------
+
+class Lion(torch.optim.Optimizer):
+    """
+    Lion optimizer (EvoLved Sign Momentum) - Google Brain 2023.
+    
+    Uses only the sign of momentum for updates, resulting in:
+    - 50% less memory than Adam (only 1 state per parameter)
+    - Simpler computation (no sqrt or division)
+    - Often faster convergence
+    
+    Note: Requires ~3-10x lower learning rate than AdamW.
+    Recommended: lr=1e-5 to 3e-5, weight_decay=0.1 to 0.3
+    """
+    def __init__(self, params, lr: float = 1e-4, betas: Tuple[float, float] = (0.9, 0.99), 
+                 weight_decay: float = 0.0):
+        """
+        Args:
+            params: Model parameters to optimize
+            lr: Learning rate (use 3-10x lower than AdamW)
+            betas: Coefficients for computing running average (beta1, beta2)
+                   beta1: for update interpolation (default: 0.9)
+                   beta2: for momentum decay (default: 0.99)
+            weight_decay: Decoupled weight decay (default: 0.0)
+        """
+        if lr < 0.0:
+            raise ValueError(f"Invalid learning rate: {lr}")
+        if not 0.0 <= betas[0] < 1.0:
+            raise ValueError(f"Invalid beta1: {betas[0]}")
+        if not 0.0 <= betas[1] < 1.0:
+            raise ValueError(f"Invalid beta2: {betas[1]}")
+            
+        defaults = dict(lr=lr, betas=betas, weight_decay=weight_decay)
+        super().__init__(params, defaults)
+
+    @torch.no_grad()
+    def step(self, closure=None):
+        """Perform a single optimization step."""
+        loss = None
+        if closure is not None:
+            with torch.enable_grad():
+                loss = closure()
+
+        for group in self.param_groups:
+            for p in group['params']:
+                if p.grad is None:
+                    continue
+                    
+                grad = p.grad
+                if grad.is_sparse:
+                    raise RuntimeError('Lion does not support sparse gradients')
+                
+                state = self.state[p]
+                
+                # Initialize momentum state
+                if len(state) == 0:
+                    state['exp_avg'] = torch.zeros_like(p)
+                
+                exp_avg = state['exp_avg']
+                beta1, beta2 = group['betas']
+                
+                # Decoupled weight decay
+                if group['weight_decay'] > 0:
+                    p.mul_(1 - group['lr'] * group['weight_decay'])
+                
+                # Lion update: use sign of interpolated momentum
+                update = exp_avg * beta1 + grad * (1 - beta1)
+                p.add_(torch.sign(update), alpha=-group['lr'])
+                
+                # Update momentum for next iteration
+                exp_avg.mul_(beta2).add_(grad, alpha=1 - beta2)
+        
+        return loss
+
+
+# -----------------------------
+# Loss Functions
+# -----------------------------
+
+class FocalLoss(nn.Module):
+    """
+    Focal Loss for addressing class imbalance and focusing on hard examples.
+    
+    FL(p_t) = -alpha_t * (1 - p_t)^gamma * log(p_t)
+    
+    When gamma=0, this is equivalent to standard cross-entropy.
+    Higher gamma values down-weight easy examples more aggressively.
+    """
+    def __init__(self, gamma: float = 2.0, alpha: float = None, 
+                 reduction: str = 'mean', ignore_index: int = -100):
+        """
+        Args:
+            gamma: Focusing parameter. Higher values focus more on hard examples.
+                   Common values: 0.5, 1.0, 2.0, 5.0. Default: 2.0
+            alpha: Optional class weight (scalar for binary, tensor for multi-class).
+                   If None, no class weighting is applied.
+            reduction: Specifies the reduction: 'none', 'mean', 'sum'
+            ignore_index: Target value to ignore (default: -100 for masked tokens)
+        """
+        super().__init__()
+        self.gamma = gamma
+        self.alpha = alpha
+        self.reduction = reduction
+        self.ignore_index = ignore_index
+        
+    def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            inputs: Logits of shape (N, C) where N is batch*seq_len, C is num_classes
+            targets: Ground truth labels of shape (N,)
+        Returns:
+            Focal loss value
+        """
+        # Compute cross-entropy (without reduction)
+        ce_loss = nn.functional.cross_entropy(
+            inputs, targets, 
+            reduction='none', 
+            ignore_index=self.ignore_index
+        )
+        
+        # Get probabilities for the target class
+        pt = torch.exp(-ce_loss)  # p_t = exp(-CE) since CE = -log(p_t)
+        
+        # Compute focal weight
+        focal_weight = (1 - pt) ** self.gamma
+        
+        # Apply focal weight to loss
+        focal_loss = focal_weight * ce_loss
+        
+        # Apply alpha weighting if specified
+        if self.alpha is not None:
+            if isinstance(self.alpha, (float, int)):
+                alpha_t = self.alpha
+            else:
+                # alpha is a tensor of per-class weights
+                alpha_t = self.alpha[targets]
+            focal_loss = alpha_t * focal_loss
+        
+        # Apply reduction
+        if self.reduction == 'mean':
+            # Only average over non-ignored elements
+            valid_mask = targets != self.ignore_index
+            return focal_loss[valid_mask].mean() if valid_mask.any() else focal_loss.sum() * 0.0
+        elif self.reduction == 'sum':
+            return focal_loss.sum()
+        else:
+            return focal_loss
+
+
+class GammaSchedulerOnPlateau:
+    """
+    Scheduler that increases focal loss gamma when accuracy plateaus.
+    
+    Similar to ReduceLROnPlateau, but increases gamma to focus more on
+    hard examples when the model stops improving on accuracy.
+    """
+    def __init__(self, loss_fn: FocalLoss, mode: str = 'max', 
+                 factor: float = 0.5, patience: int = 2,
+                 threshold: float = 1e-3, max_gamma: float = 5.0,
+                 verbose: bool = True):
+        """
+        Args:
+            loss_fn: FocalLoss instance to modify
+            mode: 'max' for accuracy (want it to increase), 'min' for loss
+            factor: Amount to add to gamma when plateau detected
+            patience: Number of epochs with no improvement before increasing gamma
+            threshold: Threshold for measuring improvement
+            max_gamma: Maximum gamma value (prevents over-focusing)
+            verbose: Print messages when gamma is updated
+        """
+        if not isinstance(loss_fn, FocalLoss):
+            raise TypeError("loss_fn must be an instance of FocalLoss")
+        
+        self.loss_fn = loss_fn
+        self.mode = mode
+        self.factor = factor
+        self.patience = patience
+        self.threshold = threshold
+        self.max_gamma = max_gamma
+        self.verbose = verbose
+        
+        self.best = None
+        self.num_bad_epochs = 0
+        self.last_epoch = 0
+        self._init_is_better()
+    
+    def _init_is_better(self):
+        if self.mode == 'max':
+            self.is_better = lambda current, best: current > best + self.threshold
+        else:
+            self.is_better = lambda current, best: current < best - self.threshold
+    
+    def step(self, metric: float, epoch: int = None):
+        """
+        Update gamma based on metric value.
+        
+        Args:
+            metric: The metric to monitor (typically accuracy)
+            epoch: Optional epoch number for logging
+        Returns:
+            bool: True if gamma was increased
+        """
+        if epoch is not None:
+            self.last_epoch = epoch
+        else:
+            self.last_epoch += 1
+        
+        current = float(metric)
+        
+        if self.best is None:
+            self.best = current
+            return False
+        
+        if self.is_better(current, self.best):
+            self.best = current
+            self.num_bad_epochs = 0
+        else:
+            self.num_bad_epochs += 1
+        
+        if self.num_bad_epochs > self.patience:
+            old_gamma = self.loss_fn.gamma
+            new_gamma = min(old_gamma + self.factor, self.max_gamma)
+            
+            if new_gamma > old_gamma:
+                self.loss_fn.gamma = new_gamma
+                self.num_bad_epochs = 0
+                
+                if self.verbose:
+                    print(f"\n*** Accuracy plateau detected! "
+                          f"Increasing gamma: {old_gamma:.2f} -> {new_gamma:.2f} ***")
+                return True
+        
+        return False
+    
+    @property
+    def gamma(self):
+        return self.loss_fn.gamma
+    
+    def state_dict(self):
+        return {
+            'best': self.best,
+            'num_bad_epochs': self.num_bad_epochs,
+            'last_epoch': self.last_epoch,
+            'gamma': self.loss_fn.gamma,
+        }
+    
+    def load_state_dict(self, state_dict):
+        self.best = state_dict['best']
+        self.num_bad_epochs = state_dict['num_bad_epochs']
+        self.last_epoch = state_dict['last_epoch']
+        self.loss_fn.gamma = state_dict['gamma']
 
 
 # -----------------------------
@@ -77,6 +333,7 @@ class CNNClassificationHead(nn.Module):
 class ESMWithCNNHead(nn.Module):
     """
     Wrapper that replaces the standard classifier with a CNN head.
+    Note: Loss is computed externally in training loop to support Focal Loss etc.
     """
     def __init__(self, base_model, cnn_head):
         super().__init__()
@@ -108,9 +365,12 @@ class ESMWithCNNHead(nn.Module):
         # Apply CNN classification head
         logits = self.cnn_head(sequence_output)
         
+        # Note: Loss is computed externally in training loop to support Focal Loss
+        # Labels are not passed during training, so loss will be None
         loss = None
         if labels is not None:
-            loss_fct = nn.CrossEntropyLoss()
+            # Fallback for inference or direct usage
+            loss_fct = nn.CrossEntropyLoss(ignore_index=-100)
             loss = loss_fct(
                 logits.view(-1, self.config.num_labels),
                 labels.view(-1)
@@ -171,20 +431,20 @@ def discover_lora_target_modules(model) -> List[str]:
     Excludes classifier and head modules which should train fully, not via LoRA.
     """
     # Modules to exclude from LoRA (these train fully)
-    exclude_patterns = ['classifier', 'head', 'lm_head', 'score', 'pooler']
-    
+    #exclude_patterns = ['classifier', 'head', 'lm_head', 'score', 'pooler']
+    include_patterns = ["layernorm_qkv.1", "out_proj", "query", "key", "value", "dense"]
     target_modules = set()
+
+    print("Discovering LoRA target modules...")
     def recurse_modules(module, parent_name=""):
         for name, child in module.named_children():
             full_name = f"{parent_name}.{name}" if parent_name else name
             
             # Skip modules that should train fully (not LoRA)
-            if any(pattern in full_name.lower() for pattern in exclude_patterns):
-                continue
-                
+            #if any(pattern in full_name.lower() for pattern in exclude_patterns):
+            #    continue
             # Check if this module is a supported type
-            if isinstance(child, (torch.nn.Linear, torch.nn.Embedding, 
-                                    torch.nn.Conv2d, Conv1D)):
+            if isinstance(child, (torch.nn.Linear, torch.nn.Embedding, torch.nn.Conv2d, Conv1D )) or any(pattern in full_name.lower() for pattern in include_patterns):
                 target_modules.add(full_name)
             
             # Recurse into children
@@ -261,12 +521,15 @@ def merge_lora_weights(
         use_cnn_head=use_cnn_head,
         cnn_num_layers=args_dict.get('cnn_num_layers', 2),
         cnn_kernel_size=args_dict.get('cnn_kernel_size', 3),
-        cnn_dropout=args_dict.get('cnn_dropout', 0.1)
+        cnn_dropout=args_dict.get('cnn_dropout', 0.01)
     )
     
-    # Load LoRA weights
+    # Load LoRA weights (handle potential DataParallel prefix)
     model_with_lora = esm_model.get_model()
-    model_with_lora.load_state_dict(checkpoint['model_state_dict'])
+    model_state_dict = checkpoint['model_state_dict']
+    if any(k.startswith("module.") for k in model_state_dict.keys()):
+        model_state_dict = {k.replace("module.", "", 1): v for k, v in model_state_dict.items()}
+    model_with_lora.load_state_dict(model_state_dict)
     model_with_lora = model_with_lora.to(device)
     
     print("✓ LoRA model loaded")
@@ -389,6 +652,10 @@ class ESM3DiModel:
         self.freeze_base_model()
         print("✓ LoRA setup complete\n")
 
+        #unfreeze all parameters for inference
+
+
+
     def _load_model(self):
         """
         Load model from HuggingFace using standard AutoModel approach.
@@ -402,6 +669,7 @@ class ESM3DiModel:
                 self.hf_model_name,
                 num_labels=self.num_labels,
                 trust_remote_code=True,  # Required for ESM++ custom code
+
             )
             print("✓ Base model loaded (TokenClassification)")
             
@@ -421,6 +689,7 @@ class ESM3DiModel:
         """Setup LoRA configuration and wrap the base model."""
         # Filter target modules to only include transformer layers (not heads/classifiers)
         # This prevents conflicts with modules_to_save in newer peft versions
+        
         safe_target_modules = [
             m for m in self.target_modules 
             if not any(x in m.lower() for x in ['classifier', 'head', 'score', 'pooler', 'lm_head'])
@@ -428,7 +697,8 @@ class ESM3DiModel:
         
         if not safe_target_modules:
             # Fallback to common transformer layer patterns
-            safe_target_modules = ["query", "key", "value", "dense", "attention"]
+            safe_target_modules = ["layernorm_qkv.1", "out_proj", "query", "key", "value", "dense" ]
+
             print(f"  Using fallback target modules: {safe_target_modules}")
         
         lora_config = LoraConfig(
@@ -455,7 +725,7 @@ class ESM3DiModel:
             dropout=self.cnn_dropout
         )
         
-        # Wrap model with CNN head
+        # Wrap model with CNN head (loss is computed externally during training)
         self.model = ESMWithCNNHead(self.model, cnn_head)
     
     def freeze_base_model(self):
@@ -506,10 +776,15 @@ class ESM3DiModel:
             if isinstance(checkpoint, dict) and \
                'model_state_dict' in checkpoint:
                 
+                # Handle potential DataParallel prefix in checkpoint
+                model_state_dict = checkpoint['model_state_dict']
+                if any(k.startswith("module.") for k in model_state_dict.keys()):
+                    model_state_dict = {k.replace("module.", "", 1): v for k, v in model_state_dict.items()}
+                
                 # Use strict=False to handle cases where checkpoint 
                 # doesn't include all weights (e.g., frozen embeddings)
                 result = self.model.load_state_dict(
-                    checkpoint['model_state_dict'], 
+                    model_state_dict, 
                     strict=False
                 )
                 epoch = checkpoint.get('epoch', 'unknown')
@@ -518,6 +793,9 @@ class ESM3DiModel:
                     print(f"  (Note: {len(result.missing_keys)} frozen weights "
                           f"not in checkpoint - this is expected)")
             else:
+                # Handle potential DataParallel prefix in raw checkpoint
+                if any(k.startswith("module.") for k in checkpoint.keys()):
+                    checkpoint = {k.replace("module.", "", 1): v for k, v in checkpoint.items()}
                 result = self.model.load_state_dict(checkpoint, strict=False)
                 print("✓ Loaded model checkpoint")
                 if result.missing_keys:

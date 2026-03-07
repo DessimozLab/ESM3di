@@ -6,6 +6,9 @@ from .ESM3di_model import (
     ESM3DiModel,
     ESMWithCNNHead,
     CNNClassificationHead,
+    FocalLoss,
+    GammaSchedulerOnPlateau,
+    Lion,
     Seq3DiDataset,
     read_fasta,
     discover_lora_target_modules,
@@ -16,6 +19,19 @@ from .ESM3di_model import (
 
 from .esmretrain import (
     predict_3di_for_fasta,
+)
+
+from .tree_utils import (
+    check_foldseek_installed,
+    run_foldseek_createdb,
+    run_foldseek_allvall,
+    read_foldseek_db,
+    tajima_distance,
+    write_distance_matrix,
+    run_mafft,
+    run_raxml,
+    run_quicktree,
+    predict_3di_from_sequences,
 )
 
 __all__ = [
@@ -34,4 +50,15 @@ __all__ = [
     "merge_lora_weights",
     # Inference
     "predict_3di_for_fasta",
+    # Tree building and FoldSeek utilities
+    "check_foldseek_installed",
+    "run_foldseek_createdb",
+    "run_foldseek_allvall",
+    "read_foldseek_db",
+    "tajima_distance",
+    "write_distance_matrix",
+    "run_mafft",
+    "run_raxml",
+    "run_quicktree",
+    "predict_3di_from_sequences",
 ]

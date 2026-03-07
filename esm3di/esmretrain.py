@@ -9,10 +9,72 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 from transformers import get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from peft import LoraConfig, get_peft_model, TaskType
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
-from .ESM3di_model import ESM3DiModel, read_fasta, Seq3DiDataset, make_collate_fn
+from .ESM3di_model import ESM3DiModel, read_fasta, Seq3DiDataset, make_collate_fn, FocalLoss, Lion, GammaSchedulerOnPlateau
+
+
+# -----------------------------
+# Validation
+# -----------------------------
+
+@torch.no_grad()
+def validate(model, val_loader, loss_fn, device, use_amp=False):
+    """
+    Run validation on a held-out dataset with model in eval mode.
+    
+    Args:
+        model: The model to validate
+        val_loader: DataLoader for validation data
+        loss_fn: Loss function to compute validation loss
+        device: Device to run on
+        use_amp: Whether to use automatic mixed precision
+    
+    Returns:
+        Tuple of (avg_loss, accuracy, total_tokens)
+    """
+    model.eval()
+    
+    total_loss = 0.0
+    total_tokens = 0
+    total_correct = 0
+    
+    for batch in tqdm(val_loader, desc="Validating", leave=False):
+        input_ids = batch["input_ids"].to(device)
+        attention_mask = batch["attention_mask"].to(device)
+        labels = batch["labels"].to(device)
+        
+        with torch.cuda.amp.autocast(enabled=use_amp):
+            outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+            logits = outputs.logits if hasattr(outputs, 'logits') else outputs
+            
+            # Flatten for loss computation
+            loss = loss_fn(
+                logits.view(-1, logits.size(-1)),
+                labels.view(-1)
+            )
+        
+        # Count non-masked tokens
+        valid_mask = labels != -100
+        token_count = valid_mask.sum().item()
+        
+        # Compute accuracy
+        preds = logits.argmax(dim=-1)
+        correct = ((preds == labels) & valid_mask).sum().item()
+        
+        total_loss += loss.item() * max(token_count, 1)
+        total_tokens += max(token_count, 1)
+        total_correct += correct
+    
+    # Restore training mode
+    model.train()
+    
+    avg_loss = total_loss / max(total_tokens, 1)
+    accuracy = total_correct / max(total_tokens, 1)
+    
+    return avg_loss, accuracy, total_tokens
 
 # -----------------------------
 # Training
@@ -99,6 +161,35 @@ def train(args):
         cnn_kernel_size=args.cnn_kernel_size,
         cnn_dropout=args.cnn_dropout
     )
+    
+    # Setup loss function (Focal Loss or Cross-Entropy)
+    if args.use_focal_loss:
+        loss_fn = FocalLoss(
+            gamma=args.focal_gamma,
+            alpha=args.focal_alpha,
+            ignore_index=-100
+        )
+        print(f"Using Focal Loss (gamma={args.focal_gamma}, alpha={args.focal_alpha})")
+    else:
+        loss_fn = torch.nn.CrossEntropyLoss(ignore_index=-100)
+        print("Using Cross-Entropy Loss")
+    
+    # Setup gamma scheduler for focal loss (increases gamma on accuracy plateau)
+    gamma_scheduler = None
+    if args.gamma_scheduler and args.use_focal_loss:
+        gamma_scheduler = GammaSchedulerOnPlateau(
+            loss_fn=loss_fn,
+            mode='max',  # Monitor accuracy (want it to increase)
+            factor=args.gamma_increase_factor,
+            patience=args.gamma_patience,
+            threshold=args.gamma_threshold,
+            max_gamma=args.gamma_max,
+            verbose=True
+        )
+        print(f"Gamma scheduler enabled (patience={args.gamma_patience}, "
+              f"increase={args.gamma_increase_factor}, max_gamma={args.gamma_max})")
+    elif args.gamma_scheduler and not args.use_focal_loss:
+        print("Warning: --gamma-scheduler requires --use-focal-loss, ignoring")
 
     #if esm2 use the tokenizer from hf
     if "esm2" in args.hf_model.lower():
@@ -111,6 +202,10 @@ def train(args):
 
     model = esm_model.get_model()
     model.to(device)
+    
+    # Move loss function to device (for any tensor parameters like alpha)
+    if hasattr(loss_fn, 'to'):
+        loss_fn = loss_fn.to(device)
     
     # Wrap with DataParallel for multi-GPU training
     if multi_gpu:
@@ -134,6 +229,18 @@ def train(args):
         dataset.char2idx,
         mask_label_chars=args.mask_label_chars,
     )
+    # Determine steps per epoch based on samples_per_epoch or full dataset
+    if args.samples_per_epoch is not None:
+        steps_per_epoch_target = args.samples_per_epoch // args.batch_size
+        if steps_per_epoch_target < 1:
+            steps_per_epoch_target = 1
+        print(f"Using custom epoch size: {args.samples_per_epoch} samples "
+              f"({steps_per_epoch_target} batches per epoch)")
+        use_custom_epoch = True
+    else:
+        steps_per_epoch_target = None
+        use_custom_epoch = False
+    
     loader = DataLoader(
         dataset,
         batch_size=args.batch_size,
@@ -141,18 +248,63 @@ def train(args):
         num_workers=args.num_workers,
         collate_fn=collate_fn,
     )
+    
+    # Setup validation dataloader if validation data provided
+    val_loader = None
+    if args.val_aa_fasta and args.val_three_di_fasta:
+        print(f"\nSetting up validation data...")
+        val_dataset = Seq3DiDataset(
+            args.val_aa_fasta,
+            args.val_three_di_fasta,
+            mask_label_chars=args.mask_label_chars
+        )
+        # Use same collate_fn (same tokenizer and label vocab)
+        # But we need to create a new one with the training dataset's char2idx
+        val_collate_fn = make_collate_fn(
+            tokenizer,
+            dataset.char2idx,  # Use training vocab to ensure consistency
+            mask_label_chars=args.mask_label_chars,
+        )
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=args.num_workers,
+            collate_fn=val_collate_fn,
+        )
+        print(f"✓ Validation set: {len(val_dataset)} sequences")
+    elif args.val_aa_fasta or args.val_three_di_fasta:
+        print("Warning: Both --val-aa-fasta and --val-three-di-fasta required for validation")
+    
     # 7) Optimizer
-    optimizer = torch.optim.AdamW(
-        [p for p in model.parameters() if p.requires_grad],
-        lr=args.lr,
-        weight_decay=args.weight_decay,
-    )
+    trainable_params = [p for p in model.parameters() if p.requires_grad]
+    
+    if args.optimizer == 'lion':
+        optimizer = Lion(
+            trainable_params,
+            lr=args.lr,
+            betas=(args.lion_beta1, args.lion_beta2),
+            weight_decay=args.weight_decay,
+        )
+        print(f"Using Lion optimizer (lr={args.lr:.2e}, betas=({args.lion_beta1}, {args.lion_beta2}), wd={args.weight_decay})")
+    else:  # adamw
+        optimizer = torch.optim.AdamW(
+            trainable_params,
+            lr=args.lr,
+            weight_decay=args.weight_decay,
+        )
+        print(f"Using AdamW optimizer (lr={args.lr:.2e}, wd={args.weight_decay})")
 
     # 8) Learning rate scheduler setup
     # Calculate total training steps (accounting for gradient accumulation)
-    steps_per_epoch = len(loader) // args.gradient_accumulation_steps
-    if len(loader) % args.gradient_accumulation_steps != 0:
-        steps_per_epoch += 1
+    if use_custom_epoch:
+        steps_per_epoch = steps_per_epoch_target // args.gradient_accumulation_steps
+        if steps_per_epoch_target % args.gradient_accumulation_steps != 0:
+            steps_per_epoch += 1
+    else:
+        steps_per_epoch = len(loader) // args.gradient_accumulation_steps
+        if len(loader) % args.gradient_accumulation_steps != 0:
+            steps_per_epoch += 1
     total_steps = steps_per_epoch * args.epochs
     
     # Determine warmup steps (default: 10% of total steps, or user-specified)
@@ -164,6 +316,7 @@ def train(args):
         warmup_steps = int(total_steps * 0.1)  # Default: 10% warmup
     
     # Create scheduler based on specified type
+    plateau_scheduler = None  # Separate variable for plateau scheduler (epoch-based)
     if args.scheduler_type == 'cosine':
         scheduler = get_cosine_schedule_with_warmup(
             optimizer,
@@ -186,6 +339,19 @@ def train(args):
             num_cycles=0.5,  # Keeps LR constant after warmup
         )
         scheduler_name = "Constant with warmup"
+    elif args.scheduler_type == 'plateau':
+        # ReduceLROnPlateau is epoch-based, not step-based
+        scheduler = None  # No per-step scheduler
+        plateau_scheduler = ReduceLROnPlateau(
+            optimizer,
+            mode='min',
+            factor=args.plateau_factor,
+            patience=args.plateau_patience,
+            threshold=args.plateau_threshold,
+            min_lr=args.plateau_min_lr,
+        )
+        scheduler_name = (f"ReduceLROnPlateau (patience={args.plateau_patience}, "
+                          f"factor={args.plateau_factor}, min_lr={args.plateau_min_lr:.2e})")
     else:
         # No scheduler
         scheduler = None
@@ -203,8 +369,22 @@ def train(args):
         
         checkpoint = torch.load(args.resume_from_checkpoint, map_location=device)
         
-        # Load model state
-        model.load_state_dict(checkpoint["model_state_dict"])
+        # Load model state (handle DataParallel wrapper)
+        model_state_dict = checkpoint["model_state_dict"]
+        
+        # Check if state dict keys have "module." prefix (saved with DataParallel)
+        saved_with_dp = any(k.startswith("module.") for k in model_state_dict.keys())
+        
+        if multi_gpu and not saved_with_dp:
+            # Loading into DataParallel model, but checkpoint was saved without it
+            # Add "module." prefix to all keys
+            model_state_dict = {"module." + k: v for k, v in model_state_dict.items()}
+        elif not multi_gpu and saved_with_dp:
+            # Loading into non-DataParallel model, but checkpoint was saved with it
+            # Remove "module." prefix from all keys
+            model_state_dict = {k.replace("module.", "", 1): v for k, v in model_state_dict.items()}
+        
+        model.load_state_dict(model_state_dict)
         print("✓ Model state loaded")
         
         # Load optimizer state
@@ -215,6 +395,21 @@ def train(args):
         if scheduler is not None and checkpoint.get("scheduler_state_dict") is not None:
             scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
             print("✓ Scheduler state loaded")
+        
+        # Load plateau scheduler state if available
+        if plateau_scheduler is not None and checkpoint.get("plateau_scheduler_state_dict") is not None:
+            plateau_scheduler.load_state_dict(checkpoint["plateau_scheduler_state_dict"])
+            print("✓ Plateau scheduler state loaded")
+        
+        # Load gamma scheduler state if available
+        if gamma_scheduler is not None and checkpoint.get("gamma_scheduler_state_dict") is not None:
+            gamma_scheduler.load_state_dict(checkpoint["gamma_scheduler_state_dict"])
+            print(f"✓ Gamma scheduler state loaded (gamma={gamma_scheduler.gamma:.2f})")
+        
+        # Load AMP scaler state if available
+        if scaler is not None and checkpoint.get("scaler_state_dict") is not None:
+            scaler.load_state_dict(checkpoint["scaler_state_dict"])
+            print("✓ AMP scaler state loaded")
         
         # Resume from next epoch
         start_epoch = checkpoint.get("epoch", 0) + 1
@@ -228,6 +423,12 @@ def train(args):
     
     # 8) Training loop
     print(f"\nStarting training for {args.epochs} epochs...\n")
+    print(f"Dataset size: {len(dataset)} sequences")
+    if use_custom_epoch:
+        print(f"Epoch definition: {args.samples_per_epoch} samples ({steps_per_epoch_target} batches)")
+        print(f"  Full dataset passes per {args.epochs} epochs: {(args.samples_per_epoch * args.epochs) / len(dataset):.2f}")
+    else:
+        print(f"Epoch definition: Full dataset ({len(dataset)} samples)")
     print(f"Batch size: {args.batch_size}")
     print(f"Gradient accumulation steps: {args.gradient_accumulation_steps}")
     print(f"Effective batch size: {args.batch_size * args.gradient_accumulation_steps}")
@@ -237,37 +438,83 @@ def train(args):
     print(f"  Initial LR: {args.lr:.2e}")
     model.train()
     
+    # For custom epoch sizes, create an infinite iterator over the dataset
+    if use_custom_epoch:
+        def infinite_loader():
+            while True:
+                for batch in loader:
+                    yield batch
+        data_iterator = iter(infinite_loader())
+    
     for epoch in range(start_epoch, args.epochs + 1):
         print(f"{'='*60}")
         print(f"EPOCH {epoch}/{args.epochs}")
+        if use_custom_epoch:
+            print(f"(Custom epoch: {args.samples_per_epoch} samples, {steps_per_epoch_target} batches)")
         print(f"{'='*60}")
         
         running_loss = 0.0
         running_tokens = 0
+        running_correct = 0
         epoch_loss = 0.0
         epoch_tokens = 0
+        epoch_correct = 0
 
         # Create progress bar for batches
-        progress_bar = tqdm(loader, desc=f"Epoch {epoch}", unit="batch")
+        if use_custom_epoch:
+            # Use custom number of steps per epoch
+            progress_bar = tqdm(range(steps_per_epoch_target), desc=f"Epoch {epoch}", unit="batch")
+            batch_source = ((i + 1, next(data_iterator)) for i in progress_bar)
+        else:
+            progress_bar = tqdm(loader, desc=f"Epoch {epoch}", unit="batch")
+            batch_source = enumerate(progress_bar, start=1)
 
-        for step, batch in enumerate(progress_bar, start=1):
+        for step, batch in batch_source:
+            # Update progress bar reference for custom epoch mode
+            if use_custom_epoch:
+                current_progress_bar = progress_bar
+            else:
+                current_progress_bar = progress_bar
             
             batch = {k: v.to(device) for k, v in batch.items()}
+            
+            # Extract labels for external loss computation
+            labels = batch.pop("labels")
             
             # Mixed precision forward pass
             if use_amp:
                 with torch.cuda.amp.autocast():
                     outputs = model(**batch)
-                    loss = outputs.loss
+                    # Compute loss externally (supports Focal Loss or CE)
+                    logits = outputs.logits
+                    loss = loss_fn(
+                        logits.view(-1, logits.size(-1)),
+                        labels.view(-1)
+                    )
             else:
                 outputs = model(**batch)
-                loss = outputs.loss
+                # Compute loss externally (supports Focal Loss or CE)
+                logits = outputs.logits
+                loss = loss_fn(
+                    logits.view(-1, logits.size(-1)),
+                    labels.view(-1)
+                )
+            
+            # Restore labels to batch for metrics
+            batch["labels"] = labels
 
             # DataParallel returns loss per GPU, need to take mean
             if multi_gpu and loss.dim() > 0:
                 loss = loss.mean()
 
-            token_count = (batch["labels"] != -100).sum().item()
+            token_count = (labels != -100).sum().item()
+
+            # Calculate accuracy
+            with torch.no_grad():
+                preds = outputs.logits.argmax(dim=-1)
+                valid_mask = labels != -100
+                correct = ((preds == labels) & valid_mask).sum().item()
+                batch_accuracy = correct / max(token_count, 1)
 
             # Scale loss by accumulation steps for proper gradient averaging
             scaled_loss = loss / args.gradient_accumulation_steps
@@ -285,8 +532,10 @@ def train(args):
 
             running_loss += loss.item() * max(token_count, 1)
             running_tokens += max(token_count, 1)
+            running_correct += correct
             epoch_loss += loss.item() * max(token_count, 1)
             epoch_tokens += max(token_count, 1)
+            epoch_correct += correct
 
             # Perform optimization step after accumulating enough gradients
             if accumulation_step % args.gradient_accumulation_steps == 0:
@@ -309,43 +558,97 @@ def train(args):
                 current_lr = optimizer.param_groups[0]['lr']
                 writer.add_scalar('Training/learning_rate', current_lr, global_step)
                 
-                # Update progress bar with current loss and LR
+                # Update progress bar with current loss, accuracy, and LR
                 avg_loss = running_loss / max(running_tokens, 1)
-                progress_bar.set_postfix({
-                    "loss/residue": f"{avg_loss:.4f}",
+                running_accuracy = running_correct / max(running_tokens, 1)
+                current_progress_bar.set_postfix({
+                    "loss": f"{avg_loss:.4f}",
+                    "acc": f"{running_accuracy:.4f}",
                     "lr": f"{current_lr:.2e}",
                     "step": global_step
                 })
                 
                 # Log to TensorBoard
                 writer.add_scalar('Loss/train_step', avg_loss, global_step)
+                writer.add_scalar('Accuracy/train_step', running_accuracy, global_step)
                 
                 if global_step % args.log_every == 0:
                     # Log running average to TensorBoard
                     writer.add_scalar('Loss/train_running_avg', avg_loss, global_step)
+                    writer.add_scalar('Accuracy/train_running_avg', running_accuracy, global_step)
                     writer.add_scalar('Training/tokens_processed', running_tokens, global_step)
                     running_loss = 0.0
                     running_tokens = 0
+                    running_correct = 0
             else:
                 # Just update progress bar during accumulation
                 avg_loss = running_loss / max(running_tokens, 1)
-                progress_bar.set_postfix({
-                    "loss/residue": f"{avg_loss:.4f}",
+                running_accuracy = running_correct / max(running_tokens, 1)
+                current_progress_bar.set_postfix({
+                    "loss": f"{avg_loss:.4f}",
+                    "acc": f"{running_accuracy:.4f}",
                     "accum": f"{accumulation_step % args.gradient_accumulation_steps}/{args.gradient_accumulation_steps}"
                 })
             
-            # Always log per-batch loss (before accumulation)
+            # Always log per-batch loss and accuracy (before accumulation)
             writer.add_scalar('Loss/train_batch', loss.item(), step + (epoch - 1) * len(loader))
             writer.add_scalar('Loss/train_per_residue_batch', per_residue_loss, step + (epoch - 1) * len(loader))
+            writer.add_scalar('Accuracy/train_batch', batch_accuracy, step + (epoch - 1) * len(loader))
 
         # Log epoch-level metrics to TensorBoard
         epoch_avg_loss = epoch_loss / max(epoch_tokens, 1)
+        epoch_accuracy = epoch_correct / max(epoch_tokens, 1)
         writer.add_scalar('Loss/train_epoch', epoch_avg_loss, epoch)
+        writer.add_scalar('Accuracy/train_epoch', epoch_accuracy, epoch)
         writer.add_scalar('Training/epoch_tokens', epoch_tokens, epoch)
+        
+        # Step plateau scheduler (epoch-based) if using it
+        if plateau_scheduler is not None:
+            old_lr = optimizer.param_groups[0]['lr']
+            plateau_scheduler.step(epoch_avg_loss)
+            new_lr = optimizer.param_groups[0]['lr']
+            if new_lr < old_lr:
+                print(f"\n*** Plateau detected! Reducing LR: {old_lr:.2e} -> {new_lr:.2e} ***")
+                writer.add_scalar('Training/lr_reduction_event', 1, epoch)
+        
+        # Step gamma scheduler (epoch-based) if using it - based on accuracy
+        if gamma_scheduler is not None:
+            old_gamma = gamma_scheduler.gamma
+            gamma_increased = gamma_scheduler.step(epoch_accuracy, epoch)
+            if gamma_increased:
+                writer.add_scalar('Training/gamma_increase_event', 1, epoch)
+            writer.add_scalar('Training/focal_gamma', gamma_scheduler.gamma, epoch)
         
         current_lr = optimizer.param_groups[0]['lr']
         print(f"\nEpoch {epoch} Average Loss (per residue): {epoch_avg_loss:.4f}")
+        print(f"Epoch {epoch} Accuracy: {epoch_accuracy:.4f} ({epoch_correct}/{epoch_tokens} residues)")
         print(f"Current Learning Rate: {current_lr:.2e}")
+        if gamma_scheduler is not None:
+            print(f"Current Focal Gamma: {gamma_scheduler.gamma:.2f}")
+        
+        # Run validation if validation data is provided
+        if val_loader is not None:
+            print(f"\nRunning validation...")
+            val_loss, val_accuracy, val_tokens = validate(
+                model, val_loader, loss_fn, device, use_amp=use_amp
+            )
+            print(f"Validation Loss: {val_loss:.4f}")
+            print(f"Validation Accuracy: {val_accuracy:.4f} ({int(val_accuracy * val_tokens)}/{val_tokens} residues)")
+            
+            # Log validation metrics to TensorBoard
+            writer.add_scalar('Loss/val_epoch', val_loss, epoch)
+            writer.add_scalar('Accuracy/val_epoch', val_accuracy, epoch)
+            writer.add_scalar('Validation/tokens', val_tokens, epoch)
+            
+            # Log train vs val comparison
+            writer.add_scalars('Loss/train_vs_val', {
+                'train': epoch_avg_loss,
+                'val': val_loss
+            }, epoch)
+            writer.add_scalars('Accuracy/train_vs_val', {
+                'train': epoch_accuracy,
+                'val': val_accuracy
+            }, epoch)
         
         # Save checkpoint each epoch
         os.makedirs(args.out_dir, exist_ok=True)
@@ -362,6 +665,9 @@ def train(args):
             "model_state_dict": model_state_dict,
             "optimizer_state_dict": optimizer.state_dict(),
             "scheduler_state_dict": scheduler.state_dict() if scheduler is not None else None,
+            "plateau_scheduler_state_dict": plateau_scheduler.state_dict() if plateau_scheduler is not None else None,
+            "gamma_scheduler_state_dict": gamma_scheduler.state_dict() if gamma_scheduler is not None else None,
+            "scaler_state_dict": scaler.state_dict() if scaler is not None else None,
             "label_vocab": dataset.label_vocab,
             "mask_label_chars": args.mask_label_chars,
             "lora_target_modules": target_modules,
@@ -417,8 +723,7 @@ def predict_3di_for_fasta(model_ckpt: str, aa_fasta: str, device: str = None):
         if "lora_target_modules" in args and args["lora_target_modules"]:
             target_modules = args["lora_target_modules"].split(",")
         else:
-            target_modules = ['q_proj', 'k_proj', 'v_proj', 'o_proj',
-                              'fc1', 'fc2']
+            target_modules = ["layernorm_qkv.1", "out_proj", "query", "key", "value", "dense"]
 
     tokenizer = AutoTokenizer.from_pretrained(
         args["hf_model"],
@@ -439,7 +744,13 @@ def predict_3di_for_fasta(model_ckpt: str, aa_fasta: str, device: str = None):
     )
 
     model = get_peft_model(base_model, lora_config)
-    model.load_state_dict(ckpt["model_state_dict"])
+    
+    # Handle potential DataParallel prefix in checkpoint
+    model_state_dict = ckpt["model_state_dict"]
+    if any(k.startswith("module.") for k in model_state_dict.keys()):
+        model_state_dict = {k.replace("module.", "", 1): v for k, v in model_state_dict.items()}
+    
+    model.load_state_dict(model_state_dict)
     model.to(device)
     model.eval()
 
@@ -505,6 +816,15 @@ def parse_args():
                    help="FASTA with amino-acid sequences.")
     p.add_argument("--three-di-fasta", type=str, required=False,
                    help="FASTA with matching 3Di sequences (same lengths).")
+    
+    # Validation data (optional)
+    p.add_argument("--val-aa-fasta", type=str, default=None,
+                   help="FASTA with validation amino-acid sequences (optional). "
+                        "If provided along with --val-three-di-fasta, validation "
+                        "will be run at the end of each epoch with model in eval mode.")
+    p.add_argument("--val-three-di-fasta", type=str, default=None,
+                   help="FASTA with validation 3Di sequences (optional). "
+                        "Must have matching sequences to --val-aa-fasta.")
 
     # Model
     p.add_argument("--hf-model", type=str,
@@ -557,6 +877,32 @@ def parse_args():
                    help="Dropout rate for CNN layers "
                         "(only used if --use-cnn-head is set)")
 
+    # Focal Loss
+    p.add_argument("--use-focal-loss", action="store_true",
+                   help="Use Focal Loss instead of Cross-Entropy. "
+                        "Focal Loss down-weights easy examples, focusing training on hard ones. "
+                        "Useful when accuracy is already high but you want to improve on difficult tokens.")
+    p.add_argument("--focal-gamma", type=float, default=2.0,
+                   help="Focal loss gamma (focusing) parameter. Higher values "
+                        "focus more on hard examples. Common values: 0.5, 1.0, 2.0, 5.0. "
+                        "(only used if --use-focal-loss is set)")
+    p.add_argument("--focal-alpha", type=float, default=None,
+                   help="Optional class weight for focal loss. "
+                        "(only used if --use-focal-loss is set)")
+    
+    # Gamma scheduler (for focal loss)
+    p.add_argument("--gamma-scheduler", action="store_true",
+                   help="Enable gamma scheduler to increase focal loss gamma on accuracy plateau. "
+                        "Helps focus on hard examples when the model stops improving.")
+    p.add_argument("--gamma-increase-factor", type=float, default=0.5,
+                   help="Amount to add to gamma when plateau detected (default: 0.5)")
+    p.add_argument("--gamma-patience", type=int, default=2,
+                   help="Number of epochs with no accuracy improvement before increasing gamma")
+    p.add_argument("--gamma-max", type=float, default=5.0,
+                   help="Maximum gamma value (prevents over-focusing on hard examples)")
+    p.add_argument("--gamma-threshold", type=float, default=1e-3,
+                   help="Minimum accuracy improvement to be considered significant")
+
     # Training
     p.add_argument("--batch-size", type=int, default=2,
                    help="Training batch size per GPU")
@@ -566,10 +912,25 @@ def parse_args():
                         "batch sizes when GPU memory is limited.")
     p.add_argument("--epochs", type=int, default=3,
                    help="Number of training epochs")
+    p.add_argument("--samples-per-epoch", type=int, default=None,
+                   help="Number of samples per epoch. If set, an 'epoch' is defined as this many "
+                        "samples rather than a full pass through the dataset. Useful for large "
+                        "datasets where a full epoch takes too long. The dataset will cycle "
+                        "continuously across epochs.")
     p.add_argument("--lr", type=float, default=1e-4,
-                   help="Learning rate")
+                   help="Learning rate. Note: if using Lion optimizer, use 3-10x lower "
+                        "(e.g., 1e-5 to 3e-5) than AdamW.")
     p.add_argument("--weight-decay", type=float, default=1e-2,
-                   help="Weight decay for optimizer")
+                   help="Weight decay for optimizer. For Lion, use higher values (0.1-0.3).")
+    p.add_argument("--optimizer", type=str, default='adamw',
+                   choices=['adamw', 'lion'],
+                   help="Optimizer to use. 'adamw' is the default and well-tested. "
+                        "'lion' uses sign-based updates with 50%% less memory - "
+                        "requires lower LR (3-10x) and higher weight decay (0.1-0.3).")
+    p.add_argument("--lion-beta1", type=float, default=0.9,
+                   help="Lion beta1 parameter for update interpolation (only used with --optimizer=lion)")
+    p.add_argument("--lion-beta2", type=float, default=0.99,
+                   help="Lion beta2 parameter for momentum decay (only used with --optimizer=lion)")
     p.add_argument("--num-workers", type=int, default=0,
                    help="Number of DataLoader workers")
     p.add_argument("--log-every", type=int, default=10,
@@ -579,14 +940,29 @@ def parse_args():
     
     # Learning rate scheduler
     p.add_argument("--scheduler-type", type=str, default='cosine',
-                   choices=['cosine', 'linear', 'constant', 'none'],
+                   choices=['cosine', 'linear', 'constant', 'plateau', 'none'],
                    help="Learning rate scheduler type. 'cosine' uses cosine decay after warmup, "
                         "'linear' uses linear decay, 'constant' keeps LR constant after warmup, "
+                        "'plateau' reduces LR when loss plateaus, "
                         "'none' uses no scheduler (constant LR throughout)")
     p.add_argument("--warmup-steps", type=int, default=None,
                    help="Number of warmup steps. If not specified, uses warmup-ratio")
     p.add_argument("--warmup-ratio", type=float, default=None,
                    help="Warmup ratio (fraction of total steps). Default: 0.1 (10%%)")
+    
+    # Plateau scheduler options
+    p.add_argument("--plateau-patience", type=int, default=2,
+                   help="Number of epochs with no improvement after which LR will be reduced "
+                        "(only used with --scheduler-type=plateau)")
+    p.add_argument("--plateau-factor", type=float, default=0.5,
+                   help="Factor by which LR will be reduced (new_lr = lr * factor). "
+                        "(only used with --scheduler-type=plateau)")
+    p.add_argument("--plateau-threshold", type=float, default=1e-4,
+                   help="Threshold for measuring the new optimum. Only focus on significant changes. "
+                        "(only used with --scheduler-type=plateau)")
+    p.add_argument("--plateau-min-lr", type=float, default=1e-7,
+                   help="Minimum learning rate. LR will not be reduced below this value. "
+                        "(only used with --scheduler-type=plateau)")
     
     # Device and performance
     p.add_argument("--device", type=str, default=None,
