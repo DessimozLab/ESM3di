@@ -3,7 +3,10 @@ import os
 from xml.parsers.expat import model
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
 from transformers import AutoModelForTokenClassification, AutoModel
+from transformers import T5Tokenizer, T5EncoderModel
 from transformers.modeling_outputs import TokenClassifierOutput
 from peft import get_peft_model, LoraConfig, TaskType
 from typing import List, Tuple, Optional
@@ -91,181 +94,16 @@ class Lion(torch.optim.Optimizer):
 
 
 # -----------------------------
-# Loss Functions
+# Loss Functions (imported from losses.py)
 # -----------------------------
-
-class FocalLoss(nn.Module):
-    """
-    Focal Loss for addressing class imbalance and focusing on hard examples.
-    
-    FL(p_t) = -alpha_t * (1 - p_t)^gamma * log(p_t)
-    
-    When gamma=0, this is equivalent to standard cross-entropy.
-    Higher gamma values down-weight easy examples more aggressively.
-    """
-    def __init__(self, gamma: float = 2.0, alpha: float = None, 
-                 reduction: str = 'mean', ignore_index: int = -100):
-        """
-        Args:
-            gamma: Focusing parameter. Higher values focus more on hard examples.
-                   Common values: 0.5, 1.0, 2.0, 5.0. Default: 2.0
-            alpha: Optional class weight (scalar for binary, tensor for multi-class).
-                   If None, no class weighting is applied.
-            reduction: Specifies the reduction: 'none', 'mean', 'sum'
-            ignore_index: Target value to ignore (default: -100 for masked tokens)
-        """
-        super().__init__()
-        self.gamma = gamma
-        self.alpha = alpha
-        self.reduction = reduction
-        self.ignore_index = ignore_index
-        
-    def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        """
-        Args:
-            inputs: Logits of shape (N, C) where N is batch*seq_len, C is num_classes
-            targets: Ground truth labels of shape (N,)
-        Returns:
-            Focal loss value
-        """
-        # Compute cross-entropy (without reduction)
-        ce_loss = nn.functional.cross_entropy(
-            inputs, targets, 
-            reduction='none', 
-            ignore_index=self.ignore_index
-        )
-        
-        # Get probabilities for the target class
-        pt = torch.exp(-ce_loss)  # p_t = exp(-CE) since CE = -log(p_t)
-        
-        # Compute focal weight
-        focal_weight = (1 - pt) ** self.gamma
-        
-        # Apply focal weight to loss
-        focal_loss = focal_weight * ce_loss
-        
-        # Apply alpha weighting if specified
-        if self.alpha is not None:
-            if isinstance(self.alpha, (float, int)):
-                alpha_t = self.alpha
-            else:
-                # alpha is a tensor of per-class weights
-                alpha_t = self.alpha[targets]
-            focal_loss = alpha_t * focal_loss
-        
-        # Apply reduction
-        if self.reduction == 'mean':
-            # Only average over non-ignored elements
-            valid_mask = targets != self.ignore_index
-            return focal_loss[valid_mask].mean() if valid_mask.any() else focal_loss.sum() * 0.0
-        elif self.reduction == 'sum':
-            return focal_loss.sum()
-        else:
-            return focal_loss
-
-
-class GammaSchedulerOnPlateau:
-    """
-    Scheduler that increases focal loss gamma when accuracy plateaus.
-    
-    Similar to ReduceLROnPlateau, but increases gamma to focus more on
-    hard examples when the model stops improving on accuracy.
-    """
-    def __init__(self, loss_fn: FocalLoss, mode: str = 'max', 
-                 factor: float = 0.5, patience: int = 2,
-                 threshold: float = 1e-3, max_gamma: float = 5.0,
-                 verbose: bool = True):
-        """
-        Args:
-            loss_fn: FocalLoss instance to modify
-            mode: 'max' for accuracy (want it to increase), 'min' for loss
-            factor: Amount to add to gamma when plateau detected
-            patience: Number of epochs with no improvement before increasing gamma
-            threshold: Threshold for measuring improvement
-            max_gamma: Maximum gamma value (prevents over-focusing)
-            verbose: Print messages when gamma is updated
-        """
-        if not isinstance(loss_fn, FocalLoss):
-            raise TypeError("loss_fn must be an instance of FocalLoss")
-        
-        self.loss_fn = loss_fn
-        self.mode = mode
-        self.factor = factor
-        self.patience = patience
-        self.threshold = threshold
-        self.max_gamma = max_gamma
-        self.verbose = verbose
-        
-        self.best = None
-        self.num_bad_epochs = 0
-        self.last_epoch = 0
-        self._init_is_better()
-    
-    def _init_is_better(self):
-        if self.mode == 'max':
-            self.is_better = lambda current, best: current > best + self.threshold
-        else:
-            self.is_better = lambda current, best: current < best - self.threshold
-    
-    def step(self, metric: float, epoch: int = None):
-        """
-        Update gamma based on metric value.
-        
-        Args:
-            metric: The metric to monitor (typically accuracy)
-            epoch: Optional epoch number for logging
-        Returns:
-            bool: True if gamma was increased
-        """
-        if epoch is not None:
-            self.last_epoch = epoch
-        else:
-            self.last_epoch += 1
-        
-        current = float(metric)
-        
-        if self.best is None:
-            self.best = current
-            return False
-        
-        if self.is_better(current, self.best):
-            self.best = current
-            self.num_bad_epochs = 0
-        else:
-            self.num_bad_epochs += 1
-        
-        if self.num_bad_epochs > self.patience:
-            old_gamma = self.loss_fn.gamma
-            new_gamma = min(old_gamma + self.factor, self.max_gamma)
-            
-            if new_gamma > old_gamma:
-                self.loss_fn.gamma = new_gamma
-                self.num_bad_epochs = 0
-                
-                if self.verbose:
-                    print(f"\n*** Accuracy plateau detected! "
-                          f"Increasing gamma: {old_gamma:.2f} -> {new_gamma:.2f} ***")
-                return True
-        
-        return False
-    
-    @property
-    def gamma(self):
-        return self.loss_fn.gamma
-    
-    def state_dict(self):
-        return {
-            'best': self.best,
-            'num_bad_epochs': self.num_bad_epochs,
-            'last_epoch': self.last_epoch,
-            'gamma': self.loss_fn.gamma,
-        }
-    
-    def load_state_dict(self, state_dict):
-        self.best = state_dict['best']
-        self.num_bad_epochs = state_dict['num_bad_epochs']
-        self.last_epoch = state_dict['last_epoch']
-        self.loss_fn.gamma = state_dict['gamma']
+from .losses import (
+    FocalLoss,
+    CyclicalFocalLoss,
+    PLDDTWeightedFocalLoss,
+    PLDDTWeightedCyclicalFocalLoss,
+    GammaSchedulerOnPlateau,
+    DEFAULT_PLDDT_BIN_WEIGHTS,
+)
 
 
 # -----------------------------
@@ -330,6 +168,82 @@ class CNNClassificationHead(nn.Module):
         return logits
 
 
+class TransformerClassificationHead(nn.Module):
+    """
+    Lightweight transformer-encoder classification head for per-token classification.
+    Applies a projection -> TransformerEncoder -> linear classifier.
+    """
+    def __init__(
+        self,
+        hidden_size: int,
+        num_labels: int,
+        transformer_dim: int = 256,
+        num_layers: int = 2,
+        dropout: float = 0.1,
+        num_heads: Optional[int] = None,
+    ):
+        super().__init__()
+
+        if transformer_dim <= 0:
+            raise ValueError("transformer_dim must be > 0")
+        if num_layers <= 0:
+            raise ValueError("num_layers must be > 0")
+
+        if num_heads is None:
+            # Prefer larger head counts when divisible; fall back safely.
+            for h in [8, 4, 2, 1]:
+                if transformer_dim % h == 0:
+                    num_heads = h
+                    break
+        if num_heads is None or num_heads <= 0 or transformer_dim % num_heads != 0:
+            raise ValueError(
+                f"Invalid transformer head config: transformer_dim={transformer_dim}, num_heads={num_heads}. "
+                "transformer_dim must be divisible by num_heads."
+            )
+
+        self.transformer_dim = transformer_dim
+        self.num_layers = num_layers
+        self.num_heads = num_heads
+
+        self.input_projection = (
+            nn.Identity()
+            if hidden_size == transformer_dim
+            else nn.Linear(hidden_size, transformer_dim)
+        )
+
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=transformer_dim,
+            nhead=num_heads,
+            dim_feedforward=transformer_dim * 4,
+            dropout=dropout,
+            activation="gelu",
+            batch_first=True,
+        )
+        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        self.norm = nn.LayerNorm(transformer_dim)
+        self.classifier = nn.Linear(transformer_dim, num_labels)
+
+    def forward(self, hidden_states, attention_mask=None):
+        """
+        Args:
+            hidden_states: (batch_size, seq_len, hidden_size)
+            attention_mask: (batch_size, seq_len) with 1 for valid tokens
+        Returns:
+            logits: (batch_size, seq_len, num_labels)
+        """
+        x = self.input_projection(hidden_states)
+        residual = x
+
+        src_key_padding_mask = None
+        if attention_mask is not None:
+            src_key_padding_mask = attention_mask == 0
+
+        x = self.encoder(x, src_key_padding_mask=src_key_padding_mask)
+        x = self.norm(x + residual)
+        logits = self.classifier(x)
+        return logits
+
+
 class ESMWithCNNHead(nn.Module):
     """
     Wrapper that replaces the standard classifier with a CNN head.
@@ -343,10 +257,13 @@ class ESMWithCNNHead(nn.Module):
         # Store config for compatibility
         self.config = base_model.config
         
-    def forward(self, input_ids, attention_mask=None, labels=None, 
-                **kwargs):
+    def forward(self, input_ids, attention_mask=None, **kwargs):
+        # Extract labels from kwargs if present - don't pass to T5 model
+        labels = kwargs.pop("labels", None)
+        
         # Get encoder outputs (without classification head)
         # Use output_hidden_states to get the last hidden state
+        # T5 does NOT accept labels parameter
         outputs = self.base_model(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -396,6 +313,84 @@ class ESMWithCNNHead(nn.Module):
         return super().load_state_dict(*args, **kwargs)
 
 
+class ESMWithTransformerHead(nn.Module):
+    """
+    Wrapper that replaces the standard classifier with a small transformer head.
+    Note: Loss is computed externally in training loop to support Focal Loss etc.
+    """
+    def __init__(self, base_model, transformer_head):
+        super().__init__()
+        self.base_model = base_model
+        self.transformer_head = transformer_head
+
+        # Store config for compatibility
+        self.config = base_model.config
+
+    def forward(self, input_ids, attention_mask=None, **kwargs):
+        # Extract labels from kwargs if present - don't pass to T5 model
+        labels = kwargs.pop("labels", None)
+        
+        # Get encoder outputs (without classification head)
+        # T5 does NOT accept labels parameter
+        outputs = self.base_model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            output_hidden_states=True,
+            **kwargs,
+        )
+
+        if hasattr(outputs, 'hidden_states') and outputs.hidden_states is not None:
+            sequence_output = outputs.hidden_states[-1]
+        else:
+            sequence_output = outputs.last_hidden_state
+
+        logits = self.transformer_head(sequence_output, attention_mask=attention_mask)
+
+        loss = None
+        if labels is not None:
+            loss_fct = nn.CrossEntropyLoss(ignore_index=-100)
+            loss = loss_fct(logits.view(-1, self.config.num_labels), labels.view(-1))
+
+        return TokenClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=outputs.hidden_states if hasattr(outputs, 'hidden_states') else None,
+            attentions=outputs.attentions if hasattr(outputs, 'attentions') else None,
+        )
+
+    def named_parameters(self, *args, **kwargs):
+        return super().named_parameters(*args, **kwargs)
+
+    def parameters(self, *args, **kwargs):
+        return super().parameters(*args, **kwargs)
+
+    def state_dict(self, *args, **kwargs):
+        return super().state_dict(*args, **kwargs)
+
+    def load_state_dict(self, *args, **kwargs):
+        return super().load_state_dict(*args, **kwargs)
+
+
+# -----------------------------
+# Model Type Detection
+# -----------------------------
+
+def is_t5_model(model_name: str) -> bool:
+    """
+    Detect if a model is a T5-based encoder model (e.g., ProtT5, Ankh).
+    These models use T5 architecture but loaded as encoder-only.
+    Requires space-separated amino acid tokenization.
+    
+    Args:
+        model_name: HuggingFace model identifier
+    
+    Returns:
+        True if model is T5-based encoder, False otherwise
+    """
+    model_lower = model_name.lower()
+    return any(pattern in model_lower for pattern in ['prot_t5', 'prott5', 'ankh'])
+
+
 # -----------------------------
 # FASTA utilities
 # -----------------------------
@@ -428,10 +423,11 @@ def discover_lora_target_modules(model) -> List[str]:
     """
     Automatically discover LoRA target modules by finding supported layer types.
     Recursively searches for Linear, Embedding, Conv2d, and Conv1D layers.
-    Excludes classifier and head modules which should train fully, not via LoRA.
+    Excludes classifier, head modules, and gated activations (T5DenseGatedActDense)
+    which should train fully or not via LoRA.
     """
-    # Modules to exclude from LoRA (these train fully)
-    #exclude_patterns = ['classifier', 'head', 'lm_head', 'score', 'pooler']
+    # Modules to exclude from LoRA (these train fully or don't work well with LoRA)
+    exclude_patterns = [ 'gate']
     include_patterns = ["layernorm_qkv.1", "out_proj", "query", "key", "value", "dense"]
     target_modules = set()
 
@@ -440,12 +436,14 @@ def discover_lora_target_modules(model) -> List[str]:
         for name, child in module.named_children():
             full_name = f"{parent_name}.{name}" if parent_name else name
             
-            # Skip modules that should train fully (not LoRA)
-            #if any(pattern in full_name.lower() for pattern in exclude_patterns):
-            #    continue
+            # Skip modules that shouldn't use LoRA
+            if any(pattern in full_name.lower() for pattern in exclude_patterns):
+                continue
+            
             # Check if this module is a supported type
-            if isinstance(child, (torch.nn.Linear, torch.nn.Embedding, torch.nn.Conv2d, Conv1D )) or any(pattern in full_name.lower() for pattern in include_patterns):
-                target_modules.add(full_name)
+            if isinstance(child, (torch.nn.Linear, torch.nn.Embedding, torch.nn.Conv2d, Conv1D)):
+                if not any(pattern in full_name.lower() for pattern in exclude_patterns):
+                    target_modules.add(full_name)
             
             # Recurse into children
             recurse_modules(child, full_name)
@@ -461,12 +459,18 @@ def freeze_all_but_lora_and_classifier(model):
       - LoRA parameters (names contain 'lora_')
       - classifier head (names contain 'classifier')
       - CNN head (names contain 'cnn_head')
+            - Transformer head (names contain 'transformer_head')
     """
     for name, p in model.named_parameters():
         p.requires_grad = False
 
     for name, p in model.named_parameters():
-        if "lora_" in name or "classifier" in name or "cnn_head" in name:
+        if (
+            "lora_" in name
+            or "classifier" in name
+            or "cnn_head" in name
+            or "transformer_head" in name
+        ):
             p.requires_grad = True
 
 
@@ -501,6 +505,7 @@ def merge_lora_weights(
                                    'facebook/esm2_t33_650M_UR50D')
     num_labels = len(checkpoint.get('label_vocab', []))
     use_cnn_head = args_dict.get('use_cnn_head', False)
+    use_transformer_head = args_dict.get('use_transformer_head', False)
     lora_r = args_dict.get('lora_r', 8)
     lora_alpha = args_dict.get('lora_alpha', 16)
     lora_dropout = args_dict.get('lora_dropout', 0.05)
@@ -521,7 +526,12 @@ def merge_lora_weights(
         use_cnn_head=use_cnn_head,
         cnn_num_layers=args_dict.get('cnn_num_layers', 2),
         cnn_kernel_size=args_dict.get('cnn_kernel_size', 3),
-        cnn_dropout=args_dict.get('cnn_dropout', 0.01)
+        cnn_dropout=args_dict.get('cnn_dropout', 0.01),
+        use_transformer_head=use_transformer_head,
+        transformer_head_dim=args_dict.get('transformer_head_dim', 256),
+        transformer_head_layers=args_dict.get('transformer_head_layers', 2),
+        transformer_head_dropout=args_dict.get('transformer_head_dropout', 0.1),
+        transformer_head_num_heads=args_dict.get('transformer_head_num_heads', None),
     )
     
     # Load LoRA weights (handle potential DataParallel prefix)
@@ -551,6 +561,16 @@ def merge_lora_weights(
         # Create wrapper with merged model
         merged_with_cnn = ESMWithCNNHead(base_esm, cnn_head)
         final_model = merged_with_cnn
+    elif use_transformer_head:
+        # Model structure: ESMWithTransformerHead -> PeftModel -> base_model
+        peft_model = model_with_lora.base_model
+        merged_model = peft_model.merge_and_unload()
+
+        # Recreate wrapper with merged base model
+        base_esm = merged_model
+        transformer_head = model_with_lora.transformer_head
+        merged_with_transformer = ESMWithTransformerHead(base_esm, transformer_head)
+        final_model = merged_with_transformer
     else:
         # Model structure: PeftModel -> base_model
         final_model = model_with_lora.merge_and_unload()
@@ -568,6 +588,11 @@ def merge_lora_weights(
                 'hf_model_name': hf_model_name,
                 'num_labels': num_labels,
                 'use_cnn_head': use_cnn_head,
+                'use_transformer_head': use_transformer_head,
+                'transformer_head_dim': args_dict.get('transformer_head_dim', 256),
+                'transformer_head_layers': args_dict.get('transformer_head_layers', 2),
+                'transformer_head_dropout': args_dict.get('transformer_head_dropout', 0.1),
+                'transformer_head_num_heads': args_dict.get('transformer_head_num_heads', None),
                 'label_vocab': checkpoint.get('label_vocab'),
                 'mask_label_chars': checkpoint.get('mask_label_chars', ''),
             },
@@ -602,7 +627,12 @@ class ESM3DiModel:
                     lora_alpha: float = 16.0, lora_dropout: float = 0.05,
                     target_modules: List[str] = None,
                     use_cnn_head: bool = False, cnn_num_layers: int = 2,
-                    cnn_kernel_size: int = 3, cnn_dropout: float = 0.1):
+                    cnn_kernel_size: int = 3, cnn_dropout: float = 0.1,
+                    use_transformer_head: bool = False,
+                    transformer_head_dim: int = 256,
+                    transformer_head_layers: int = 2,
+                    transformer_head_dropout: float = 0.1,
+                    transformer_head_num_heads: Optional[int] = None):
         """
         Initialize ESM model with LoRA configuration.
 
@@ -617,7 +647,15 @@ class ESM3DiModel:
             cnn_num_layers: Number of CNN layers (if use_cnn_head=True)
             cnn_kernel_size: CNN kernel size (if use_cnn_head=True)
             cnn_dropout: Dropout rate for CNN layers (if use_cnn_head=True)
+            use_transformer_head: Whether to use a transformer encoder head instead of linear
+            transformer_head_dim: Hidden dimension inside transformer head
+            transformer_head_layers: Number of transformer encoder layers in head
+            transformer_head_dropout: Dropout rate for transformer head
+            transformer_head_num_heads: Optional attention head count for transformer head
         """
+        if use_cnn_head and use_transformer_head:
+            raise ValueError("use_cnn_head and use_transformer_head are mutually exclusive")
+
         self.hf_model_name = hf_model_name
         self.num_labels = num_labels
         self.lora_r = lora_r
@@ -627,6 +665,17 @@ class ESM3DiModel:
         self.cnn_num_layers = cnn_num_layers
         self.cnn_kernel_size = cnn_kernel_size
         self.cnn_dropout = cnn_dropout
+        self.use_transformer_head = use_transformer_head
+        self.transformer_head_dim = transformer_head_dim
+        self.transformer_head_layers = transformer_head_layers
+        self.transformer_head_dropout = transformer_head_dropout
+        self.transformer_head_num_heads = transformer_head_num_heads
+
+        # Detect model type
+        self.is_t5 = is_t5_model(hf_model_name)
+        if self.is_t5:
+            print(f"\n⚡ Detected T5-based model: {hf_model_name}")
+            print("   Using T5Tokenizer with space-separated amino acids")
 
         # Load model using standard HuggingFace approach
         self._load_model()
@@ -648,6 +697,12 @@ class ESM3DiModel:
         if self.use_cnn_head:
             self._setup_cnn_head()
             print(f"✓ CNN classification head added ({cnn_num_layers} layers)")
+        elif self.use_transformer_head:
+            self._setup_transformer_head()
+            print(
+                f"✓ Transformer classification head added "
+                f"(dim={self.transformer_head_dim}, layers={self.transformer_head_layers})"
+            )
 
         self.freeze_base_model()
         print("✓ LoRA setup complete\n")
@@ -659,30 +714,67 @@ class ESM3DiModel:
     def _load_model(self):
         """
         Load model from HuggingFace using standard AutoModel approach.
-        Supports ESM2, ESM++, and other transformer models.
+        Supports ESM2, ESM++, ProtT5, Ankh, and other transformer models.
         """
         print(f"\nLoading model: {self.hf_model_name}")
         
-        try:
-            # Try loading as TokenClassification model directly
-            self.base_model = AutoModelForTokenClassification.from_pretrained(
+        if self.is_t5:
+            # T5-based model (ProtT5, Ankh, etc.)
+            print("  Using T5EncoderModel for encoder-only architecture")
+            print("  Space-separated amino acids will be used for tokenization")
+            self.base_model = T5EncoderModel.from_pretrained(
                 self.hf_model_name,
-                num_labels=self.num_labels,
-                trust_remote_code=True,  # Required for ESM++ custom code
-
+                trust_remote_code=True
             )
-            print("✓ Base model loaded (TokenClassification)")
+            # T5 models need a classification head added
+            # Add a linear layer for token classification
+            from torch import nn
+            self.base_model.classifier = nn.Linear(
+                self.base_model.config.d_model,
+                self.num_labels
+            )
+            # Store config attributes for compatibility
+            self.base_model.config.hidden_size = self.base_model.config.d_model
+            self.base_model.config.num_labels = self.num_labels
             
-        except Exception as e:
-            print(f"  Failed to load as TokenClassification: {e}")
-            print("  Falling back to AutoModel and adding classification head...")
-            # Load base model
-            self.base_model = AutoModel.from_pretrained(
-                self.hf_model_name,
-                trust_remote_code=True,  # Required for ESM++ custom code
-            )
-            self.tokenizer = self.base_model.tokenizer
-            print("✓ Base model loaded (AutoModel)")
+            # Load tokenizer - try AutoTokenizer first (works for Ankh), fall back to T5Tokenizer (ProtT5)
+            try:
+                self.tokenizer = AutoTokenizer.from_pretrained(
+                    self.hf_model_name,
+                    trust_remote_code=True
+                )
+            except Exception:
+                # ProtT5 may need explicit T5Tokenizer with legacy mode
+                self.tokenizer = T5Tokenizer.from_pretrained(
+                    self.hf_model_name,
+                    legacy=True,
+                    trust_remote_code=True
+                )
+            print("✓ Base model loaded (T5EncoderModel)")
+            print(f"  Hidden size: {self.base_model.config.d_model}")
+            
+        else:
+            # Standard ESM2/ESM++ loading
+            try:
+                # Try loading as TokenClassification model directly
+                self.base_model = AutoModelForTokenClassification.from_pretrained(
+                    self.hf_model_name,
+                    num_labels=self.num_labels,
+                    trust_remote_code=True,  # Required for ESM++ custom code
+
+                )
+                print("✓ Base model loaded (TokenClassification)")
+                
+            except Exception as e:
+                print(f"  Failed to load as TokenClassification: {e}")
+                print("  Falling back to AutoModel and adding classification head...")
+                # Load base model
+                self.base_model = AutoModel.from_pretrained(
+                    self.hf_model_name,
+                    trust_remote_code=True,  # Required for ESM++ custom code
+                )
+                self.tokenizer = self.base_model.tokenizer
+                print("✓ Base model loaded (AutoModel)")
         
 
     def _setup_lora(self):
@@ -701,8 +793,12 @@ class ESM3DiModel:
 
             print(f"  Using fallback target modules: {safe_target_modules}")
         
+        # Use FEATURE_EXTRACTION for T5 models (they don't support labels in forward())
+        # Use TOKEN_CLS for ESM models (standard behavior)
+        task_type = TaskType.FEATURE_EXTRACTION if is_t5_model(self.hf_model_name) else TaskType.TOKEN_CLS
+        
         lora_config = LoraConfig(
-            task_type=TaskType.TOKEN_CLS,
+            task_type=task_type,
             r=self.lora_r,
             lora_alpha=self.lora_alpha,
             lora_dropout=self.lora_dropout,
@@ -727,6 +823,22 @@ class ESM3DiModel:
         
         # Wrap model with CNN head (loss is computed externally during training)
         self.model = ESMWithCNNHead(self.model, cnn_head)
+
+    def _setup_transformer_head(self):
+        """Replace standard classifier with a small transformer classification head."""
+        hidden_size = self.base_model.config.hidden_size
+
+        transformer_head = TransformerClassificationHead(
+            hidden_size=hidden_size,
+            num_labels=self.num_labels,
+            transformer_dim=self.transformer_head_dim,
+            num_layers=self.transformer_head_layers,
+            dropout=self.transformer_head_dropout,
+            num_heads=self.transformer_head_num_heads,
+        )
+
+        # Wrap model with transformer head (loss is computed externally during training)
+        self.model = ESMWithTransformerHead(self.model, transformer_head)
     
     def freeze_base_model(self):
         """Freeze all base model parameters except LoRA and classifier."""
@@ -823,11 +935,18 @@ class ESM3DiModel:
             pass
         
         if tokenizer is None:
-            tokenizer = AutoTokenizer.from_pretrained(
-                self.hf_model_name,
-                do_lower_case=False,
-                trust_remote_code=True,
-            )
+            if self.is_t5:
+                tokenizer = T5Tokenizer.from_pretrained(
+                    self.hf_model_name,
+                    legacy=True,
+                    trust_remote_code=True,
+                )
+            else:
+                tokenizer = AutoTokenizer.from_pretrained(
+                    self.hf_model_name,
+                    do_lower_case=False,
+                    trust_remote_code=True,
+                )
         
         # Read input FASTA
         print(f"Reading input FASTA: {input_fasta_path}")
@@ -841,6 +960,10 @@ class ESM3DiModel:
             for i in range(0, len(aa_records), batch_size):
                 batch_records = aa_records[i:i+batch_size]
                 headers, seqs = zip(*batch_records)
+                
+                # T5 models require space-separated amino acids
+                if self.is_t5:
+                    seqs = [' '.join(list(seq)) for seq in seqs]
                 
                 # Tokenize batch
                 enc = tokenizer(
@@ -911,22 +1034,35 @@ class ESM3DiModel:
 
 class Seq3DiDataset(Dataset):
     """
-    Holds (amino_acid_sequence, 3Di_label_sequence) pairs.
+    Holds (amino_acid_sequence, 3Di_label_sequence, plddt_bins) tuples.
     Assumes 1:1 correspondence and equal lengths.
 
     mask_label_chars: characters in 3Di sequences that indicate "masked" positions
                       (e.g. low pLDDT). Those chars:
                       - are NOT part of label_vocab / model outputs
                       - are ignored in the loss (labels = -100).
+    
+    plddt_bins_fasta: Optional path to FASTA with pLDDT bins (0-9 per position).
+                      If provided, enables pLDDT-weighted loss.
     """
     def __init__(
         self,
         aa_fasta: str,
         three_di_fasta: str,
-        mask_label_chars: str = ""
+        mask_label_chars: str = "",
+        plddt_bins_fasta: str = None
     ):
         aa_records = read_fasta(aa_fasta)
         lab_records = read_fasta(three_di_fasta)
+        
+        # Optionally load pLDDT bins
+        self.has_plddt = plddt_bins_fasta is not None
+        if self.has_plddt:
+            plddt_records = read_fasta(plddt_bins_fasta)
+            assert len(plddt_records) == len(aa_records), \
+                f"pLDDT bins FASTA has {len(plddt_records)} sequences, expected {len(aa_records)}"
+        else:
+            plddt_records = None
 
         assert len(aa_records) == len(lab_records), "Mismatched number of sequences"
 
@@ -934,12 +1070,23 @@ class Seq3DiDataset(Dataset):
         all_chars = set()
         self.mask_label_chars = set(mask_label_chars) if mask_label_chars else set()
 
-        for (h_aa, seq_aa), (h_lab, seq_lab) in zip(aa_records, lab_records):
+        for idx, ((h_aa, seq_aa), (h_lab, seq_lab)) in enumerate(zip(aa_records, lab_records)):
             if len(seq_aa) != len(seq_lab):
                 raise ValueError(
                     f"Length mismatch {h_aa}/{h_lab}: {len(seq_aa)} vs {len(seq_lab)}"
                 )
-            self.items.append((h_aa, seq_aa, seq_lab))
+            
+            # Get pLDDT bins if available
+            if self.has_plddt:
+                h_plddt, plddt_seq = plddt_records[idx]
+                if len(plddt_seq) != len(seq_aa):
+                    raise ValueError(
+                        f"pLDDT length mismatch {h_aa}: AA={len(seq_aa)}, pLDDT={len(plddt_seq)}"
+                    )
+                self.items.append((h_aa, seq_aa, seq_lab, plddt_seq))
+            else:
+                self.items.append((h_aa, seq_aa, seq_lab, None))
+            
             all_chars.update(seq_lab)
 
         # Build vocab from all non-masked characters
@@ -951,24 +1098,42 @@ class Seq3DiDataset(Dataset):
         return len(self.items)
 
     def __getitem__(self, idx):
-        # (header, aa_seq, 3di_seq)
+        # (header, aa_seq, 3di_seq, plddt_bins_str_or_None)
         return self.items[idx]
 
 # -----------------------------
 # Collate with HF tokenizer
 # -----------------------------
-def make_collate_fn(tokenizer, char2idx, mask_label_chars: str = ""):
+def make_collate_fn(tokenizer, char2idx, mask_label_chars: str = "", include_plddt: bool = False, is_t5: bool = False):
     """
-    - Tokenizes AA sequences with HF tokenizer (ESM-2, ESM++, etc.).
+    - Tokenizes AA sequences with HF tokenizer (ESM-2, ESM++, ProtT5, etc.).
     - Uses special_tokens_mask to align per-residue 3Di labels
       to non-special tokens.
     - Positions whose 3Di label is in mask_label_chars are set to -100
       (ignored in the loss) and do NOT belong to label_vocab.
+    - Optionally includes pLDDT bins for weighted loss.
+    - Supports T5 models with space-separated amino acid tokenization.
+    
+    Args:
+        tokenizer: HuggingFace tokenizer
+        char2idx: Mapping from 3Di characters to label indices
+        mask_label_chars: Characters to ignore in loss calculation
+        include_plddt: Whether to include pLDDT bins in batch output
+        is_t5: Whether using T5-based model (requires space-separated AA)
     """
     mask_set = set(mask_label_chars) if mask_label_chars else set()
 
     def collate(batch):
-        headers, aa_seqs, label_seqs = zip(*batch)
+        # Unpack batch - now includes optional pLDDT
+        if len(batch[0]) == 4:
+            headers, aa_seqs, label_seqs, plddt_seqs = zip(*batch)
+        else:
+            headers, aa_seqs, label_seqs = zip(*batch)
+            plddt_seqs = [None] * len(headers)
+
+        # T5 models require space-separated amino acids
+        if is_t5:
+            aa_seqs = [' '.join(list(seq)) for seq in aa_seqs]
 
         # Standard HuggingFace tokenization
         enc = tokenizer(
@@ -989,13 +1154,26 @@ def make_collate_fn(tokenizer, char2idx, mask_label_chars: str = ""):
             -100,  # ignore_index for CE
             dtype=torch.long,
         )
+        
+        # Initialize pLDDT bins tensor if needed
+        has_plddt = include_plddt and plddt_seqs[0] is not None
+        if has_plddt:
+            plddt_bins = torch.zeros(
+                (batch_size, max_len),
+                dtype=torch.long,
+            )
+        else:
+            plddt_bins = None
 
         for i, lab_seq in enumerate(label_seqs):
+            plddt_seq = plddt_seqs[i] if has_plddt else None
             k = 0  # index into label sequence
             for j in range(max_len):
                 if special_mask[i, j] == 1:
                     # CLS/EOS/PAD etc.
                     labels[i, j] = -100
+                    if has_plddt:
+                        plddt_bins[i, j] = 0  # zero weight for special tokens
                 else:
                     if k < len(lab_seq):
                         ch = lab_seq[k]
@@ -1010,9 +1188,17 @@ def make_collate_fn(tokenizer, char2idx, mask_label_chars: str = ""):
                                     f"Label char '{ch}' not in vocabulary and not in "
                                     f"mask_label_chars; check your data."
                                 )
+                        
+                        # Set pLDDT bin for this position
+                        if has_plddt and plddt_seq is not None:
+                            plddt_bins[i, j] = int(plddt_seq[k])
+                        
                         k += 1
                     else:
                         labels[i, j] = -100
+                        if has_plddt:
+                            plddt_bins[i, j] = 0
+            
             if k != len(lab_seq):
                 # Safety check: we should have consumed all labels
                 raise ValueError(
@@ -1025,6 +1211,9 @@ def make_collate_fn(tokenizer, char2idx, mask_label_chars: str = ""):
             "attention_mask": attention_mask,
             "labels": labels,
         }
+        
+        if has_plddt:
+            batch_out["plddt_bins"] = plddt_bins
         
         return batch_out
 

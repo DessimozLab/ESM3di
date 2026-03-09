@@ -254,6 +254,43 @@ def write_fasta(sequences: Dict[str, str], output_path: str , order: Optional[Li
                 f.write(seq[i:i+80] + "\n")
 
 
+def plddt_to_bin(plddt: float) -> int:
+    """
+    Convert pLDDT score (0-100) to discretized bin (0-9).
+    
+    Bins:
+        0: pLDDT [0, 10)
+        1: pLDDT [10, 20)
+        ...
+        9: pLDDT [90, 100]
+    
+    Args:
+        plddt: pLDDT score in range [0, 100]
+    Returns:
+        Bin index in range [0, 9]
+    """
+    bin_idx = int(plddt // 10)
+    return min(bin_idx, 9)  # Clamp to 9 for pLDDT=100
+
+
+def plddt_scores_to_bin_string(plddt_scores: List[float]) -> str:
+    """
+    Convert a list of pLDDT scores to a string of bin indices.
+    
+    Each position becomes a single digit 0-9 representing the pLDDT bin:
+        0: pLDDT [0, 10)
+        1: pLDDT [10, 20)
+        ...
+        9: pLDDT [90, 100]
+    
+    Args:
+        plddt_scores: List of pLDDT scores (one per residue)
+    Returns:
+        String of single-digit bin indices (e.g., "9987786554")
+    """
+    return ''.join(str(plddt_to_bin(p)) for p in plddt_scores)
+
+
 def mask_3di_by_plddt(
     three_di_seq: str,
     plddt_scores: List[float],
@@ -281,7 +318,53 @@ def mask_3di_by_plddt(
         three_di_seq = three_di_seq[:min_len]
         plddt_scores = plddt_scores[:min_len]
     masked_seq = [ mask_char if plddt < plddt_threshold else three_di_char for three_di_char, plddt in zip(three_di_seq, plddt_scores) ]
-    return ''.join(masked_seq)  
+    return ''.join(masked_seq)
+
+
+def create_plddt_bin_fasta(
+    pdb_data: Dict[str, Dict[str, Tuple[str, List[float]]]],
+    output_path: str,
+    sequence_order: Optional[List[str]] = None
+) -> str:
+    """
+    Create a FASTA file with discretized pLDDT bins (0-9) for each position.
+    
+    Each sequence in the output FASTA contains one digit per residue,
+    representing the pLDDT bin (0-9). This can be used for pLDDT-weighted
+    loss during training.
+    
+    Args:
+        pdb_data: Dictionary mapping structure_id -> {chain_id -> (aa_seq, plddt_scores)}
+        output_path: Path to write the pLDDT bin FASTA
+        sequence_order: Optional list of headers to specify output order
+    
+    Returns:
+        Path to the written FASTA file
+    
+    Example output:
+        >protein1
+        9988877766655544433
+        >protein2
+        9999988887777666555
+    """
+    plddt_sequences = {}
+    
+    for struct_id, chains in pdb_data.items():
+        for chain_id, (aa_seq, plddt_scores) in chains.items():
+            # Generate header matching other FASTAs
+            if len(chains) > 1:
+                header = f"{struct_id}_{chain_id}"
+            else:
+                header = struct_id
+            
+            # Convert pLDDT scores to bin string
+            bin_string = plddt_scores_to_bin_string(plddt_scores)
+            plddt_sequences[header] = bin_string
+    
+    # Write to FASTA
+    write_fasta(plddt_sequences, output_path, order=sequence_order)
+    
+    return output_path  
     
 
 def mask_sequence_worker(header, three_di_seq, pdb_data, plddt_threshold, mask_char):
@@ -429,6 +512,11 @@ Output files:
         type=str,
         default=None,
         help="Pre-generated 3Di FASTA file (requires --skip-foldseek)"
+    )
+    parser.add_argument(
+        "--output-plddt-bins",
+        action="store_true",
+        help="Output a FASTA with discretized pLDDT bins (0-9) per position for weighted training"
     )
     
     args = parser.parse_args()
@@ -598,6 +686,18 @@ Output files:
     
     print(f"✓ Wrote masked 3Di FASTA to {output_3di_masked}")
     
+    # Step 5b: Optionally write pLDDT bins FASTA
+    plddt_bins_fasta = None
+    if args.output_plddt_bins:
+        plddt_bins_fasta = f"{args.output_prefix}_plddt_bins.fasta"
+        print(f"\nGenerating pLDDT bins FASTA...")
+        create_plddt_bin_fasta(
+            pdb_data,
+            plddt_bins_fasta,
+            sequence_order=list(three_di_sequences.keys())
+        )
+        print(f"✓ Wrote pLDDT bins FASTA to {plddt_bins_fasta}")
+    
     # Step 6: Write statistics
     stats_file = f"{args.output_prefix}_stats.txt"
     mask_percentage = (stats['masked_residues'] / stats['total_residues'] * 100
@@ -627,6 +727,8 @@ Output files:
     print(f"\nOutput files:")
     print(f"  - {aa_fasta}")
     print(f"  - {output_3di_masked}")
+    if plddt_bins_fasta:
+        print(f"  - {plddt_bins_fasta}")
     print(f"  - {stats_file}")
     print("\n✓ Dataset ready for training!")
 

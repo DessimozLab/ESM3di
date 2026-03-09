@@ -5,9 +5,9 @@ __version__ = "0.1.0"
 from .ESM3di_model import (
     ESM3DiModel,
     ESMWithCNNHead,
+    ESMWithTransformerHead,
     CNNClassificationHead,
-    FocalLoss,
-    GammaSchedulerOnPlateau,
+    TransformerClassificationHead,
     Lion,
     Seq3DiDataset,
     read_fasta,
@@ -15,6 +15,15 @@ from .ESM3di_model import (
     freeze_all_but_lora_and_classifier,
     merge_lora_weights,
     make_collate_fn,
+)
+
+from .losses import (
+    FocalLoss,
+    CyclicalFocalLoss,
+    PLDDTWeightedFocalLoss,
+    PLDDTWeightedCyclicalFocalLoss,
+    GammaSchedulerOnPlateau,
+    DEFAULT_PLDDT_BIN_WEIGHTS,
 )
 
 from .esmretrain import (
@@ -39,7 +48,18 @@ __all__ = [
     "ESM3DiModel",
     # Model components
     "ESMWithCNNHead",
+    "ESMWithTransformerHead",
     "CNNClassificationHead",
+    "TransformerClassificationHead",
+    # Loss functions
+    "FocalLoss",
+    "CyclicalFocalLoss",
+    "PLDDTWeightedFocalLoss",
+    "PLDDTWeightedCyclicalFocalLoss",
+    "GammaSchedulerOnPlateau",
+    "DEFAULT_PLDDT_BIN_WEIGHTS",
+    # Optimizers
+    "Lion",
     # Data utilities
     "Seq3DiDataset",
     "read_fasta",

@@ -8,12 +8,21 @@ from datetime import datetime
 import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer, AutoModelForTokenClassification
+from transformers import T5Tokenizer
 from transformers import get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from peft import LoraConfig, get_peft_model, TaskType
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
-from .ESM3di_model import ESM3DiModel, read_fasta, Seq3DiDataset, make_collate_fn, FocalLoss, Lion, GammaSchedulerOnPlateau
+from .ESM3di_model import ESM3DiModel, read_fasta, Seq3DiDataset, make_collate_fn, Lion, is_t5_model
+from .losses import (
+    FocalLoss, 
+    CyclicalFocalLoss,
+    PLDDTWeightedFocalLoss, 
+    PLDDTWeightedCyclicalFocalLoss, 
+    DEFAULT_PLDDT_BIN_WEIGHTS, 
+    GammaSchedulerOnPlateau
+)
 
 
 # -----------------------------
@@ -21,7 +30,7 @@ from .ESM3di_model import ESM3DiModel, read_fasta, Seq3DiDataset, make_collate_f
 # -----------------------------
 
 @torch.no_grad()
-def validate(model, val_loader, loss_fn, device, use_amp=False):
+def validate(model, val_loader, loss_fn, device, use_amp=False, use_plddt=False, epoch=0):
     """
     Run validation on a held-out dataset with model in eval mode.
     
@@ -31,30 +40,66 @@ def validate(model, val_loader, loss_fn, device, use_amp=False):
         loss_fn: Loss function to compute validation loss
         device: Device to run on
         use_amp: Whether to use automatic mixed precision
+        use_plddt: Whether to track pLDDT-stratified accuracy
+        epoch: Current epoch (needed for CyclicalFocalLoss)
     
     Returns:
-        Tuple of (avg_loss, accuracy, total_tokens)
+        Tuple of (avg_loss, accuracy, total_tokens, plddt_accuracies)
+        plddt_accuracies is a dict {threshold: accuracy} or empty dict if not tracking
     """
     model.eval()
+    
+    # Check if loss function is cyclical (needs epoch parameter)
+    is_cyclical = isinstance(loss_fn, (CyclicalFocalLoss, PLDDTWeightedCyclicalFocalLoss))
     
     total_loss = 0.0
     total_tokens = 0
     total_correct = 0
     
+    # pLDDT-stratified accuracy tracking
+    plddt_thresholds = [2, 4, 6, 8]  # bin thresholds (pLDDT >= 20, 40, 60, 80)
+    correct_by_plddt = {t: 0 for t in plddt_thresholds}
+    tokens_by_plddt = {t: 0 for t in plddt_thresholds}
+    
     for batch in tqdm(val_loader, desc="Validating", leave=False):
         input_ids = batch["input_ids"].to(device)
         attention_mask = batch["attention_mask"].to(device)
         labels = batch["labels"].to(device)
+        plddt_bins = batch.get("plddt_bins")
+        if plddt_bins is not None:
+            plddt_bins = plddt_bins.to(device)
         
         with torch.cuda.amp.autocast(enabled=use_amp):
             outputs = model(input_ids=input_ids, attention_mask=attention_mask)
             logits = outputs.logits if hasattr(outputs, 'logits') else outputs
             
             # Flatten for loss computation
-            loss = loss_fn(
-                logits.view(-1, logits.size(-1)),
-                labels.view(-1)
-            )
+            if use_plddt and plddt_bins is not None:
+                if is_cyclical:
+                    loss = loss_fn(
+                        logits.view(-1, logits.size(-1)),
+                        labels.view(-1),
+                        epoch=epoch,
+                        plddt_bins=plddt_bins.view(-1)
+                    )
+                else:
+                    loss = loss_fn(
+                        logits.view(-1, logits.size(-1)),
+                        labels.view(-1),
+                        plddt_bins.view(-1)
+                    )
+            else:
+                if is_cyclical:
+                    loss = loss_fn(
+                        logits.view(-1, logits.size(-1)),
+                        labels.view(-1),
+                        epoch=epoch
+                    )
+                else:
+                    loss = loss_fn(
+                        logits.view(-1, logits.size(-1)),
+                        labels.view(-1)
+                    )
         
         # Count non-masked tokens
         valid_mask = labels != -100
@@ -63,6 +108,15 @@ def validate(model, val_loader, loss_fn, device, use_amp=False):
         # Compute accuracy
         preds = logits.argmax(dim=-1)
         correct = ((preds == labels) & valid_mask).sum().item()
+        
+        # pLDDT-stratified accuracy
+        if use_plddt and plddt_bins is not None:
+            for thresh in plddt_thresholds:
+                plddt_mask = (plddt_bins >= thresh) & valid_mask
+                thresh_tokens = plddt_mask.sum().item()
+                thresh_correct = ((preds == labels) & plddt_mask).sum().item()
+                correct_by_plddt[thresh] += thresh_correct
+                tokens_by_plddt[thresh] += thresh_tokens
         
         total_loss += loss.item() * max(token_count, 1)
         total_tokens += max(token_count, 1)
@@ -74,7 +128,14 @@ def validate(model, val_loader, loss_fn, device, use_amp=False):
     avg_loss = total_loss / max(total_tokens, 1)
     accuracy = total_correct / max(total_tokens, 1)
     
-    return avg_loss, accuracy, total_tokens
+    # Compute pLDDT-stratified accuracies
+    plddt_accuracies = {}
+    if use_plddt:
+        for thresh in plddt_thresholds:
+            if tokens_by_plddt[thresh] > 0:
+                plddt_accuracies[thresh] = correct_by_plddt[thresh] / tokens_by_plddt[thresh]
+    
+    return avg_loss, accuracy, total_tokens, plddt_accuracies
 
 # -----------------------------
 # Training
@@ -131,17 +192,21 @@ def train(args):
     print(f"  ssh -L 6006:localhost:6006 user@{socket.gethostname()}")
     print(f"{'='*60}\n")
 
-    # 1) Data (with mask_label_chars)
+    # 1) Data (with mask_label_chars and optional pLDDT bins)
+    use_plddt = args.plddt_bins_fasta is not None
     dataset = Seq3DiDataset(
         args.aa_fasta,
         args.three_di_fasta,
         mask_label_chars=args.mask_label_chars,
+        plddt_bins_fasta=args.plddt_bins_fasta,
     )
     print(f"Loaded {len(dataset)} sequences")
     print(f"3Di vocab ({len(dataset.label_vocab)}): {dataset.label_vocab}")
     if args.mask_label_chars:
         print(f"Masked 3Di chars (ignored in loss): "
                 f"{list(set(args.mask_label_chars))}")
+    if use_plddt:
+        print(f"pLDDT bins loaded from: {args.plddt_bins_fasta}")
     
     
     # Create ESM3Di model wrapper
@@ -159,11 +224,61 @@ def train(args):
         use_cnn_head=args.use_cnn_head,
         cnn_num_layers=args.cnn_num_layers,
         cnn_kernel_size=args.cnn_kernel_size,
-        cnn_dropout=args.cnn_dropout
+        cnn_dropout=args.cnn_dropout,
+        use_transformer_head=args.use_transformer_head,
+        transformer_head_dim=args.transformer_head_dim,
+        transformer_head_layers=args.transformer_head_layers,
+        transformer_head_dropout=args.transformer_head_dropout,
+        transformer_head_num_heads=args.transformer_head_num_heads,
     )
     
-    # Setup loss function (Focal Loss or Cross-Entropy)
-    if args.use_focal_loss:
+    # Setup loss function (pLDDT-weighted, Focal Loss, or Cross-Entropy)
+    if use_plddt:
+        if args.use_cyclical_focal:
+            # pLDDT-weighted Cyclical Focal Loss
+            loss_fn = PLDDTWeightedCyclicalFocalLoss(
+                gamma_pos=args.gamma_pos,
+                gamma_neg=args.gamma_neg,
+                gamma_hc=args.gamma_hc,
+                eps=args.label_smoothing,
+                epochs=args.epochs,  # Total epochs for eta schedule
+                factor=args.cyclical_factor,  # 2.0 = cyclical, 1.0 = one-way
+                min_bin=args.plddt_min_bin,
+                weight_exponent=args.plddt_weight_exponent,
+                ignore_index=-100
+            )
+            print(f"Using pLDDT-Weighted Cyclical Focal Loss:")
+            print(f"  gamma_pos={args.gamma_pos}, gamma_neg={args.gamma_neg}, gamma_hc={args.gamma_hc}")
+            print(f"  epochs={args.epochs}, factor={args.cyclical_factor}, label_smoothing={args.label_smoothing}")
+            print(f"  min_bin={args.plddt_min_bin}, weight_exponent={args.plddt_weight_exponent}")
+            print(f"  Bin weights: {DEFAULT_PLDDT_BIN_WEIGHTS}")
+        else:
+            # Regular pLDDT-weighted Focal Loss
+            loss_fn = PLDDTWeightedFocalLoss(
+                gamma=args.focal_gamma if args.use_focal_loss else 0.0,
+                bin_weights=DEFAULT_PLDDT_BIN_WEIGHTS,
+                min_bin=args.plddt_min_bin,
+                weight_exponent=args.plddt_weight_exponent,
+                ignore_index=-100
+            )
+            print(f"Using pLDDT-Weighted Focal Loss (gamma={loss_fn.gamma}, "
+                  f"min_bin={args.plddt_min_bin}, weight_exponent={args.plddt_weight_exponent})")
+            print(f"  Bin weights: {DEFAULT_PLDDT_BIN_WEIGHTS}")
+    elif args.use_cyclical_focal:
+        # Regular Cyclical Focal Loss (no pLDDT)
+        loss_fn = CyclicalFocalLoss(
+            gamma_pos=args.gamma_pos,
+            gamma_neg=args.gamma_neg,
+            gamma_hc=args.gamma_hc,
+            eps=args.label_smoothing,
+            epochs=args.epochs,
+            factor=args.cyclical_factor,
+            ignore_index=-100
+        )
+        print(f"Using Cyclical Focal Loss:")
+        print(f"  gamma_pos={args.gamma_pos}, gamma_neg={args.gamma_neg}, gamma_hc={args.gamma_hc}")
+        print(f"  epochs={args.epochs}, factor={args.cyclical_factor}, label_smoothing={args.label_smoothing}")
+    elif args.use_focal_loss:
         loss_fn = FocalLoss(
             gamma=args.focal_gamma,
             alpha=args.focal_alpha,
@@ -175,8 +290,11 @@ def train(args):
         print("Using Cross-Entropy Loss")
     
     # Setup gamma scheduler for focal loss (increases gamma on accuracy plateau)
+    # Note: Gamma scheduler only works with regular Focal Loss, not Cyclical Focal Loss
     gamma_scheduler = None
-    if args.gamma_scheduler and args.use_focal_loss:
+    if args.gamma_scheduler and args.use_cyclical_focal:
+        print("Warning: --gamma-scheduler is not compatible with --use-cyclical-focal, ignoring")
+    elif args.gamma_scheduler and (args.use_focal_loss or use_plddt):
         gamma_scheduler = GammaSchedulerOnPlateau(
             loss_fn=loss_fn,
             mode='max',  # Monitor accuracy (want it to increase)
@@ -188,11 +306,27 @@ def train(args):
         )
         print(f"Gamma scheduler enabled (patience={args.gamma_patience}, "
               f"increase={args.gamma_increase_factor}, max_gamma={args.gamma_max})")
-    elif args.gamma_scheduler and not args.use_focal_loss:
-        print("Warning: --gamma-scheduler requires --use-focal-loss, ignoring")
+    elif args.gamma_scheduler and not args.use_focal_loss and not use_plddt:
+        print("Warning: --gamma-scheduler requires --use-focal-loss or --plddt-bins-fasta, ignoring")
 
-    #if esm2 use the tokenizer from hf
-    if "esm2" in args.hf_model.lower():
+    # Detect if using T5-based model and initialize appropriate tokenizer
+    is_t5 = is_t5_model(args.hf_model)
+    
+    if is_t5:
+        print("\nUsing T5Tokenizer for T5-based model")
+        # Try AutoTokenizer first (works for Ankh), fall back to T5Tokenizer (ProtT5)
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(
+                args.hf_model,
+                trust_remote_code=True
+            )
+        except Exception:
+            tokenizer = T5Tokenizer.from_pretrained(
+                args.hf_model,
+                legacy=True,
+                trust_remote_code=True
+            )
+    elif "esm2" in args.hf_model.lower():
         tokenizer = AutoTokenizer.from_pretrained(
             args.hf_model,
             trust_remote_code=True  # Required for ESM++ custom code
@@ -228,6 +362,8 @@ def train(args):
         tokenizer,
         dataset.char2idx,
         mask_label_chars=args.mask_label_chars,
+        include_plddt=use_plddt,
+        is_t5=is_t5,
     )
     # Determine steps per epoch based on samples_per_epoch or full dataset
     if args.samples_per_epoch is not None:
@@ -256,14 +392,18 @@ def train(args):
         val_dataset = Seq3DiDataset(
             args.val_aa_fasta,
             args.val_three_di_fasta,
-            mask_label_chars=args.mask_label_chars
+            mask_label_chars=args.mask_label_chars,
+            plddt_bins_fasta=args.val_plddt_bins_fasta,
         )
         # Use same collate_fn (same tokenizer and label vocab)
         # But we need to create a new one with the training dataset's char2idx
+        val_use_plddt = use_plddt and args.val_plddt_bins_fasta is not None
         val_collate_fn = make_collate_fn(
             tokenizer,
             dataset.char2idx,  # Use training vocab to ensure consistency
             mask_label_chars=args.mask_label_chars,
+            include_plddt=val_use_plddt,
+            is_t5=is_t5,
         )
         val_loader = DataLoader(
             val_dataset,
@@ -273,6 +413,8 @@ def train(args):
             collate_fn=val_collate_fn,
         )
         print(f"✓ Validation set: {len(val_dataset)} sequences")
+        if val_use_plddt:
+            print(f"  pLDDT bins: {args.val_plddt_bins_fasta}")
     elif args.val_aa_fasta or args.val_three_di_fasta:
         print("Warning: Both --val-aa-fasta and --val-three-di-fasta required for validation")
     
@@ -438,6 +580,9 @@ def train(args):
     print(f"  Initial LR: {args.lr:.2e}")
     model.train()
     
+    # Check if loss function is cyclical (needs epoch parameter)
+    is_cyclical = isinstance(loss_fn, (CyclicalFocalLoss, PLDDTWeightedCyclicalFocalLoss))
+    
     # For custom epoch sizes, create an infinite iterator over the dataset
     if use_custom_epoch:
         def infinite_loader():
@@ -459,6 +604,11 @@ def train(args):
         epoch_loss = 0.0
         epoch_tokens = 0
         epoch_correct = 0
+        
+        # pLDDT-stratified accuracy tracking (bins 2, 4, 6, 8 = pLDDT >= 20, 40, 60, 80)
+        plddt_thresholds = [2, 4, 6, 8]  # bin thresholds
+        epoch_correct_by_plddt = {t: 0 for t in plddt_thresholds}
+        epoch_tokens_by_plddt = {t: 0 for t in plddt_thresholds}
 
         # Create progress bar for batches
         if use_custom_epoch:
@@ -478,27 +628,72 @@ def train(args):
             
             batch = {k: v.to(device) for k, v in batch.items()}
             
-            # Extract labels for external loss computation
+            # Extract labels and optional pLDDT bins for external loss computation
             labels = batch.pop("labels")
+            plddt_bins = batch.pop("plddt_bins", None)
             
             # Mixed precision forward pass
             if use_amp:
                 with torch.cuda.amp.autocast():
                     outputs = model(**batch)
-                    # Compute loss externally (supports Focal Loss or CE)
+                    # Compute loss externally (supports pLDDT-weighted, Focal Loss, or CE)
                     logits = outputs.logits
-                    loss = loss_fn(
-                        logits.view(-1, logits.size(-1)),
-                        labels.view(-1)
-                    )
+                    if use_plddt and plddt_bins is not None:
+                        if is_cyclical:
+                            loss = loss_fn(
+                                logits.view(-1, logits.size(-1)),
+                                labels.view(-1),
+                                epoch=epoch,
+                                plddt_bins=plddt_bins.view(-1)
+                            )
+                        else:
+                            loss = loss_fn(
+                                logits.view(-1, logits.size(-1)),
+                                labels.view(-1),
+                                plddt_bins.view(-1)
+                            )
+                    else:
+                        if is_cyclical:
+                            loss = loss_fn(
+                                logits.view(-1, logits.size(-1)),
+                                labels.view(-1),
+                                epoch=epoch
+                            )
+                        else:
+                            loss = loss_fn(
+                                logits.view(-1, logits.size(-1)),
+                                labels.view(-1)
+                            )
             else:
                 outputs = model(**batch)
-                # Compute loss externally (supports Focal Loss or CE)
+                # Compute loss externally (supports pLDDT-weighted, Focal Loss, or CE)
                 logits = outputs.logits
-                loss = loss_fn(
-                    logits.view(-1, logits.size(-1)),
-                    labels.view(-1)
-                )
+                if use_plddt and plddt_bins is not None:
+                    if is_cyclical:
+                        loss = loss_fn(
+                            logits.view(-1, logits.size(-1)),
+                            labels.view(-1),
+                            epoch=epoch,
+                            plddt_bins=plddt_bins.view(-1)
+                        )
+                    else:
+                        loss = loss_fn(
+                            logits.view(-1, logits.size(-1)),
+                            labels.view(-1),
+                            plddt_bins.view(-1)
+                        )
+                else:
+                    if is_cyclical:
+                        loss = loss_fn(
+                            logits.view(-1, logits.size(-1)),
+                            labels.view(-1),
+                            epoch=epoch
+                        )
+                    else:
+                        loss = loss_fn(
+                            logits.view(-1, logits.size(-1)),
+                            labels.view(-1)
+                        )
             
             # Restore labels to batch for metrics
             batch["labels"] = labels
@@ -515,6 +710,16 @@ def train(args):
                 valid_mask = labels != -100
                 correct = ((preds == labels) & valid_mask).sum().item()
                 batch_accuracy = correct / max(token_count, 1)
+                
+                # pLDDT-stratified accuracy (only when plddt_bins available)
+                if use_plddt and plddt_bins is not None:
+                    for thresh in plddt_thresholds:
+                        # Positions with pLDDT bin >= threshold
+                        plddt_mask = (plddt_bins >= thresh) & valid_mask
+                        thresh_tokens = plddt_mask.sum().item()
+                        thresh_correct = ((preds == labels) & plddt_mask).sum().item()
+                        epoch_correct_by_plddt[thresh] += thresh_correct
+                        epoch_tokens_by_plddt[thresh] += thresh_tokens
 
             # Scale loss by accumulation steps for proper gradient averaging
             scaled_loss = loss / args.gradient_accumulation_steps
@@ -602,6 +807,19 @@ def train(args):
         writer.add_scalar('Accuracy/train_epoch', epoch_accuracy, epoch)
         writer.add_scalar('Training/epoch_tokens', epoch_tokens, epoch)
         
+        # Log pLDDT-stratified accuracy if using pLDDT weighting
+        if use_plddt:
+            plddt_accuracies = {}
+            for thresh in plddt_thresholds:
+                thresh_tokens = epoch_tokens_by_plddt[thresh]
+                thresh_correct = epoch_correct_by_plddt[thresh]
+                if thresh_tokens > 0:
+                    thresh_acc = thresh_correct / thresh_tokens
+                    plddt_accuracies[thresh] = thresh_acc
+                    # Log to TensorBoard
+                    plddt_val = thresh * 10  # Convert bin to pLDDT value (2 -> 20, etc.)
+                    writer.add_scalar(f'Accuracy/plddt_ge{plddt_val}', thresh_acc, epoch)
+        
         # Step plateau scheduler (epoch-based) if using it
         if plateau_scheduler is not None:
             old_lr = optimizer.param_groups[0]['lr']
@@ -622,6 +840,12 @@ def train(args):
         current_lr = optimizer.param_groups[0]['lr']
         print(f"\nEpoch {epoch} Average Loss (per residue): {epoch_avg_loss:.4f}")
         print(f"Epoch {epoch} Accuracy: {epoch_accuracy:.4f} ({epoch_correct}/{epoch_tokens} residues)")
+        
+        # Print pLDDT-stratified accuracy
+        if use_plddt and plddt_accuracies:
+            plddt_str = " | ".join([f"≥{t*10}: {plddt_accuracies.get(t, 0):.4f}" for t in plddt_thresholds if t in plddt_accuracies])
+            print(f"Epoch {epoch} Accuracy by pLDDT: {plddt_str}")
+        
         print(f"Current Learning Rate: {current_lr:.2e}")
         if gamma_scheduler is not None:
             print(f"Current Focal Gamma: {gamma_scheduler.gamma:.2f}")
@@ -629,16 +853,27 @@ def train(args):
         # Run validation if validation data is provided
         if val_loader is not None:
             print(f"\nRunning validation...")
-            val_loss, val_accuracy, val_tokens = validate(
-                model, val_loader, loss_fn, device, use_amp=use_amp
+            val_loss, val_accuracy, val_tokens, val_plddt_accuracies = validate(
+                model, val_loader, loss_fn, device, use_amp=use_amp, use_plddt=use_plddt, epoch=epoch
             )
             print(f"Validation Loss: {val_loss:.4f}")
             print(f"Validation Accuracy: {val_accuracy:.4f} ({int(val_accuracy * val_tokens)}/{val_tokens} residues)")
+            
+            # Print pLDDT-stratified validation accuracy
+            if use_plddt and val_plddt_accuracies:
+                val_plddt_str = " | ".join([f"≥{t*10}: {val_plddt_accuracies.get(t, 0):.4f}" for t in plddt_thresholds if t in val_plddt_accuracies])
+                print(f"Validation Accuracy by pLDDT: {val_plddt_str}")
             
             # Log validation metrics to TensorBoard
             writer.add_scalar('Loss/val_epoch', val_loss, epoch)
             writer.add_scalar('Accuracy/val_epoch', val_accuracy, epoch)
             writer.add_scalar('Validation/tokens', val_tokens, epoch)
+            
+            # Log pLDDT-stratified validation accuracy
+            if use_plddt and val_plddt_accuracies:
+                for thresh, acc in val_plddt_accuracies.items():
+                    plddt_val = thresh * 10
+                    writer.add_scalar(f'Accuracy/val_plddt_ge{plddt_val}', acc, epoch)
             
             # Log train vs val comparison
             writer.add_scalars('Loss/train_vs_val', {
@@ -725,25 +960,25 @@ def predict_3di_for_fasta(model_ckpt: str, aa_fasta: str, device: str = None):
         else:
             target_modules = ["layernorm_qkv.1", "out_proj", "query", "key", "value", "dense"]
 
-    tokenizer = AutoTokenizer.from_pretrained(
-        args["hf_model"],
-        trust_remote_code=True  # Required for ESM++ custom code
-    )
-    base_model = AutoModelForTokenClassification.from_pretrained(
-        args["hf_model"],
+    esm_model = ESM3DiModel(
+        hf_model_name=args["hf_model"],
         num_labels=len(label_vocab),
-        trust_remote_code=True  # Required for ESM++ custom code
-    )
-
-    lora_config = LoraConfig(
-        task_type=TaskType.TOKEN_CLS,
-        r=args["lora_r"],
+        lora_r=args["lora_r"],
         lora_alpha=args["lora_alpha"],
         lora_dropout=args["lora_dropout"],
         target_modules=target_modules,
+        use_cnn_head=args.get("use_cnn_head", False),
+        cnn_num_layers=args.get("cnn_num_layers", 2),
+        cnn_kernel_size=args.get("cnn_kernel_size", 3),
+        cnn_dropout=args.get("cnn_dropout", 0.1),
+        use_transformer_head=args.get("use_transformer_head", False),
+        transformer_head_dim=args.get("transformer_head_dim", 256),
+        transformer_head_layers=args.get("transformer_head_layers", 2),
+        transformer_head_dropout=args.get("transformer_head_dropout", 0.1),
+        transformer_head_num_heads=args.get("transformer_head_num_heads", None),
     )
 
-    model = get_peft_model(base_model, lora_config)
+    model = esm_model.get_model()
     
     # Handle potential DataParallel prefix in checkpoint
     model_state_dict = ckpt["model_state_dict"]
@@ -753,6 +988,14 @@ def predict_3di_for_fasta(model_ckpt: str, aa_fasta: str, device: str = None):
     model.load_state_dict(model_state_dict)
     model.to(device)
     model.eval()
+
+    if "esm2" in args["hf_model"].lower():
+        tokenizer = AutoTokenizer.from_pretrained(
+            args["hf_model"],
+            trust_remote_code=True,
+        )
+    else:
+        tokenizer = esm_model.base_model.tokenizer
 
     records = read_fasta(aa_fasta)
     results = []
@@ -877,6 +1120,23 @@ def parse_args():
                    help="Dropout rate for CNN layers "
                         "(only used if --use-cnn-head is set)")
 
+    # Transformer Classification Head
+    p.add_argument("--use-transformer-head", action="store_true",
+                   help="Use a small TransformerEncoder classification head instead "
+                        "of the default linear classifier.")
+    p.add_argument("--transformer-head-dim", type=int, default=256,
+                   help="Hidden dimension of transformer head "
+                        "(only used if --use-transformer-head is set)")
+    p.add_argument("--transformer-head-layers", type=int, default=2,
+                   help="Number of TransformerEncoder layers in head "
+                        "(only used if --use-transformer-head is set)")
+    p.add_argument("--transformer-head-dropout", type=float, default=0.1,
+                   help="Dropout rate for transformer head "
+                        "(only used if --use-transformer-head is set)")
+    p.add_argument("--transformer-head-num-heads", type=int, default=None,
+                   help="Attention head count for transformer head. If omitted, "
+                        "auto-selects a divisor of --transformer-head-dim.")
+
     # Focal Loss
     p.add_argument("--use-focal-loss", action="store_true",
                    help="Use Focal Loss instead of Cross-Entropy. "
@@ -889,6 +1149,42 @@ def parse_args():
     p.add_argument("--focal-alpha", type=float, default=None,
                    help="Optional class weight for focal loss. "
                         "(only used if --use-focal-loss is set)")
+    
+    # Cyclical Focal Loss
+    p.add_argument("--use-cyclical-focal", action="store_true",
+                   help="Use Cyclical Focal Loss instead of regular Focal Loss. "
+                        "CFL dynamically adjusts focus during training with epoch-dependent weighting. "
+                        "Can be combined with --plddt-bins-fasta for pLDDT-weighted cyclical loss.")
+    p.add_argument("--gamma-pos", type=float, default=0.0,
+                   help="CFL: Focal exponent for positive (correct) class. "
+                        "0.0 = no down-weighting of correct predictions (default: 0.0)")
+    p.add_argument("--gamma-neg", type=float, default=4.0,
+                   help="CFL: Focal exponent for negative (incorrect) classes. "
+                        "Higher values suppress easy negatives more strongly (default: 4.0)")
+    p.add_argument("--gamma-hc", type=float, default=0.0,
+                   help="CFL: Hard-class positive weighting exponent. "
+                        "Increases loss for uncertain correct predictions. "
+                        "Use 0.5-2.0 for highly overlapping classes (default: 0.0)")
+    p.add_argument("--cyclical-factor", type=float, default=2.0,
+                   help="CFL: Scheduling factor. 2.0 = full cyclical behavior, "
+                        "1.0 = one-way modified schedule (default: 2.0)")
+    p.add_argument("--label-smoothing", type=float, default=0.1,
+                   help="CFL: Label smoothing epsilon for regularization (default: 0.1)")
+    
+    # pLDDT-weighted loss
+    p.add_argument("--plddt-bins-fasta", type=str, default=None,
+                   help="FASTA with pLDDT bin values (0-9 per position). "
+                        "If provided, uses PLDDTWeightedFocalLoss which weights loss "
+                        "by pLDDT confidence. Generate with build_trainingset.py --output-plddt-bins.")
+    p.add_argument("--val-plddt-bins-fasta", type=str, default=None,
+                   help="FASTA with validation pLDDT bin values (optional).")
+    p.add_argument("--plddt-min-bin", type=int, default=5,
+                   help="Minimum pLDDT bin (0-9) to include in loss. Bins below this "
+                        "get zero weight. Default 5 corresponds to pLDDT >= 50.")
+    p.add_argument("--plddt-weight-exponent", type=float, default=1.0,
+                   help="Exponent applied to pLDDT weights. Higher values sharpen "
+                        "contrast between low and high confidence. Values >1 increase "
+                        "focus on high-confidence regions.")
     
     # Gamma scheduler (for focal loss)
     p.add_argument("--gamma-scheduler", action="store_true",
@@ -1003,6 +1299,9 @@ def parse_args():
     if not args.aa_fasta or not args.three_di_fasta:
         p.error("--aa-fasta and --three-di-fasta are required "
                 "(or must be in config file)")
+
+    if args.use_cnn_head and args.use_transformer_head:
+        p.error("--use-cnn-head and --use-transformer-head are mutually exclusive")
     
     return args
 

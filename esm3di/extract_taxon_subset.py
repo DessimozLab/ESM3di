@@ -35,6 +35,7 @@ DEFAULT_METADATA = "/mnt/data1/bfvd/metadata/bfvd_taxid_rank_scientificname_line
 DEFAULT_AA_FASTA = "/mnt/data1/bfvd/training_set/bfvd_data_aa.fasta"
 DEFAULT_3DI_FASTA = "/mnt/data1/bfvd/training_set/bfvd_data_3di.fasta"
 DEFAULT_3DI_MASKED_FASTA = "/mnt/data1/bfvd/training_set/bfvd_data_3di_masked.fasta"
+DEFAULT_PLDDT_BINS_FASTA = "/mnt/data1/bfvd/training_set/bfvd_data_plddt_bins.fasta"
 
 
 def parse_metadata_line(line: str) -> Optional[Dict]:
@@ -264,6 +265,10 @@ def main():
                         help='Also extract masked 3Di sequences')
     parser.add_argument('--masked-fasta', type=str, default=DEFAULT_3DI_MASKED_FASTA,
                         help=f'Path to masked 3Di FASTA (default: {DEFAULT_3DI_MASKED_FASTA})')
+    parser.add_argument('--include-plddt-bins', action='store_true',
+                        help='Also extract pLDDT bins FASTA (for pLDDT-weighted loss)')
+    parser.add_argument('--plddt-bins-fasta', type=str, default=DEFAULT_PLDDT_BINS_FASTA,
+                        help=f'Path to pLDDT bins FASTA (default: {DEFAULT_PLDDT_BINS_FASTA})')
     
     # Search options
     parser.add_argument('--exact-match', '-e', action='store_true',
@@ -354,6 +359,12 @@ def main():
             masked_output = f"{args.output_prefix}_3di_masked.fasta"
             print(f"Extracting masked 3Di sequences to {masked_output}...", file=sys.stderr)
             extract_subset_streaming(args.masked_fasta, masked_output, matching_accessions, verbose=args.verbose)
+    
+    # Extract pLDDT bins if requested
+    if args.include_plddt_bins:
+        plddt_output = f"{args.output_prefix}_plddt_bins.fasta"
+        print(f"Extracting pLDDT bins to {plddt_output}...", file=sys.stderr)
+        extract_subset_streaming(args.plddt_bins_fasta, plddt_output, matching_accessions, verbose=args.verbose)
     
     print("Done!", file=sys.stderr)
 

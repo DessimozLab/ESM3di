@@ -319,7 +319,12 @@ def _gpu_worker(gpu_id, shard_fasta, output_fasta, checkpoint_path, args_dict, p
             use_cnn_head=use_cnn_head,
             cnn_num_layers=args_dict.get('cnn_num_layers', 2),
             cnn_kernel_size=args_dict.get('cnn_kernel_size', 3),
-            cnn_dropout=args_dict.get('cnn_dropout', 0.1)
+            cnn_dropout=args_dict.get('cnn_dropout', 0.1),
+            use_transformer_head=args_dict.get('use_transformer_head', False),
+            transformer_head_dim=args_dict.get('transformer_head_dim', 256),
+            transformer_head_layers=args_dict.get('transformer_head_layers', 2),
+            transformer_head_dropout=args_dict.get('transformer_head_dropout', 0.1),
+            transformer_head_num_heads=args_dict.get('transformer_head_num_heads', None),
         )
         
         # Run inference on this shard
@@ -649,6 +654,7 @@ Examples:
             idx2char = {i: c for i, c in enumerate(label_vocab)}
             
             use_cnn_head = args_dict.get('use_cnn_head', False)
+            use_transformer_head = args_dict.get('use_transformer_head', False)
             lora_r = args_dict.get('lora_r', 8)
             lora_alpha = args_dict.get('lora_alpha', 16)
             lora_dropout = args_dict.get('lora_dropout', 0.05)
@@ -669,9 +675,14 @@ Examples:
                 'lora_alpha': lora_alpha,
                 'lora_dropout': lora_dropout,
                 'use_cnn_head': use_cnn_head,
+                'use_transformer_head': use_transformer_head,
                 'cnn_num_layers': args_dict.get('cnn_num_layers', 2),
                 'cnn_kernel_size': args_dict.get('cnn_kernel_size', 3),
                 'cnn_dropout': args_dict.get('cnn_dropout', 0.1),
+                'transformer_head_dim': args_dict.get('transformer_head_dim', 256),
+                'transformer_head_layers': args_dict.get('transformer_head_layers', 2),
+                'transformer_head_dropout': args_dict.get('transformer_head_dropout', 0.1),
+                'transformer_head_num_heads': args_dict.get('transformer_head_num_heads', None),
                 'batch_size': 4
             }
             
@@ -707,7 +718,12 @@ Examples:
                     use_cnn_head=use_cnn_head,
                     cnn_num_layers=args_dict.get('cnn_num_layers', 2),
                     cnn_kernel_size=args_dict.get('cnn_kernel_size', 3),
-                    cnn_dropout=args_dict.get('cnn_dropout', 0.1)
+                    cnn_dropout=args_dict.get('cnn_dropout', 0.1),
+                    use_transformer_head=use_transformer_head,
+                    transformer_head_dim=args_dict.get('transformer_head_dim', 256),
+                    transformer_head_layers=args_dict.get('transformer_head_layers', 2),
+                    transformer_head_dropout=args_dict.get('transformer_head_dropout', 0.1),
+                    transformer_head_num_heads=args_dict.get('transformer_head_num_heads', None),
                 )
                 
                 # Run inference using the model's predict_from_fasta method
