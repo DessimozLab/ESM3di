@@ -1,0 +1,11 @@
+Flasuviricetes	fla
+Alsuviricetes	als
+Herviviricetes	her
+Megaviricetes	meg
+Naldaviricetes	nal
+Pokkesviricetes	pok
+Caudoviricetes	cau
+Malgrandaviricetes	mal
+Monjiviricetes	mon
+Pisoniviricetes	pis
+Revtraviricetes	rev
