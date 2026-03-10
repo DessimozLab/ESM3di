@@ -17,8 +17,9 @@ from typing import List, Optional
 
 # Default pLDDT bin weights for pLDDT-weighted losses
 # Index 0-9 maps to weight for pLDDT bins [0-10), [10-20), ..., [90-100]
-DEFAULT_PLDDT_BIN_WEIGHTS = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1.0]
+DEFAULT_PLDDT_BIN_WEIGHTS = [0.4, 0.4, 0.4, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 
+#DEFAULT_PLDDT_BIN_WEIGHTS = [0.9 , 0.8 , 0.7 , 0.6, 0.5, 0.4, 0.4, 0.4, 0.4, 0.4 ]
 
 class FocalLoss(nn.Module):
     """

@@ -17,6 +17,15 @@ from .ESM3di_model import (
     make_collate_fn,
 )
 
+from .T5Model import (
+    T5ProteinModel,
+    T5WithClassificationHead,
+    is_t5_model,
+    is_prostt5_model,
+    discover_t5_lora_modules,
+    prepare_t5_batch,
+)
+
 from .losses import (
     FocalLoss,
     CyclicalFocalLoss,
@@ -44,13 +53,18 @@ from .tree_utils import (
 )
 
 __all__ = [
-    # Main model class
+    # Main model classes
     "ESM3DiModel",
+    "T5ProteinModel",
     # Model components
     "ESMWithCNNHead",
     "ESMWithTransformerHead",
+    "T5WithClassificationHead",
     "CNNClassificationHead",
     "TransformerClassificationHead",
+    # Model detection
+    "is_t5_model",
+    "is_prostt5_model",
     # Loss functions
     "FocalLoss",
     "CyclicalFocalLoss",
@@ -64,8 +78,10 @@ __all__ = [
     "Seq3DiDataset",
     "read_fasta",
     "make_collate_fn",
+    "prepare_t5_batch",
     # LoRA utilities
     "discover_lora_target_modules",
+    "discover_t5_lora_modules",
     "freeze_all_but_lora_and_classifier",
     "merge_lora_weights",
     # Inference

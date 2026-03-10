@@ -8,13 +8,13 @@ from datetime import datetime
 import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer, AutoModelForTokenClassification
-from transformers import T5Tokenizer
 from transformers import get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from peft import LoraConfig, get_peft_model, TaskType
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
-from .ESM3di_model import ESM3DiModel, read_fasta, Seq3DiDataset, make_collate_fn, Lion, is_t5_model
+from .ESM3di_model import ESM3DiModel, read_fasta, Seq3DiDataset, make_collate_fn, Lion
+from .T5Model import T5ProteinModel, is_t5_model
 from .losses import (
     FocalLoss, 
     CyclicalFocalLoss,
@@ -209,28 +209,53 @@ def train(args):
         print(f"pLDDT bins loaded from: {args.plddt_bins_fasta}")
     
     
-    # Create ESM3Di model wrapper
+    # Create model wrapper (T5ProteinModel for T5-based, ESM3DiModel otherwise)
     target_modules = None
     if args.lora_target_modules:
         target_modules = [m.strip() for m in args.lora_target_modules.split(",")]
     
-    esm_model = ESM3DiModel(
-        hf_model_name=args.hf_model,
-        num_labels=len(dataset.label_vocab),
-        lora_r=args.lora_r,
-        lora_alpha=args.lora_alpha,
-        lora_dropout=args.lora_dropout,
-        target_modules=target_modules,
-        use_cnn_head=args.use_cnn_head,
-        cnn_num_layers=args.cnn_num_layers,
-        cnn_kernel_size=args.cnn_kernel_size,
-        cnn_dropout=args.cnn_dropout,
-        use_transformer_head=args.use_transformer_head,
-        transformer_head_dim=args.transformer_head_dim,
-        transformer_head_layers=args.transformer_head_layers,
-        transformer_head_dropout=args.transformer_head_dropout,
-        transformer_head_num_heads=args.transformer_head_num_heads,
-    )
+    # Check if model is T5-based (ProstT5, ProtT5, Ankh)
+    is_t5 = is_t5_model(args.hf_model)
+    
+    if is_t5:
+        # Use T5ProteinModel for T5-based models
+        esm_model = T5ProteinModel(
+            hf_model_name=args.hf_model,
+            num_labels=len(dataset.label_vocab),
+            lora_r=args.lora_r,
+            lora_alpha=args.lora_alpha,
+            lora_dropout=args.lora_dropout,
+            target_modules=target_modules,
+            use_cnn_head=args.use_cnn_head,
+            cnn_num_layers=args.cnn_num_layers,
+            cnn_kernel_size=args.cnn_kernel_size,
+            cnn_dropout=args.cnn_dropout,
+            use_transformer_head=args.use_transformer_head,
+            transformer_head_dim=args.transformer_head_dim,
+            transformer_head_layers=args.transformer_head_layers,
+            transformer_head_dropout=args.transformer_head_dropout,
+            transformer_head_num_heads=args.transformer_head_num_heads,
+            half_precision=getattr(args, 'half_precision', False),
+        )
+    else:
+        # Use ESM3DiModel for ESM2/ESM++ models
+        esm_model = ESM3DiModel(
+            hf_model_name=args.hf_model,
+            num_labels=len(dataset.label_vocab),
+            lora_r=args.lora_r,
+            lora_alpha=args.lora_alpha,
+            lora_dropout=args.lora_dropout,
+            target_modules=target_modules,
+            use_cnn_head=args.use_cnn_head,
+            cnn_num_layers=args.cnn_num_layers,
+            cnn_kernel_size=args.cnn_kernel_size,
+            cnn_dropout=args.cnn_dropout,
+            use_transformer_head=args.use_transformer_head,
+            transformer_head_dim=args.transformer_head_dim,
+            transformer_head_layers=args.transformer_head_layers,
+            transformer_head_dropout=args.transformer_head_dropout,
+            transformer_head_num_heads=args.transformer_head_num_heads,
+        )
     
     # Setup loss function (pLDDT-weighted, Focal Loss, or Cross-Entropy)
     if use_plddt:
@@ -309,27 +334,16 @@ def train(args):
     elif args.gamma_scheduler and not args.use_focal_loss and not use_plddt:
         print("Warning: --gamma-scheduler requires --use-focal-loss or --plddt-bins-fasta, ignoring")
 
-    # Detect if using T5-based model and initialize appropriate tokenizer
-    is_t5 = is_t5_model(args.hf_model)
-    
+    # Get tokenizer from model (T5ProteinModel and ESM3DiModel both have tokenizer attribute)
     if is_t5:
-        print("\nUsing T5Tokenizer for T5-based model")
-        # Try AutoTokenizer first (works for Ankh), fall back to T5Tokenizer (ProtT5)
-        try:
-            tokenizer = AutoTokenizer.from_pretrained(
-                args.hf_model,
-                trust_remote_code=True
-            )
-        except Exception:
-            tokenizer = T5Tokenizer.from_pretrained(
-                args.hf_model,
-                legacy=True,
-                trust_remote_code=True
-            )
+        tokenizer = esm_model.get_tokenizer()
+        print("\nUsing T5 tokenizer (space-separated amino acids)")
+    elif hasattr(esm_model, 'tokenizer') and esm_model.tokenizer is not None:
+        tokenizer = esm_model.tokenizer
     elif "esm2" in args.hf_model.lower():
         tokenizer = AutoTokenizer.from_pretrained(
             args.hf_model,
-            trust_remote_code=True  # Required for ESM++ custom code
+            trust_remote_code=True
         )
     else:
         tokenizer = esm_model.base_model.tokenizer

@@ -671,11 +671,17 @@ class ESM3DiModel:
         self.transformer_head_dropout = transformer_head_dropout
         self.transformer_head_num_heads = transformer_head_num_heads
 
-        # Detect model type
+        # Detect model type - T5 models should use T5ProteinModel instead
         self.is_t5 = is_t5_model(hf_model_name)
         if self.is_t5:
-            print(f"\n⚡ Detected T5-based model: {hf_model_name}")
-            print("   Using T5Tokenizer with space-separated amino acids")
+            import warnings
+            warnings.warn(
+                f"T5-based model detected: {hf_model_name}. "
+                "Consider using T5ProteinModel from esm3di.T5Model instead for better support.",
+                DeprecationWarning
+            )
+            print(f"\n⚠️  T5-based model detected: {hf_model_name}")
+            print("   For better support, use T5ProteinModel from esm3di.T5Model")
 
         # Load model using standard HuggingFace approach
         self._load_model()
