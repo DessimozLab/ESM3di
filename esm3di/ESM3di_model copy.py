@@ -11,6 +11,7 @@ from .iterative_head import (
     IterativeTransformerOutput,
     ModelWithIterativeTransformerHead,
     ESMWithIterativeTransformerHead,  # Backward compat alias
+    GRUGate,
 )
 from transformers import T5Tokenizer, T5EncoderModel
 from transformers.modeling_outputs import TokenClassifierOutput
@@ -20,7 +21,6 @@ from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer
 from peft import LoraConfig, get_peft_model, TaskType
 from transformers.pytorch_utils import Conv1D
-from .model_outputs import PLDDT_BIN_VOCAB, TokenClassifierOutputWithPLDDT
 
 
 # -----------------------------
@@ -251,64 +251,7 @@ class TransformerClassificationHead(nn.Module):
         return logits
 
 
-class LinearClassificationHead(nn.Module):
-    """Simple per-token linear classification head."""
-
-    def __init__(self, hidden_size: int, num_labels: int):
-        super().__init__()
-        self.classifier = nn.Linear(hidden_size, num_labels)
-
-    def forward(self, hidden_states, attention_mask=None):
-        return self.classifier(hidden_states)
-
-
 # IterativeTransformerClassificationHead is now imported from iterative_head.py
-
-
-def _extract_sequence_output(outputs):
-    if hasattr(outputs, 'hidden_states') and outputs.hidden_states is not None:
-        return outputs.hidden_states[-1]
-    return outputs.last_hidden_state
-
-
-class ESMWithLinearHead(nn.Module):
-    """Wrapper that uses explicit linear heads for 3Di and optional auxiliary tracks."""
-
-    def __init__(self, base_model, classifier, plddt_head=None, aux_heads=None):
-        super().__init__()
-        self.base_model = base_model
-        self.classifier = classifier
-        self.plddt_head = plddt_head
-        self.aux_heads = nn.ModuleDict(aux_heads or {})
-        self.config = base_model.config
-
-    def forward(self, input_ids, attention_mask=None, **kwargs):
-        labels = kwargs.pop("labels", None)
-
-        outputs = self.base_model(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            output_hidden_states=True,
-            **kwargs,
-        )
-        sequence_output = _extract_sequence_output(outputs)
-        logits = self.classifier(sequence_output)
-        plddt_logits = self.plddt_head(sequence_output) if self.plddt_head is not None else None
-        aux_logits = {name: head(sequence_output) for name, head in self.aux_heads.items()} if self.aux_heads else None
-
-        loss = None
-        if labels is not None:
-            loss_fct = nn.CrossEntropyLoss(ignore_index=-100)
-            loss = loss_fct(logits.view(-1, self.config.num_labels), labels.view(-1))
-
-        return TokenClassifierOutputWithPLDDT(
-            loss=loss,
-            logits=logits,
-            hidden_states=outputs.hidden_states if hasattr(outputs, 'hidden_states') else None,
-            attentions=outputs.attentions if hasattr(outputs, 'attentions') else None,
-            plddt_logits=plddt_logits,
-            aux_logits=aux_logits,
-        )
 
 
 class ESMWithCNNHead(nn.Module):
@@ -316,12 +259,10 @@ class ESMWithCNNHead(nn.Module):
     Wrapper that replaces the standard classifier with a CNN head.
     Note: Loss is computed externally in training loop to support Focal Loss etc.
     """
-    def __init__(self, base_model, cnn_head, plddt_head=None, aux_heads=None):
+    def __init__(self, base_model, cnn_head):
         super().__init__()
         self.base_model = base_model
         self.cnn_head = cnn_head
-        self.plddt_head = plddt_head
-        self.aux_heads = nn.ModuleDict(aux_heads or {})
         
         # Store config for compatibility
         self.config = base_model.config
@@ -341,12 +282,15 @@ class ESMWithCNNHead(nn.Module):
         )
         
         # Get the last hidden state from the model
-        sequence_output = _extract_sequence_output(outputs)
+        # For standard HuggingFace models like ESM2/ESM++
+        if hasattr(outputs, 'hidden_states') and outputs.hidden_states is not None:
+            sequence_output = outputs.hidden_states[-1]  # (batch, seq_len, hidden_size)
+        else:
+            # Fallback to last_hidden_state if available
+            sequence_output = outputs.last_hidden_state  # (batch, seq_len, hidden_size)
         
         # Apply CNN classification head
         logits = self.cnn_head(sequence_output)
-        plddt_logits = self.plddt_head(sequence_output) if self.plddt_head is not None else None
-        aux_logits = {name: head(sequence_output) for name, head in self.aux_heads.items()} if self.aux_heads else None
         
         # Note: Loss is computed externally in training loop to support Focal Loss
         # Labels are not passed during training, so loss will be None
@@ -359,13 +303,11 @@ class ESMWithCNNHead(nn.Module):
                 labels.view(-1)
             )
         
-        return TokenClassifierOutputWithPLDDT(
+        return TokenClassifierOutput(
             loss=loss,
             logits=logits,
             hidden_states=outputs.hidden_states if hasattr(outputs, 'hidden_states') else None,
             attentions=outputs.attentions if hasattr(outputs, 'attentions') else None,
-            plddt_logits=plddt_logits,
-            aux_logits=aux_logits,
         )
     
     def named_parameters(self, *args, **kwargs):
@@ -386,12 +328,10 @@ class ESMWithTransformerHead(nn.Module):
     Wrapper that replaces the standard classifier with a small transformer head.
     Note: Loss is computed externally in training loop to support Focal Loss etc.
     """
-    def __init__(self, base_model, transformer_head, plddt_head=None, aux_heads=None):
+    def __init__(self, base_model, transformer_head):
         super().__init__()
         self.base_model = base_model
         self.transformer_head = transformer_head
-        self.plddt_head = plddt_head
-        self.aux_heads = nn.ModuleDict(aux_heads or {})
 
         # Store config for compatibility
         self.config = base_model.config
@@ -409,24 +349,23 @@ class ESMWithTransformerHead(nn.Module):
             **kwargs,
         )
 
-        sequence_output = _extract_sequence_output(outputs)
+        if hasattr(outputs, 'hidden_states') and outputs.hidden_states is not None:
+            sequence_output = outputs.hidden_states[-1]
+        else:
+            sequence_output = outputs.last_hidden_state
 
         logits = self.transformer_head(sequence_output, attention_mask=attention_mask)
-        plddt_logits = self.plddt_head(sequence_output) if self.plddt_head is not None else None
-        aux_logits = {name: head(sequence_output) for name, head in self.aux_heads.items()} if self.aux_heads else None
 
         loss = None
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss(ignore_index=-100)
             loss = loss_fct(logits.view(-1, self.config.num_labels), labels.view(-1))
 
-        return TokenClassifierOutputWithPLDDT(
+        return TokenClassifierOutput(
             loss=loss,
             logits=logits,
             hidden_states=outputs.hidden_states if hasattr(outputs, 'hidden_states') else None,
             attentions=outputs.attentions if hasattr(outputs, 'attentions') else None,
-            plddt_logits=plddt_logits,
-            aux_logits=aux_logits,
         )
 
     def named_parameters(self, *args, **kwargs):
@@ -440,6 +379,268 @@ class ESMWithTransformerHead(nn.Module):
 
     def load_state_dict(self, *args, **kwargs):
         return super().load_state_dict(*args, **kwargs)
+
+
+class ESMWithIterativeBackboneHead(nn.Module):
+    """
+    Wrapper that iteratively re-applies the final k backbone layers with learned halting.
+    This uses the protein LLM's own top layers (LoRA-adapted) instead of a separate
+    transformer refinement head.
+    """
+    def __init__(
+        self,
+        base_model,
+        num_labels: int,
+        final_k_layers: int = 2,
+        max_iterations: int = 5,
+        halt_threshold: float = 0.95,
+        lambda_p: float = 0.01,
+        geometric_prior_p: float = 0.5,
+        use_hidden_state_feedback: bool = True,
+        use_gru_gate: bool = False,
+    ):
+        super().__init__()
+        self.base_model = base_model
+        self.config = base_model.config
+
+        self.final_k_layers = final_k_layers
+        self.max_iterations = max_iterations
+        self.halt_threshold = halt_threshold
+        self.lambda_p = lambda_p
+        self.geometric_prior_p = geometric_prior_p
+        self.use_hidden_state_feedback = use_hidden_state_feedback
+        self.use_gru_gate = use_gru_gate
+
+        hidden_size = self.config.hidden_size
+        self.halt_predictor = nn.Linear(hidden_size, 1)
+        self.classifier = nn.Linear(hidden_size, num_labels)
+        self.iteration_embedding = nn.Embedding(max_iterations, hidden_size)
+        self.norm = nn.LayerNorm(hidden_size)
+        if not use_hidden_state_feedback:
+            self.feedback_projection = nn.Linear(num_labels, hidden_size)
+        
+        # GRU gate for controlled hidden state updates between iterations
+        if use_gru_gate:
+            self.gru_gate = GRUGate(hidden_size)
+        else:
+            self.gru_gate = None
+
+    def _resolve_backbone_module(self):
+        model = self.base_model
+        if hasattr(model, 'base_model') and hasattr(model.base_model, 'model'):
+            model = model.base_model.model
+        elif hasattr(model, 'model'):
+            model = model.model
+
+        if hasattr(model, 'esm'):
+            model = model.esm
+        elif hasattr(model, 'encoder') and hasattr(model.encoder, 'layer'):
+            return model
+        elif hasattr(model, 'transformer') and hasattr(model.transformer, 'blocks'):
+            return model
+        elif hasattr(model, 'transformer') and hasattr(model.transformer, 'encoder') and hasattr(model.transformer.encoder, 'block'):
+            return model
+
+        return model
+
+    def _get_top_k_layers(self):
+        backbone = self._resolve_backbone_module()
+        if hasattr(backbone, 'encoder') and hasattr(backbone.encoder, 'layer'):
+            layers = backbone.encoder.layer
+        elif hasattr(backbone, 'transformer') and hasattr(backbone.transformer, 'blocks'):
+            layers = backbone.transformer.blocks
+        elif hasattr(backbone, 'transformer') and hasattr(backbone.transformer, 'encoder') and hasattr(backbone.transformer.encoder, 'block'):
+            layers = backbone.transformer.encoder.block
+        else:
+            raise ValueError("Could not locate encoder layers for iterative backbone refinement")
+
+        if self.final_k_layers <= 0:
+            raise ValueError("final_k_layers must be > 0")
+        if self.final_k_layers > len(layers):
+            raise ValueError(
+                f"final_k_layers ({self.final_k_layers}) exceeds total encoder layers ({len(layers)})"
+            )
+        return layers[-self.final_k_layers:]
+
+    def _compute_geometric_prior(self, n_steps: int, device):
+        p = self.geometric_prior_p
+        steps = torch.arange(n_steps, device=device, dtype=torch.float32)
+        prior = p * ((1 - p) ** steps)
+        prior = prior / prior.sum()
+        return prior
+
+    def _apply_top_k_layers(self, hidden_states, attention_mask, top_k_layers):
+        output = hidden_states
+
+        ext_attention_mask = None
+        backbone = self._resolve_backbone_module()
+        if attention_mask is not None and hasattr(backbone, 'get_extended_attention_mask'):
+            ext_attention_mask = backbone.get_extended_attention_mask(
+                attention_mask,
+                attention_mask.shape,
+                hidden_states.device,
+            )
+
+        for layer in top_k_layers:
+            layer_out = None
+
+            if layer.__class__.__name__ == "T5Block":
+                t5_attention_mask = ext_attention_mask
+                if t5_attention_mask is None and attention_mask is not None:
+                    t5_attention_mask = attention_mask[:, None, None, :].to(dtype=output.dtype)
+                    t5_attention_mask = (1.0 - t5_attention_mask) * torch.finfo(output.dtype).min
+
+                cache_position = torch.arange(output.shape[1], device=output.device)
+                try:
+                    layer_out = layer(
+                        output,
+                        attention_mask=t5_attention_mask,
+                        position_bias=None,
+                        layer_head_mask=None,
+                        past_key_value=None,
+                        use_cache=False,
+                        output_attentions=False,
+                        cache_position=cache_position,
+                    )
+                except TypeError:
+                    layer_out = layer(
+                        output,
+                        attention_mask=t5_attention_mask,
+                        position_bias=None,
+                        layer_head_mask=None,
+                        past_key_value=None,
+                        use_cache=False,
+                        output_attentions=False,
+                    )
+
+            if layer_out is None and ext_attention_mask is not None:
+                try:
+                    layer_out = layer(output, attention_mask=ext_attention_mask)
+                except TypeError:
+                    layer_out = None
+
+            if layer_out is None and attention_mask is not None:
+                try:
+                    layer_out = layer(output, attention_mask=attention_mask)
+                except TypeError:
+                    layer_out = None
+
+            if layer_out is None and attention_mask is not None:
+                try:
+                    layer_out = layer(output, padding_mask=(attention_mask == 0))
+                except TypeError:
+                    layer_out = None
+
+            if layer_out is None:
+                layer_out = layer(output)
+
+            output = layer_out[0] if isinstance(layer_out, (tuple, list)) else layer_out
+
+        return self.norm(output)
+
+    def forward(self, input_ids, attention_mask=None, **kwargs):
+        labels = kwargs.pop("labels", None)
+        return_halt_info = kwargs.pop("return_halt_info", self.training)
+
+        outputs = self.base_model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            output_hidden_states=True,
+            **kwargs,
+        )
+
+        if hasattr(outputs, 'hidden_states') and outputs.hidden_states is not None:
+            all_hidden = outputs.hidden_states
+            if len(all_hidden) < self.final_k_layers + 1:
+                raise ValueError(
+                    f"Need at least {self.final_k_layers + 1} hidden states, got {len(all_hidden)}"
+                )
+            state = all_hidden[-(self.final_k_layers + 1)]
+        else:
+            state = outputs.last_hidden_state
+
+        top_k_layers = self._get_top_k_layers()
+
+        batch_size, seq_len, _ = state.shape
+        device = state.device
+        cumulative_halt = torch.zeros(batch_size, seq_len, 1, device=device)
+        halted = torch.zeros(batch_size, seq_len, dtype=torch.bool, device=device)
+        halt_probs = []
+        all_logits = []
+        actual_iterations = 0
+
+        for iteration in range(self.max_iterations):
+            actual_iterations = iteration + 1
+            iter_emb = self.iteration_embedding(
+                torch.tensor(iteration, device=device)
+            ).unsqueeze(0).unsqueeze(0)
+            iter_state = state + iter_emb
+
+            refined = self._apply_top_k_layers(iter_state, attention_mask, top_k_layers)
+            logits = self.classifier(refined)
+            all_logits.append(logits)
+
+            lambda_n = torch.sigmoid(self.halt_predictor(refined))
+            if iteration < self.max_iterations - 1:
+                p_n = lambda_n * (1 - cumulative_halt)
+            else:
+                p_n = 1 - cumulative_halt
+
+            halt_probs.append(p_n)
+            cumulative_halt = cumulative_halt + p_n
+
+            if not self.training and iteration < self.max_iterations - 1:
+                newly_halted = cumulative_halt.squeeze(-1) >= self.halt_threshold
+                halted = halted | newly_halted
+                if halted.all():
+                    break
+
+            if iteration < self.max_iterations - 1:
+                if self.use_gru_gate:
+                    # GRU-style gating for controlled state updates (best for gradient flow)
+                    state = self.gru_gate(refined, state)
+                elif self.use_hidden_state_feedback:
+                    state = refined
+                else:
+                    probs = F.softmax(logits, dim=-1)
+                    feedback = self.feedback_projection(probs)
+                    state = refined + feedback
+
+        halt_probs_tensor = torch.cat(halt_probs, dim=-1)
+        stacked_logits = torch.stack(all_logits, dim=-1)
+        weighted_logits = (stacked_logits * halt_probs_tensor.unsqueeze(2)).sum(dim=-1)
+
+        halt_reg_loss = None
+        mean_halt_dist = None
+        n_iterations = None
+        if return_halt_info:
+            with torch.no_grad():
+                valid_mask = attention_mask if attention_mask is not None else torch.ones(batch_size, seq_len, device=device)
+
+            mean_halt_dist = (halt_probs_tensor * valid_mask.unsqueeze(-1)).sum(dim=[0, 1])
+            mean_halt_dist = mean_halt_dist / (valid_mask.sum() + 1e-8)
+            prior = self._compute_geometric_prior(actual_iterations, device)
+
+            eps = 1e-8
+            kl_div = (mean_halt_dist * (torch.log(mean_halt_dist + eps) - torch.log(prior + eps))).sum()
+            halt_reg_loss = self.lambda_p * kl_div
+            n_iterations = torch.tensor(actual_iterations, device=weighted_logits.device)
+
+        loss = None
+        if labels is not None:
+            loss_fct = nn.CrossEntropyLoss(ignore_index=-100)
+            loss = loss_fct(weighted_logits.view(-1, self.config.num_labels), labels.view(-1))
+
+        return IterativeTransformerOutput(
+            loss=loss,
+            logits=weighted_logits,
+            hidden_states=outputs.hidden_states if hasattr(outputs, 'hidden_states') else None,
+            attentions=outputs.attentions if hasattr(outputs, 'attentions') else None,
+            halt_probs=halt_probs_tensor if return_halt_info else None,
+            halt_reg_loss=halt_reg_loss,
+            n_iterations=n_iterations,
+            mean_halt_dist=mean_halt_dist,
+        )
 
 
 # IterativeTransformerOutput and ESMWithIterativeTransformerHead are now imported from iterative_head.py
@@ -462,7 +663,7 @@ def is_t5_model(model_name: str) -> bool:
         True if model is T5-based encoder, False otherwise
     """
     model_lower = model_name.lower()
-    return any(pattern in model_lower for pattern in ['prot_t5', 'prott5', 'prost_t5', 'prostt5', 'ankh'])
+    return any(pattern in model_lower for pattern in ['prot_t5', 'prott5', 'ankh'])
 
 
 # -----------------------------
@@ -534,7 +735,8 @@ def freeze_all_but_lora_and_classifier(model):
       - classifier head (names contain 'classifier')
       - CNN head (names contain 'cnn_head')
       - Transformer head (names contain 'transformer_head')
-      - Iterative transformer head (names contain 'iterative_transformer_head')
+    - Iterative transformer head (names contain 'iterative_transformer_head')
+    - Iterative backbone head (names contain 'iterative_backbone')
     """
     for name, p in model.named_parameters():
         p.requires_grad = False
@@ -543,11 +745,10 @@ def freeze_all_but_lora_and_classifier(model):
         if (
             "lora_" in name
             or "classifier" in name
-            or "plddt_head" in name
-            or "aux_heads" in name
             or "cnn_head" in name
             or "transformer_head" in name
             or "iterative_transformer_head" in name
+            or "iterative_backbone" in name
         ):
             p.requires_grad = True
 
@@ -584,9 +785,6 @@ def merge_lora_weights(
     num_labels = len(checkpoint.get('label_vocab', []))
     use_cnn_head = args_dict.get('use_cnn_head', False)
     use_transformer_head = args_dict.get('use_transformer_head', False)
-    use_iterative_transformer_head = args_dict.get('use_iterative_transformer_head', False)
-    use_plddt_prediction_head = args_dict.get('use_plddt_prediction_head', False)
-    plddt_prediction_mode = args_dict.get('plddt_prediction_mode', 'classification')
     lora_r = args_dict.get('lora_r', 8)
     lora_alpha = args_dict.get('lora_alpha', 16)
     lora_dropout = args_dict.get('lora_dropout', 0.05)
@@ -609,20 +807,10 @@ def merge_lora_weights(
         cnn_kernel_size=args_dict.get('cnn_kernel_size', 3),
         cnn_dropout=args_dict.get('cnn_dropout', 0.01),
         use_transformer_head=use_transformer_head,
-        use_plddt_prediction_head=use_plddt_prediction_head,
-        plddt_num_bins=args_dict.get('plddt_num_bins', len(checkpoint.get('plddt_label_vocab', PLDDT_BIN_VOCAB))),
-        plddt_prediction_mode=plddt_prediction_mode,
         transformer_head_dim=args_dict.get('transformer_head_dim', 256),
         transformer_head_layers=args_dict.get('transformer_head_layers', 2),
         transformer_head_dropout=args_dict.get('transformer_head_dropout', 0.1),
         transformer_head_num_heads=args_dict.get('transformer_head_num_heads', None),
-        use_iterative_transformer_head=use_iterative_transformer_head,
-        iterative_head_max_iterations=args_dict.get('iterative_head_max_iterations', 5),
-        iterative_head_halt_threshold=args_dict.get('iterative_head_halt_threshold', 0.95),
-        iterative_head_lambda_p=args_dict.get('iterative_head_lambda_p', 0.01),
-        iterative_head_prior_p=args_dict.get('iterative_head_prior_p', 0.5),
-        use_positional_encoding=args_dict.get('use_positional_encoding', True),
-        use_hidden_state_feedback=args_dict.get('use_hidden_state_feedback', True),
     )
     
     # Load LoRA weights (handle potential DataParallel prefix)
@@ -650,12 +838,7 @@ def merge_lora_weights(
         cnn_head = model_with_lora.cnn_head
         
         # Create wrapper with merged model
-        merged_with_cnn = ESMWithCNNHead(
-            base_esm,
-            cnn_head,
-            plddt_head=getattr(model_with_lora, 'plddt_head', None),
-            aux_heads=getattr(model_with_lora, 'aux_heads', None),
-        )
+        merged_with_cnn = ESMWithCNNHead(base_esm, cnn_head)
         final_model = merged_with_cnn
     elif use_transformer_head:
         # Model structure: ESMWithTransformerHead -> PeftModel -> base_model
@@ -665,32 +848,8 @@ def merge_lora_weights(
         # Recreate wrapper with merged base model
         base_esm = merged_model
         transformer_head = model_with_lora.transformer_head
-        merged_with_transformer = ESMWithTransformerHead(
-            base_esm,
-            transformer_head,
-            plddt_head=getattr(model_with_lora, 'plddt_head', None),
-            aux_heads=getattr(model_with_lora, 'aux_heads', None),
-        )
+        merged_with_transformer = ESMWithTransformerHead(base_esm, transformer_head)
         final_model = merged_with_transformer
-    elif use_iterative_transformer_head:
-        # Model structure: ESMWithIterativeTransformerHead -> PeftModel -> base_model
-        peft_model = model_with_lora.base_model
-        merged_model = peft_model.merge_and_unload()
-
-        # Recreate wrapper with merged base model
-        base_esm = merged_model
-        iterative_head = model_with_lora.iterative_transformer_head
-        merged_with_iterative = ESMWithIterativeTransformerHead(base_esm, iterative_head)
-        final_model = merged_with_iterative
-    elif use_plddt_prediction_head and isinstance(model_with_lora, ESMWithLinearHead):
-        peft_model = model_with_lora.base_model
-        merged_model = peft_model.merge_and_unload()
-        final_model = ESMWithLinearHead(
-            merged_model,
-            model_with_lora.classifier,
-            plddt_head=getattr(model_with_lora, 'plddt_head', None),
-            aux_heads=getattr(model_with_lora, 'aux_heads', None),
-        )
     else:
         # Model structure: PeftModel -> base_model
         final_model = model_with_lora.merge_and_unload()
@@ -709,21 +868,10 @@ def merge_lora_weights(
                 'num_labels': num_labels,
                 'use_cnn_head': use_cnn_head,
                 'use_transformer_head': use_transformer_head,
-                'use_iterative_transformer_head': use_iterative_transformer_head,
-                'use_plddt_prediction_head': use_plddt_prediction_head,
-                'plddt_num_bins': args_dict.get('plddt_num_bins', len(checkpoint.get('plddt_label_vocab', PLDDT_BIN_VOCAB))),
-                'plddt_prediction_mode': plddt_prediction_mode,
-                'plddt_label_vocab': checkpoint.get('plddt_label_vocab', PLDDT_BIN_VOCAB),
                 'transformer_head_dim': args_dict.get('transformer_head_dim', 256),
                 'transformer_head_layers': args_dict.get('transformer_head_layers', 2),
                 'transformer_head_dropout': args_dict.get('transformer_head_dropout', 0.1),
                 'transformer_head_num_heads': args_dict.get('transformer_head_num_heads', None),
-                'iterative_head_max_iterations': args_dict.get('iterative_head_max_iterations', 5),
-                'iterative_head_halt_threshold': args_dict.get('iterative_head_halt_threshold', 0.95),
-                'iterative_head_lambda_p': args_dict.get('iterative_head_lambda_p', 0.01),
-                'iterative_head_prior_p': args_dict.get('iterative_head_prior_p', 0.5),
-                'use_positional_encoding': args_dict.get('use_positional_encoding', True),
-                'use_hidden_state_feedback': args_dict.get('use_hidden_state_feedback', True),
                 'label_vocab': checkpoint.get('label_vocab'),
                 'mask_label_chars': checkpoint.get('mask_label_chars', ''),
             },
@@ -765,17 +913,15 @@ class ESM3DiModel:
                     transformer_head_dropout: float = 0.1,
                     transformer_head_num_heads: Optional[int] = None,
                     use_iterative_transformer_head: bool = False,
+                    use_iterative_backbone_head: bool = False,
+                    iterative_backbone_k_layers: int = 2,
                     iterative_head_max_iterations: int = 5,
                     iterative_head_halt_threshold: float = 0.95,
                     iterative_head_lambda_p: float = 0.01,
                     iterative_head_prior_p: float = 0.5,
                     use_positional_encoding: bool = True,
                     use_hidden_state_feedback: bool = True,
-                    use_gru_gate: bool = False,
-                    use_plddt_prediction_head: bool = False,
-                    plddt_num_bins: int = 10,
-                    plddt_prediction_mode: str = "classification",
-                    aux_track_num_bins: Optional[dict] = None):
+                    use_gru_gate: bool = False):
         """
         Initialize ESM model with LoRA configuration.
 
@@ -796,6 +942,8 @@ class ESM3DiModel:
             transformer_head_dropout: Dropout rate for transformer head
             transformer_head_num_heads: Optional attention head count for transformer head
             use_iterative_transformer_head: Whether to use iterative transformer head with learned halting
+            use_iterative_backbone_head: Whether to iteratively refine using final k backbone layers
+            iterative_backbone_k_layers: Number of final backbone layers to iterate over
             iterative_head_max_iterations: Maximum number of refinement iterations (default: 5)
             iterative_head_halt_threshold: Cumulative halt probability for early stopping (default: 0.95)
             iterative_head_lambda_p: Weight for halting regularization loss (default: 0.01)
@@ -804,15 +952,9 @@ class ESM3DiModel:
             use_hidden_state_feedback: Feed hidden states back instead of logits during iteration (default: True)
             use_gru_gate: Use GRU-style gating for controlled hidden state updates (default: False)
         """
-        head_count = sum([use_cnn_head, use_transformer_head, use_iterative_transformer_head])
+        head_count = sum([use_cnn_head, use_transformer_head, use_iterative_transformer_head, use_iterative_backbone_head])
         if head_count > 1:
-            raise ValueError("Only one of use_cnn_head, use_transformer_head, or use_iterative_transformer_head can be True")
-        if use_plddt_prediction_head and use_iterative_transformer_head:
-            raise ValueError("pLDDT prediction head is not yet supported with iterative transformer head")
-        if aux_track_num_bins and use_iterative_transformer_head:
-            raise ValueError("auxiliary categorical heads are not yet supported with iterative transformer head")
-        if plddt_prediction_mode not in {"classification", "regression"}:
-            raise ValueError("plddt_prediction_mode must be 'classification' or 'regression'")
+            raise ValueError("Only one of use_cnn_head, use_transformer_head, use_iterative_transformer_head, or use_iterative_backbone_head can be True")
 
         self.hf_model_name = hf_model_name
         self.num_labels = num_labels
@@ -829,6 +971,8 @@ class ESM3DiModel:
         self.transformer_head_dropout = transformer_head_dropout
         self.transformer_head_num_heads = transformer_head_num_heads
         self.use_iterative_transformer_head = use_iterative_transformer_head
+        self.use_iterative_backbone_head = use_iterative_backbone_head
+        self.iterative_backbone_k_layers = iterative_backbone_k_layers
         self.iterative_head_max_iterations = iterative_head_max_iterations
         self.iterative_head_halt_threshold = iterative_head_halt_threshold
         self.iterative_head_lambda_p = iterative_head_lambda_p
@@ -836,10 +980,6 @@ class ESM3DiModel:
         self.use_positional_encoding = use_positional_encoding
         self.use_hidden_state_feedback = use_hidden_state_feedback
         self.use_gru_gate = use_gru_gate
-        self.use_plddt_prediction_head = use_plddt_prediction_head
-        self.plddt_num_bins = plddt_num_bins
-        self.plddt_prediction_mode = plddt_prediction_mode
-        self.aux_track_num_bins = dict(aux_track_num_bins or {})
 
         # Detect model type - T5 models should use T5ProteinModel instead
         self.is_t5 = is_t5_model(hf_model_name)
@@ -886,12 +1026,13 @@ class ESM3DiModel:
                 f"(dim={self.transformer_head_dim}, layers={self.transformer_head_layers}, "
                 f"max_iter={self.iterative_head_max_iterations}, λ_p={self.iterative_head_lambda_p})"
             )
-        elif self.use_plddt_prediction_head:
-            self._setup_linear_head()
-            if self.plddt_prediction_mode == "regression":
-                print("✓ Linear classification head added with auxiliary pLDDT regression track")
-            else:
-                print(f"✓ Linear classification head added with auxiliary pLDDT track ({self.plddt_num_bins} bins)")
+        elif self.use_iterative_backbone_head:
+            self._setup_iterative_backbone_head()
+            print(
+                f"✓ Iterative backbone head with learned halting "
+                f"(top_k={self.iterative_backbone_k_layers}, "
+                f"max_iter={self.iterative_head_max_iterations}, λ_p={self.iterative_head_lambda_p})"
+            )
 
         self.freeze_base_model()
         print("✓ LoRA setup complete\n")
@@ -1011,23 +1152,7 @@ class ESM3DiModel:
         )
         
         # Wrap model with CNN head (loss is computed externally during training)
-        self.model = ESMWithCNNHead(
-            self.model,
-            cnn_head,
-            plddt_head=self._build_plddt_head(),
-            aux_heads=self._build_aux_heads(),
-        )
-
-    def _setup_linear_head(self):
-        """Replace the default classifier path with explicit linear heads."""
-        hidden_size = self.base_model.config.hidden_size
-        classifier = LinearClassificationHead(hidden_size=hidden_size, num_labels=self.num_labels)
-        self.model = ESMWithLinearHead(
-            self.model,
-            classifier,
-            plddt_head=self._build_plddt_head(),
-            aux_heads=self._build_aux_heads(),
-        )
+        self.model = ESMWithCNNHead(self.model, cnn_head)
 
     def _setup_transformer_head(self):
         """Replace standard classifier with a small transformer classification head."""
@@ -1043,12 +1168,7 @@ class ESM3DiModel:
         )
 
         # Wrap model with transformer head (loss is computed externally during training)
-        self.model = ESMWithTransformerHead(
-            self.model,
-            transformer_head,
-            plddt_head=self._build_plddt_head(),
-            aux_heads=self._build_aux_heads(),
-        )
+        self.model = ESMWithTransformerHead(self.model, transformer_head)
 
     def _setup_iterative_transformer_head(self):
         """Replace standard classifier with an iterative transformer head with learned halting."""
@@ -1073,21 +1193,19 @@ class ESM3DiModel:
         # Wrap model with iterative transformer head
         self.model = ESMWithIterativeTransformerHead(self.model, iterative_head)
 
-    def _build_plddt_head(self):
-        if not self.use_plddt_prediction_head:
-            return None
-        hidden_size = self.base_model.config.hidden_size
-        plddt_output_dim = 1 if self.plddt_prediction_mode == "regression" else self.plddt_num_bins
-        return LinearClassificationHead(hidden_size=hidden_size, num_labels=plddt_output_dim)
-
-    def _build_aux_heads(self):
-        hidden_size = self.base_model.config.hidden_size
-        heads = {}
-        for track_name, n_bins in self.aux_track_num_bins.items():
-            if n_bins < 2:
-                raise ValueError(f"aux track '{track_name}' must have >=2 bins, got {n_bins}")
-            heads[track_name] = LinearClassificationHead(hidden_size=hidden_size, num_labels=n_bins)
-        return heads
+    def _setup_iterative_backbone_head(self):
+        """Iteratively refine hidden states by re-applying the final k backbone layers."""
+        self.model = ESMWithIterativeBackboneHead(
+            self.model,
+            num_labels=self.num_labels,
+            final_k_layers=self.iterative_backbone_k_layers,
+            max_iterations=self.iterative_head_max_iterations,
+            halt_threshold=self.iterative_head_halt_threshold,
+            lambda_p=self.iterative_head_lambda_p,
+            geometric_prior_p=self.iterative_head_prior_p,
+            use_hidden_state_feedback=self.use_hidden_state_feedback,
+            use_gru_gate=self.use_gru_gate,
+        )
     
     def freeze_base_model(self):
         """Freeze all base model parameters except LoRA and classifier."""
@@ -1118,7 +1236,7 @@ class ESM3DiModel:
             device: Device to run on ('cuda' or 'cpu'). Auto-detect if None.
         
         Returns:
-            List of prediction records.
+            None. Writes predictions to output_fasta_path.
         """
         # Auto-detect device
         if device is None:
@@ -1166,14 +1284,10 @@ class ESM3DiModel:
             label_vocab = checkpoint["label_vocab"]
             idx2char = {i: c for i, c in enumerate(label_vocab)}
             args = checkpoint["args"]
-            plddt_label_vocab = checkpoint.get("plddt_label_vocab", args.get("plddt_label_vocab", PLDDT_BIN_VOCAB))
-            plddt_prediction_mode = args.get("plddt_prediction_mode", "classification")
         else:
             print("No checkpoint provided, using current model state")
             label_vocab = list("ACDEFGHIKLMNPQRSTVWY")[:self.num_labels]
             idx2char = {i: c for i, c in enumerate(label_vocab)}
-            plddt_label_vocab = PLDDT_BIN_VOCAB
-            plddt_prediction_mode = getattr(self, "plddt_prediction_mode", "classification")
 
         self.model = self.model.to(device)
         self.model.eval()
@@ -1212,13 +1326,11 @@ class ESM3DiModel:
         with torch.no_grad():
             for i in range(0, len(aa_records), batch_size):
                 batch_records = aa_records[i:i+batch_size]
-                headers, raw_seqs = zip(*batch_records)
+                headers, seqs = zip(*batch_records)
                 
                 # T5 models require space-separated amino acids
                 if self.is_t5:
-                    seqs = [' '.join(list(seq)) for seq in raw_seqs]
-                else:
-                    seqs = list(raw_seqs)
+                    seqs = [' '.join(list(seq)) for seq in seqs]
                 
                 # Tokenize batch
                 enc = tokenizer(
@@ -1239,59 +1351,31 @@ class ESM3DiModel:
                                     attention_mask=attention_mask)
                 
                 logits = outputs.logits
-                plddt_logits = getattr(outputs, 'plddt_logits', None)
                 
                 # Get predicted labels
                 pred_labels = torch.argmax(logits, dim=-1)
-                pred_plddt_labels = None
-                pred_plddt_scores = None
-                if plddt_logits is not None:
-                    if plddt_prediction_mode == "regression":
-                        pred_plddt_scores = torch.clamp(plddt_logits.squeeze(-1), min=0.0, max=100.0)
-                    else:
-                        pred_plddt_labels = torch.argmax(plddt_logits, dim=-1)
                 # Convert predictions to 3Di sequences
-                for j, (header, raw_seq) in enumerate(zip(headers, raw_seqs)):
+                for j, (header, seq) in enumerate(zip(headers, seqs)):
                     pred_3di = []
-                    pred_plddt = []
-                    pred_plddt_score = []
                     k = 0  # Index into original sequence
                     
                     for pos in range(pred_labels.shape[1]):
                         # Skip special tokens
                         if special_mask[j, pos] == 0:
-                            if k < len(raw_seq):
+                            if k < len(seq):
                                 label_idx = pred_labels[j, pos].item()
                                 pred_char = idx2char.get(label_idx, 'X')
                                 pred_3di.append(pred_char)
-                                if pred_plddt_scores is not None:
-                                    plddt_score = float(pred_plddt_scores[j, pos].item())
-                                    pred_plddt_score.append(plddt_score)
-                                    plddt_bin = max(0, min(9, int(plddt_score // 10.0)))
-                                    pred_plddt.append(str(plddt_bin))
-                                elif pred_plddt_labels is not None:
-                                    plddt_idx = pred_plddt_labels[j, pos].item()
-                                    pred_plddt.append(plddt_label_vocab[plddt_idx] if plddt_idx < len(plddt_label_vocab) else '0')
                                 k += 1
                     
                     pred_3di_seq = "".join(pred_3di)
-                    pred_plddt_seq = "".join(pred_plddt) if pred_plddt else None
                     
                     # Verify length matches input
-                    if len(pred_3di_seq) != len(raw_seq):
+                    if len(pred_3di_seq) != len(seq):
                         print(f"Warning: Length mismatch for {header}: "
-                              f"AA={len(raw_seq)}, 3Di={len(pred_3di_seq)}")
-                    if pred_plddt_seq is not None and len(pred_plddt_seq) != len(raw_seq):
-                        print(f"Warning: pLDDT length mismatch for {header}: "
-                              f"AA={len(raw_seq)}, pLDDT={len(pred_plddt_seq)}")
+                              f"AA={len(seq)}, 3Di={len(pred_3di_seq)}")
                     
-                    predictions.append({
-                        "header": header,
-                        "aa_seq": raw_seq,
-                        "pred_3di": pred_3di_seq,
-                        "pred_plddt": pred_plddt_seq,
-                        "pred_plddt_scores": pred_plddt_score if pred_plddt_score else None,
-                    })
+                    predictions.append((header, pred_3di_seq))
                 
                 if (i + batch_size) % (batch_size * 10) == 0 or \
                    (i + batch_size) >= len(aa_records):
@@ -1302,29 +1386,14 @@ class ESM3DiModel:
         # Write output FASTA
         print(f"Writing predictions to: {output_fasta_path}")
         with open(output_fasta_path, 'w') as f:
-            for record in predictions:
-                f.write(f">{record['header']}\n")
+            for header, pred_seq in predictions:
+                f.write(f">{header}\n")
                 # Write sequence in lines of 80 characters
-                pred_seq = record["pred_3di"]
                 for i in range(0, len(pred_seq), 80):
                     f.write(pred_seq[i:i+80] + "\n")
-
-        if output_confidence_fasta:
-            plddt_records = [record for record in predictions if record["pred_plddt"] is not None]
-            if not plddt_records:
-                print("Warning: pLDDT sidecar output requested, but this checkpoint/model has no pLDDT prediction head")
-            else:
-                print(f"Writing predicted pLDDT bins to: {output_confidence_fasta}")
-                with open(output_confidence_fasta, 'w') as f:
-                    for record in plddt_records:
-                        f.write(f">{record['header']}\n")
-                        pred_seq = record["pred_plddt"]
-                        for i in range(0, len(pred_seq), 80):
-                            f.write(pred_seq[i:i+80] + "\n")
         
         print(f"✓ Prediction complete! {len(predictions)} sequences "
               f"written to {output_fasta_path}")
-        return predictions
 
 # -----------------------------
 # Dataset
@@ -1332,36 +1401,23 @@ class ESM3DiModel:
 
 class Seq3DiDataset(Dataset):
     """
-    Holds (amino_acid_sequence, 3Di_label_sequence, plddt_bins, aux_bins...) tuples.
+    Holds (amino_acid_sequence, 3Di_label_sequence, plddt_bins) tuples.
     Assumes 1:1 correspondence and equal lengths.
 
     mask_label_chars: characters in 3Di sequences that indicate "masked" positions
-                      (e.g. low pLDDT). Only used when pLDDT bins are NOT provided.
-                      
-                      WITHOUT pLDDT bins (hard masking):
-                      - Masked chars are NOT part of label_vocab / model outputs
-                      - Those positions are ignored in the loss (labels = -100)
-                      
-                      WITH pLDDT bins:
-                      - mask_label_chars is IGNORED completely
-                      - Use the ORIGINAL ground truth 3Di FASTA (no 'X' masking)
-                      - pLDDT weighting handles low-confidence positions via soft weighting
+                      (e.g. low pLDDT). Those chars:
+                      - are NOT part of label_vocab / model outputs
+                      - are ignored in the loss (labels = -100).
     
     plddt_bins_fasta: Optional path to FASTA with pLDDT bins (0-9 per position).
-                      If provided, enables pLDDT-weighted loss. Use original 3Di FASTA.
-
-    aux_fastas: Optional dict mapping track name → FASTA path for per-residue auxiliary
-                classification targets (e.g. {"bend": "bend_bin.fasta", "torsion": "torsion_bin.fasta"}).
-                Characters in each FASTA are converted to int via ord(ch) - ord('0') for digit
-                alphabets or via explicit mapping for long alphabets.
+                      If provided, enables pLDDT-weighted loss.
     """
     def __init__(
         self,
         aa_fasta: str,
         three_di_fasta: str,
         mask_label_chars: str = "",
-        plddt_bins_fasta: str = None,
-        aux_fastas: Optional[dict] = None,
+        plddt_bins_fasta: str = None
     ):
         aa_records = read_fasta(aa_fasta)
         lab_records = read_fasta(three_di_fasta)
@@ -1375,26 +1431,11 @@ class Seq3DiDataset(Dataset):
         else:
             plddt_records = None
 
-        # Optionally load aux track FASTAs
-        self.aux_track_names: list = list(aux_fastas.keys()) if aux_fastas else []
-        aux_records_by_name: dict = {}
-        if aux_fastas:
-            for track_name, fasta_path in aux_fastas.items():
-                recs = read_fasta(fasta_path)
-                assert len(recs) == len(aa_records), \
-                    f"Aux track '{track_name}' FASTA has {len(recs)} sequences, expected {len(aa_records)}"
-                aux_records_by_name[track_name] = recs
-
         assert len(aa_records) == len(lab_records), "Mismatched number of sequences"
 
         self.items = []
         all_chars = set()
-        
-        # When pLDDT is used, ignore mask_label_chars entirely (use original 3Di)
-        if self.has_plddt:
-            self.mask_label_chars = set()  # Empty - no masking when pLDDT active
-        else:
-            self.mask_label_chars = set(mask_label_chars) if mask_label_chars else set()
+        self.mask_label_chars = set(mask_label_chars) if mask_label_chars else set()
 
         for idx, ((h_aa, seq_aa), (h_lab, seq_lab)) in enumerate(zip(aa_records, lab_records)):
             if len(seq_aa) != len(seq_lab):
@@ -1409,24 +1450,13 @@ class Seq3DiDataset(Dataset):
                     raise ValueError(
                         f"pLDDT length mismatch {h_aa}: AA={len(seq_aa)}, pLDDT={len(plddt_seq)}"
                     )
+                self.items.append((h_aa, seq_aa, seq_lab, plddt_seq))
             else:
-                plddt_seq = None
-
-            # Get aux track sequences
-            aux_seqs: dict = {}
-            for track_name in self.aux_track_names:
-                h_aux, aux_seq = aux_records_by_name[track_name][idx]
-                if len(aux_seq) != len(seq_aa):
-                    raise ValueError(
-                        f"Aux track '{track_name}' length mismatch {h_aa}: "
-                        f"AA={len(seq_aa)}, track={len(aux_seq)}"
-                    )
-                aux_seqs[track_name] = aux_seq
-
-            self.items.append((h_aa, seq_aa, seq_lab, plddt_seq, aux_seqs))
+                self.items.append((h_aa, seq_aa, seq_lab, None))
+            
             all_chars.update(seq_lab)
 
-        # Build vocab: exclude masked characters (when not using pLDDT)
+        # Build vocab from all non-masked characters
         label_chars = sorted(ch for ch in all_chars if ch not in self.mask_label_chars)
         self.label_vocab = label_chars
         self.char2idx = {c: i for i, c in enumerate(self.label_vocab)}
@@ -1435,76 +1465,40 @@ class Seq3DiDataset(Dataset):
         return len(self.items)
 
     def __getitem__(self, idx):
-        # (header, aa_seq, 3di_seq, plddt_bins_str_or_None, aux_seqs_dict)
+        # (header, aa_seq, 3di_seq, plddt_bins_str_or_None)
         return self.items[idx]
 
 # -----------------------------
 # Collate with HF tokenizer
 # -----------------------------
-def make_collate_fn(
-    tokenizer,
-    char2idx,
-    mask_label_chars: str = "",
-    include_plddt: bool = False,
-    is_t5: bool = False,
-    max_seq_length: int = None,
-    aux_track_names: Optional[list] = None,
-):
+def make_collate_fn(tokenizer, char2idx, mask_label_chars: str = "", include_plddt: bool = False, is_t5: bool = False, max_seq_length: int = None):
     """
     - Tokenizes AA sequences with HF tokenizer (ESM-2, ESM++, ProtT5, etc.).
     - Uses special_tokens_mask to align per-residue 3Di labels
       to non-special tokens.
+    - Positions whose 3Di label is in mask_label_chars are set to -100
+      (ignored in the loss) and do NOT belong to label_vocab.
     - Optionally includes pLDDT bins for weighted loss.
-    - Optionally includes per-residue auxiliary track bins (bend, torsion, …).
     - Supports T5 models with space-separated amino acid tokenization.
-    
-    Masking behavior:
-        WITHOUT pLDDT (include_plddt=False):
-            - Positions with chars in mask_label_chars are set to -100 (ignored in loss)
-        
-        WITH pLDDT (include_plddt=True):
-            - mask_label_chars is COMPLETELY IGNORED
-            - Use the ORIGINAL ground truth 3Di FASTA (no 'X' characters)
-            - pLDDT bins handle low-confidence positions via soft weighting
     
     Args:
         tokenizer: HuggingFace tokenizer
         char2idx: Mapping from 3Di characters to label indices
-        mask_label_chars: Characters to ignore in loss (ONLY when NOT using pLDDT)
-        include_plddt: Whether to include pLDDT bins (disables masking)
+        mask_label_chars: Characters to ignore in loss calculation
+        include_plddt: Whether to include pLDDT bins in batch output
         is_t5: Whether using T5-based model (requires space-separated AA)
         max_seq_length: Maximum sequence length (truncates longer sequences).
-        aux_track_names: List of auxiliary track names to include from batch items
-                         (must match Seq3DiDataset.aux_track_names).
+                        If None, uses tokenizer's model_max_length.
     """
     mask_set = set(mask_label_chars) if mask_label_chars else set()
-    _aux_track_names = list(aux_track_names) if aux_track_names else []
-
-    # Build per-character → bin index mapping for BIN_ALPHABET_BASE characters.
-    # Characters '0'-'9' map to 0-9, 'A'-'Z' to 10-35, 'a'-'z' to 36-61.
-    _BIN_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-    _char_to_bin = {ch: i for i, ch in enumerate(_BIN_ALPHABET)}
-
-    def _aux_char_to_bin(ch: str) -> int:
-        """Convert a single aux-track character to its bin index."""
-        if ch in _char_to_bin:
-            return _char_to_bin[ch]
-        raise ValueError(
-            f"Aux track character '{ch}' not in BIN_ALPHABET. "
-            "Ensure tracks.py produced valid tokens."
-        )
 
     def collate(batch):
-        # Batch items are (header, aa_seq, 3di_seq, plddt_seq_or_None, aux_seqs_dict)
-        if len(batch[0]) == 5:
-            headers, aa_seqs, label_seqs, plddt_seqs, aux_seqs_list = zip(*batch)
-        elif len(batch[0]) == 4:
+        # Unpack batch - now includes optional pLDDT
+        if len(batch[0]) == 4:
             headers, aa_seqs, label_seqs, plddt_seqs = zip(*batch)
-            aux_seqs_list = [{}] * len(headers)
         else:
             headers, aa_seqs, label_seqs = zip(*batch)
             plddt_seqs = [None] * len(headers)
-            aux_seqs_list = [{}] * len(headers)
 
         # T5 models require space-separated amino acids
         if is_t5:
@@ -1541,62 +1535,39 @@ def make_collate_fn(
         else:
             plddt_bins = None
 
-        # Initialize aux track bin tensors (-100 = ignore_index for CE)
-        has_aux = bool(_aux_track_names) and bool(aux_seqs_list[0])
-        aux_bins: dict = {}
-        if has_aux:
-            for track_name in _aux_track_names:
-                aux_bins[track_name] = torch.full(
-                    (batch_size, max_len), -100, dtype=torch.long
-                )
-
         for i, lab_seq in enumerate(label_seqs):
             plddt_seq = plddt_seqs[i] if has_plddt else None
-            aux_seqs_i: dict = aux_seqs_list[i] if has_aux else {}
-            k = 0  # index into residue sequences
+            k = 0  # index into label sequence
             for j in range(max_len):
                 if special_mask[i, j] == 1:
                     # CLS/EOS/PAD etc.
                     labels[i, j] = -100
                     if has_plddt:
                         plddt_bins[i, j] = 0  # zero weight for special tokens
-                    # aux stays -100 (ignore)
                 else:
                     if k < len(lab_seq):
                         ch = lab_seq[k]
-                        # When pLDDT weighting is used, no masking - use original 3Di directly
-                        # pLDDT bins handle low-confidence positions via soft weighting
-                        if ch in mask_set and not has_plddt:
-                            # masked -> ignore in loss (only when NOT using pLDDT)
+                        if ch in mask_set:
+                            # masked (e.g. low pLDDT) -> ignore in loss
                             labels[i, j] = -100
                         else:
-                            # Get label index - char must be in vocab
-                            if ch in char2idx:
+                            try:
                                 labels[i, j] = char2idx[ch]
-                            else:
+                            except KeyError:
                                 raise ValueError(
-                                    f"Label char '{ch}' not in vocabulary. "
-                                    f"When using pLDDT weighting, use the original 3Di FASTA."
+                                    f"Label char '{ch}' not in vocabulary and not in "
+                                    f"mask_label_chars; check your data."
                                 )
                         
                         # Set pLDDT bin for this position
                         if has_plddt and plddt_seq is not None:
                             plddt_bins[i, j] = int(plddt_seq[k])
-
-                        # Set aux track bins for this position
-                        if has_aux:
-                            for track_name in _aux_track_names:
-                                track_seq = aux_seqs_i.get(track_name, "")
-                                if k < len(track_seq):
-                                    aux_bins[track_name][i, j] = _aux_char_to_bin(track_seq[k])
-                                # else stays -100
                         
                         k += 1
                     else:
                         labels[i, j] = -100
                         if has_plddt:
                             plddt_bins[i, j] = 0
-                        # aux stays -100
             
             # Note: k may be < len(lab_seq) if sequence was truncated
             # This is expected behavior when max_seq_length is set
@@ -1609,9 +1580,6 @@ def make_collate_fn(
         
         if has_plddt:
             batch_out["plddt_bins"] = plddt_bins
-
-        if has_aux:
-            batch_out["aux_bins"] = aux_bins
         
         return batch_out
 

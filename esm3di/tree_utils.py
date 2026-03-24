@@ -386,6 +386,7 @@ def predict_3di_from_sequences(
     num_labels = len(checkpoint.get('label_vocab', []))
     use_cnn_head = args_dict.get('use_cnn_head', False)
     use_transformer_head = args_dict.get('use_transformer_head', False)
+    use_iterative_transformer_head = args_dict.get('use_iterative_transformer_head', False)
     lora_r = args_dict.get('lora_r', 8)
     lora_alpha = args_dict.get('lora_alpha', 16)
     lora_dropout = args_dict.get('lora_dropout', 0.05)
@@ -414,6 +415,13 @@ def predict_3di_from_sequences(
         transformer_head_layers=args_dict.get('transformer_head_layers', 2),
         transformer_head_dropout=args_dict.get('transformer_head_dropout', 0.1),
         transformer_head_num_heads=args_dict.get('transformer_head_num_heads', None),
+        use_iterative_transformer_head=use_iterative_transformer_head,
+        iterative_head_max_iterations=args_dict.get('iterative_head_max_iterations', 5),
+        iterative_head_halt_threshold=args_dict.get('iterative_head_halt_threshold', 0.95),
+        iterative_head_lambda_p=args_dict.get('iterative_head_lambda_p', 0.01),
+        iterative_head_prior_p=args_dict.get('iterative_head_prior_p', 0.5),
+        use_positional_encoding=args_dict.get('use_positional_encoding', True),
+        use_hidden_state_feedback=args_dict.get('use_hidden_state_feedback', True),
     )
     
     # Run inference

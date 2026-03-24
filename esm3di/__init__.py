@@ -17,6 +17,14 @@ from .ESM3di_model import (
     make_collate_fn,
 )
 
+# Iterative head components (shared between ESM and T5 models)
+from .iterative_head import (
+    IterativeTransformerClassificationHead,
+    IterativeTransformerOutput,
+    ModelWithIterativeTransformerHead,
+    ESMWithIterativeTransformerHead,  # Backward compatibility alias
+)
+
 from .T5Model import (
     T5ProteinModel,
     T5WithClassificationHead,
@@ -59,9 +67,13 @@ __all__ = [
     # Model components
     "ESMWithCNNHead",
     "ESMWithTransformerHead",
+    "ESMWithIterativeTransformerHead",
+    "ModelWithIterativeTransformerHead",
     "T5WithClassificationHead",
     "CNNClassificationHead",
     "TransformerClassificationHead",
+    "IterativeTransformerClassificationHead",
+    "IterativeTransformerOutput",
     # Model detection
     "is_t5_model",
     "is_prostt5_model",

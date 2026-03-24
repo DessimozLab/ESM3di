@@ -24,7 +24,8 @@ from typing import List, Tuple, Optional
 import torch
 
 # Import from our package
-from .ESM3di_model import ESM3DiModel
+from .ESM3di_model import ESM3DiModel, is_t5_model
+from .T5Model import T5ProteinModel
 
 
 def write_fasta(records: List[Tuple[str, str]], output_path: str):
@@ -303,29 +304,78 @@ def _gpu_worker(gpu_id, shard_fasta, output_fasta, checkpoint_path, args_dict, p
         )
         num_labels = len(checkpoint.get('label_vocab', []))
         use_cnn_head = args_dict.get('use_cnn_head', False)
+        use_transformer_head = args_dict.get('use_transformer_head', False)
+        use_iterative_transformer_head = args_dict.get('use_iterative_transformer_head', False)
+        use_plddt_prediction_head = args_dict.get('use_plddt_prediction_head', False)
+        plddt_prediction_mode = args_dict.get('plddt_prediction_mode', 'classification')
         lora_r = args_dict.get('lora_r', 8)
         lora_alpha = args_dict.get('lora_alpha', 16)
         lora_dropout = args_dict.get('lora_dropout', 0.05)
         target_modules = checkpoint.get('lora_target_modules', None)
         
-        # Initialize model
-        model = ESM3DiModel(
-            hf_model_name=hf_model_name,
-            num_labels=num_labels,
-            lora_r=lora_r,
-            lora_alpha=lora_alpha,
-            lora_dropout=lora_dropout,
-            target_modules=target_modules,
-            use_cnn_head=use_cnn_head,
-            cnn_num_layers=args_dict.get('cnn_num_layers', 2),
-            cnn_kernel_size=args_dict.get('cnn_kernel_size', 3),
-            cnn_dropout=args_dict.get('cnn_dropout', 0.1),
-            use_transformer_head=args_dict.get('use_transformer_head', False),
-            transformer_head_dim=args_dict.get('transformer_head_dim', 256),
-            transformer_head_layers=args_dict.get('transformer_head_layers', 2),
-            transformer_head_dropout=args_dict.get('transformer_head_dropout', 0.1),
-            transformer_head_num_heads=args_dict.get('transformer_head_num_heads', None),
-        )
+        is_t5 = is_t5_model(hf_model_name)
+        if is_t5:
+            model = T5ProteinModel(
+                hf_model_name=hf_model_name,
+                num_labels=num_labels,
+                lora_r=lora_r,
+                lora_alpha=lora_alpha,
+                lora_dropout=lora_dropout,
+                target_modules=target_modules,
+                use_cnn_head=use_cnn_head,
+                cnn_num_layers=args_dict.get('cnn_num_layers', 2),
+                cnn_kernel_size=args_dict.get('cnn_kernel_size', 3),
+                cnn_dropout=args_dict.get('cnn_dropout', 0.1),
+                use_transformer_head=use_transformer_head,
+                transformer_head_dim=args_dict.get('transformer_head_dim', 256),
+                transformer_head_layers=args_dict.get('transformer_head_layers', 2),
+                transformer_head_dropout=args_dict.get('transformer_head_dropout', 0.1),
+                transformer_head_num_heads=args_dict.get('transformer_head_num_heads', 4),
+                use_iterative_transformer_head=use_iterative_transformer_head,
+                iterative_head_max_iterations=args_dict.get('iterative_head_max_iterations', 5),
+                iterative_head_halt_threshold=args_dict.get('iterative_head_halt_threshold', 0.95),
+                iterative_head_lambda_p=args_dict.get('iterative_head_lambda_p', 0.01),
+                iterative_head_prior_p=args_dict.get('iterative_head_prior_p', 0.5),
+                use_positional_encoding=args_dict.get('use_positional_encoding', True),
+                use_hidden_state_feedback=args_dict.get('use_hidden_state_feedback', True),
+                use_gru_gate=args_dict.get('use_gru_gate', False),
+                use_plddt_prediction_head=use_plddt_prediction_head,
+                plddt_num_bins=args_dict.get('plddt_num_bins', len(checkpoint.get('plddt_label_vocab', [])) or 10),
+                plddt_prediction_mode=plddt_prediction_mode,
+                aux_track_num_bins=args_dict.get('aux_track_num_bins', None) or
+                                   checkpoint.get('aux_track_num_bins', None),
+            )
+        else:
+            model = ESM3DiModel(
+                hf_model_name=hf_model_name,
+                num_labels=num_labels,
+                lora_r=lora_r,
+                lora_alpha=lora_alpha,
+                lora_dropout=lora_dropout,
+                target_modules=target_modules,
+                use_cnn_head=use_cnn_head,
+                cnn_num_layers=args_dict.get('cnn_num_layers', 2),
+                cnn_kernel_size=args_dict.get('cnn_kernel_size', 3),
+                cnn_dropout=args_dict.get('cnn_dropout', 0.1),
+                use_transformer_head=use_transformer_head,
+                use_plddt_prediction_head=use_plddt_prediction_head,
+                plddt_num_bins=args_dict.get('plddt_num_bins', len(checkpoint.get('plddt_label_vocab', [])) or 10),
+                plddt_prediction_mode=plddt_prediction_mode,
+                transformer_head_dim=args_dict.get('transformer_head_dim', 256),
+                transformer_head_layers=args_dict.get('transformer_head_layers', 2),
+                transformer_head_dropout=args_dict.get('transformer_head_dropout', 0.1),
+                transformer_head_num_heads=args_dict.get('transformer_head_num_heads', None),
+                use_iterative_transformer_head=use_iterative_transformer_head,
+                iterative_head_max_iterations=args_dict.get('iterative_head_max_iterations', 5),
+                iterative_head_halt_threshold=args_dict.get('iterative_head_halt_threshold', 0.95),
+                iterative_head_lambda_p=args_dict.get('iterative_head_lambda_p', 0.01),
+                iterative_head_prior_p=args_dict.get('iterative_head_prior_p', 0.5),
+                use_positional_encoding=args_dict.get('use_positional_encoding', True),
+                use_hidden_state_feedback=args_dict.get('use_hidden_state_feedback', True),
+                use_gru_gate=args_dict.get('use_gru_gate', False),
+                aux_track_num_bins=args_dict.get('aux_track_num_bins', None) or
+                                   checkpoint.get('aux_track_num_bins', None),
+            )
         
         # Run inference on this shard
         model.predict_from_fasta(
@@ -655,6 +705,8 @@ Examples:
             
             use_cnn_head = args_dict.get('use_cnn_head', False)
             use_transformer_head = args_dict.get('use_transformer_head', False)
+            use_plddt_prediction_head = args_dict.get('use_plddt_prediction_head', False)
+            plddt_prediction_mode = args_dict.get('plddt_prediction_mode', 'classification')
             lora_r = args_dict.get('lora_r', 8)
             lora_alpha = args_dict.get('lora_alpha', 16)
             lora_dropout = args_dict.get('lora_dropout', 0.05)
@@ -676,6 +728,10 @@ Examples:
                 'lora_dropout': lora_dropout,
                 'use_cnn_head': use_cnn_head,
                 'use_transformer_head': use_transformer_head,
+                'use_plddt_prediction_head': use_plddt_prediction_head,
+                'plddt_num_bins': args_dict.get('plddt_num_bins', len(checkpoint.get('plddt_label_vocab', [])) or 10),
+                'plddt_prediction_mode': plddt_prediction_mode,
+                'use_iterative_transformer_head': args_dict.get('use_iterative_transformer_head', False),
                 'cnn_num_layers': args_dict.get('cnn_num_layers', 2),
                 'cnn_kernel_size': args_dict.get('cnn_kernel_size', 3),
                 'cnn_dropout': args_dict.get('cnn_dropout', 0.1),
@@ -683,12 +739,23 @@ Examples:
                 'transformer_head_layers': args_dict.get('transformer_head_layers', 2),
                 'transformer_head_dropout': args_dict.get('transformer_head_dropout', 0.1),
                 'transformer_head_num_heads': args_dict.get('transformer_head_num_heads', None),
+                'iterative_head_max_iterations': args_dict.get('iterative_head_max_iterations', 5),
+                'iterative_head_halt_threshold': args_dict.get('iterative_head_halt_threshold', 0.95),
+                'iterative_head_lambda_p': args_dict.get('iterative_head_lambda_p', 0.01),
+                'iterative_head_prior_p': args_dict.get('iterative_head_prior_p', 0.5),
+                'use_positional_encoding': args_dict.get('use_positional_encoding', True),
+                'use_hidden_state_feedback': args_dict.get('use_hidden_state_feedback', True),
+                'use_gru_gate': args_dict.get('use_gru_gate', False),
+                'aux_track_num_bins': args_dict.get('aux_track_num_bins', None) or
+                                      checkpoint.get('aux_track_num_bins', None),
                 'batch_size': 4
             }
             
             # Try multi-GPU inference first
             use_multi_gpu = False
-            if num_gpus > 1:
+            if args.output_confidence_fasta and num_gpus > 1:
+                print("WARNING: auxiliary pLDDT sidecar output is currently only supported in single-GPU inference; falling back to single GPU")
+            elif num_gpus > 1:
                 try:
                     use_multi_gpu = _run_multi_gpu_inference(
                         input_fasta=args.aa_fasta,
@@ -706,25 +773,71 @@ Examples:
             if not use_multi_gpu:
                 print(f"Using single GPU: {device}")
                 
-                # Initialize model
-                print(f"Initializing ESM3DiModel with {hf_model_name}...")
-                model = ESM3DiModel(
-                    hf_model_name=hf_model_name,
-                    num_labels=num_labels,
-                    lora_r=lora_r,
-                    lora_alpha=lora_alpha,
-                    lora_dropout=lora_dropout,
-                    target_modules=target_modules,
-                    use_cnn_head=use_cnn_head,
-                    cnn_num_layers=args_dict.get('cnn_num_layers', 2),
-                    cnn_kernel_size=args_dict.get('cnn_kernel_size', 3),
-                    cnn_dropout=args_dict.get('cnn_dropout', 0.1),
-                    use_transformer_head=use_transformer_head,
-                    transformer_head_dim=args_dict.get('transformer_head_dim', 256),
-                    transformer_head_layers=args_dict.get('transformer_head_layers', 2),
-                    transformer_head_dropout=args_dict.get('transformer_head_dropout', 0.1),
-                    transformer_head_num_heads=args_dict.get('transformer_head_num_heads', None),
-                )
+                is_t5 = is_t5_model(hf_model_name)
+                if is_t5:
+                    print(f"Initializing T5ProteinModel with {hf_model_name}...")
+                    model = T5ProteinModel(
+                        hf_model_name=hf_model_name,
+                        num_labels=num_labels,
+                        lora_r=lora_r,
+                        lora_alpha=lora_alpha,
+                        lora_dropout=lora_dropout,
+                        target_modules=target_modules,
+                        use_cnn_head=use_cnn_head,
+                        cnn_num_layers=args_dict.get('cnn_num_layers', 2),
+                        cnn_kernel_size=args_dict.get('cnn_kernel_size', 3),
+                        cnn_dropout=args_dict.get('cnn_dropout', 0.1),
+                        use_transformer_head=use_transformer_head,
+                        transformer_head_dim=args_dict.get('transformer_head_dim', 256),
+                        transformer_head_layers=args_dict.get('transformer_head_layers', 2),
+                        transformer_head_dropout=args_dict.get('transformer_head_dropout', 0.1),
+                        transformer_head_num_heads=args_dict.get('transformer_head_num_heads', 4),
+                        use_iterative_transformer_head=args_dict.get('use_iterative_transformer_head', False),
+                        iterative_head_max_iterations=args_dict.get('iterative_head_max_iterations', 5),
+                        iterative_head_halt_threshold=args_dict.get('iterative_head_halt_threshold', 0.95),
+                        iterative_head_lambda_p=args_dict.get('iterative_head_lambda_p', 0.01),
+                        iterative_head_prior_p=args_dict.get('iterative_head_prior_p', 0.5),
+                        use_positional_encoding=args_dict.get('use_positional_encoding', True),
+                        use_hidden_state_feedback=args_dict.get('use_hidden_state_feedback', True),
+                        use_gru_gate=args_dict.get('use_gru_gate', False),
+                        use_plddt_prediction_head=use_plddt_prediction_head,
+                        plddt_num_bins=args_dict.get('plddt_num_bins', len(checkpoint.get('plddt_label_vocab', [])) or 10),
+                        plddt_prediction_mode=plddt_prediction_mode,
+                        aux_track_num_bins=args_dict.get('aux_track_num_bins', None) or
+                                           checkpoint.get('aux_track_num_bins', None),
+                    )
+                else:
+                    print(f"Initializing ESM3DiModel with {hf_model_name}...")
+                    model = ESM3DiModel(
+                        hf_model_name=hf_model_name,
+                        num_labels=num_labels,
+                        lora_r=lora_r,
+                        lora_alpha=lora_alpha,
+                        lora_dropout=lora_dropout,
+                        target_modules=target_modules,
+                        use_cnn_head=use_cnn_head,
+                        cnn_num_layers=args_dict.get('cnn_num_layers', 2),
+                        cnn_kernel_size=args_dict.get('cnn_kernel_size', 3),
+                        cnn_dropout=args_dict.get('cnn_dropout', 0.1),
+                        use_transformer_head=use_transformer_head,
+                        use_plddt_prediction_head=use_plddt_prediction_head,
+                        plddt_num_bins=args_dict.get('plddt_num_bins', len(checkpoint.get('plddt_label_vocab', [])) or 10),
+                        plddt_prediction_mode=plddt_prediction_mode,
+                        transformer_head_dim=args_dict.get('transformer_head_dim', 256),
+                        transformer_head_layers=args_dict.get('transformer_head_layers', 2),
+                        transformer_head_dropout=args_dict.get('transformer_head_dropout', 0.1),
+                        transformer_head_num_heads=args_dict.get('transformer_head_num_heads', None),
+                        use_iterative_transformer_head=args_dict.get('use_iterative_transformer_head', False),
+                        iterative_head_max_iterations=args_dict.get('iterative_head_max_iterations', 5),
+                        iterative_head_halt_threshold=args_dict.get('iterative_head_halt_threshold', 0.95),
+                        iterative_head_lambda_p=args_dict.get('iterative_head_lambda_p', 0.01),
+                        iterative_head_prior_p=args_dict.get('iterative_head_prior_p', 0.5),
+                        use_positional_encoding=args_dict.get('use_positional_encoding', True),
+                        use_hidden_state_feedback=args_dict.get('use_hidden_state_feedback', True),
+                        use_gru_gate=args_dict.get('use_gru_gate', False),
+                        aux_track_num_bins=args_dict.get('aux_track_num_bins', None) or
+                                           checkpoint.get('aux_track_num_bins', None),
+                    )
                 
                 # Run inference using the model's predict_from_fasta method
                 print("Predicting 3Di sequences...")
@@ -733,7 +846,8 @@ Examples:
                     output_fasta_path=three_di_fasta_path,
                     model_checkpoint_path=args.model_ckpt,
                     batch_size=4,
-                    device=device
+                    device=device,
+                    output_confidence_fasta=args.output_confidence_fasta,
                 )
             
             print("✓ FASTA files ready")
