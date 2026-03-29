@@ -19,7 +19,7 @@ from transformers import (
 	get_linear_schedule_with_warmup,
 )
 from tqdm import tqdm
-from peft import LoraConfig, TaskType, get_peft_model
+from peft import LoraConfig, TaskType, get_peft_model, PeftModel
 
 from .ESM3di_model import read_fasta, discover_lora_target_modules
 
@@ -372,6 +372,46 @@ def load_config_if_present(args):
 	return args
 
 
+def find_latest_epoch_checkpoint(output_dir: Path) -> Optional[int]:
+	if not output_dir.exists() or not output_dir.is_dir():
+		return None
+	epochs = []
+	for entry in output_dir.iterdir():
+		if not entry.is_dir():
+			continue
+		name = entry.name
+		if name.startswith("epoch_"):
+			try:
+				epochs.append(int(name.split("epoch_")[-1]))
+			except ValueError:
+				continue
+	if not epochs:
+		return None
+	return max(epochs)
+
+
+def load_model_checkpoint(model, checkpoint_dir: Path, args, tokenizer, dtype):
+	# Load base model + tokenizer and optionally LoRA adapters.
+	if not checkpoint_dir.exists():
+		return model
+
+	model = AutoModelForMaskedLM.from_pretrained(
+		checkpoint_dir,
+		trust_remote_code=True,
+		torch_dtype=dtype,
+	)
+
+	if args.use_lora:
+		# Put base model into PEFT wrapper with existing weights:
+		model = PeftModel.from_pretrained(model, checkpoint_dir)
+	else:
+		if tokenizer.pad_token_id is not None and model.config.pad_token_id is None:
+			model.config.pad_token_id = tokenizer.pad_token_id
+	if len(tokenizer) != model.get_input_embeddings().num_embeddings:
+		model.resize_token_embeddings(len(tokenizer))
+	return model
+
+
 def main():
 	args = load_config_if_present(parse_args())
 
@@ -423,31 +463,40 @@ def main():
 		else:
 			tokenizer.add_special_tokens({"pad_token": "[PAD]"})
 
-	model = AutoModelForMaskedLM.from_pretrained(
-		args.model_name,
-		trust_remote_code=True,
-		torch_dtype=dtype,
-	)
-	if tokenizer.pad_token_id is not None and model.config.pad_token_id is None:
-		model.config.pad_token_id = tokenizer.pad_token_id
-	if len(tokenizer) != model.get_input_embeddings().num_embeddings:
-		model.resize_token_embeddings(len(tokenizer))
-
-	if args.use_lora:
-		if args.lora_targets:
-			target_modules = [name.strip() for name in args.lora_targets.split(",") if name.strip()]
-		else:
-			target_modules = discover_lora_target_modules(model)
-		lora_config = LoraConfig(
-			r=args.lora_r,
-			lora_alpha=args.lora_alpha,
-			lora_dropout=args.lora_dropout,
-			bias="none",
-			task_type=TaskType.MASKED_LM,
-			target_modules=target_modules,
+	# If there are saved epochs, resume from latest checkpoint
+	resumed_epoch = find_latest_epoch_checkpoint(output_dir) or 0
+	if resumed_epoch > 0:
+		logger.info("Resuming from existing checkpoint at epoch %d", resumed_epoch)
+		model = load_model_checkpoint(None, output_dir / f"epoch_{resumed_epoch}", args, tokenizer, dtype)
+		start_epoch = resumed_epoch + 1
+	else:
+		model = AutoModelForMaskedLM.from_pretrained(
+			args.model_name,
+			trust_remote_code=True,
+			torch_dtype=dtype,
 		)
-		model = get_peft_model(model, lora_config)
-		model.print_trainable_parameters()
+		if tokenizer.pad_token_id is not None and model.config.pad_token_id is None:
+			model.config.pad_token_id = tokenizer.pad_token_id
+		if len(tokenizer) != model.get_input_embeddings().num_embeddings:
+			model.resize_token_embeddings(len(tokenizer))
+
+		if args.use_lora:
+			if args.lora_targets:
+				target_modules = [name.strip() for name in args.lora_targets.split(",") if name.strip()]
+			else:
+				target_modules = discover_lora_target_modules(model)
+			lora_config = LoraConfig(
+				r=args.lora_r,
+				lora_alpha=args.lora_alpha,
+				lora_dropout=args.lora_dropout,
+				bias="none",
+				task_type=TaskType.MASKED_LM,
+				target_modules=target_modules,
+			)
+			model = get_peft_model(model, lora_config)
+			model.print_trainable_parameters()
+
+		start_epoch = 1
 
 	model.to(device)
 
@@ -497,7 +546,7 @@ def main():
 		weight_decay=args.weight_decay,
 	)
 
-	total_steps = math.ceil(len(train_loader) / max(args.grad_accum_steps, 1)) * args.epochs
+	total_steps = math.ceil(len(train_loader) / max(args.grad_accum_steps, 1)) * max(0, (args.epochs - start_epoch + 1))
 	scheduler = get_linear_schedule_with_warmup(
 		optimizer,
 		num_warmup_steps=args.warmup_steps,
@@ -510,20 +559,26 @@ def main():
 	run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 	logger.info("Loaded %d sequences | run_id=%s", len(sequences), run_id)
 
-	for epoch in range(1, args.epochs + 1):
-		train_loss = train_one_epoch(
-			model,
-			train_loader,
-			optimizer,
-			scheduler,
-			device,
-			use_amp=use_amp,
-			grad_accum_steps=args.grad_accum_steps,
-			scaler=scaler,
-			logger=logger,
-			log_every=args.log_every,
-			epoch=epoch,
-		)
+
+	if start_epoch > args.epochs:
+		logger.info("No training needed: already at or beyond target epoch %d", args.epochs)
+		train_loss = None
+		val_loss = None
+	else:
+		for epoch in range(start_epoch, args.epochs + 1):
+			train_loss = train_one_epoch(
+				model,
+				train_loader,
+				optimizer,
+				scheduler,
+				device,
+				use_amp=use_amp,
+				grad_accum_steps=args.grad_accum_steps,
+				scaler=scaler,
+				logger=logger,
+				log_every=args.log_every,
+				epoch=epoch,
+			)
 
 		val_loss = None
 		if val_loader is not None:
@@ -542,11 +597,42 @@ def main():
 		else:
 			logger.info("Epoch %d: train_loss=%.6f val_loss=%.6f", epoch, train_loss, val_loss)
 
+	if start_epoch > args.epochs:
+		last_epoch = resumed_epoch
+	else:
+		last_epoch = args.epochs
+
+	# Ensure testing uses the last saved checkpoint (resumed or newly trained)
+	last_checkpoint_dir = output_dir / f"epoch_{last_epoch}"
+	if last_checkpoint_dir.exists():
+		logger.info("Loading checkpoint from epoch %d for final testing", last_epoch)
+		model = load_model_checkpoint(model, last_checkpoint_dir, args, tokenizer, dtype)
+		model.to(device)
+
 	save_checkpoint(model, tokenizer, output_dir, "final")
 
+	# Save model in Hugging Face compatible format for easy loading and sharing
+	hf_output_dir = output_dir / "hf_compatible"
+	hf_output_dir.mkdir(parents=True, exist_ok=True)
+	hf_model = model.module if hasattr(model, "module") else model
+	try:
+		if hasattr(hf_model, "save_pretrained"):
+			hf_model.save_pretrained(hf_output_dir)
+		else:
+			backend = getattr(hf_model, "base_model", None)
+			if backend is not None and hasattr(backend, "save_pretrained"):
+				backend.save_pretrained(hf_output_dir)
+			else:
+				logger.warning("Could not find save_pretrained() on model or base_model, HF compatible save skipped")
+		if tokenizer is not None and hasattr(tokenizer, "save_pretrained"):
+			tokenizer.save_pretrained(hf_output_dir)
+		logger.info("Saved Hugging Face compatible model to %s", hf_output_dir)
+	except Exception as exc:
+		logger.warning("Failed to export HF compatible model: %s", exc)
+
 	if test_loader is not None:
-		test_loss = validate(model, test_loader, device, use_amp=use_amp)
-		logger.info("Final test_loss=%.6f", test_loss)
+		test_loss = validate(model, test_loader, device, use_amp=use_amp, epoch=last_epoch)
+		logger.info("Final test_loss=% .6f", test_loss)
 
 	if args.use_lora:
 		adapter_dir = output_dir / "lora_adapters"
@@ -558,7 +644,12 @@ def main():
 			merged_dir.mkdir(parents=True, exist_ok=True)
 			merged_model.save_pretrained(merged_dir)
 			tokenizer.save_pretrained(merged_dir)
-
+			print(f"Saved merged model with LoRA weights at: {merged_dir}")
+			print(f"Saved LoRA adapters at: {adapter_dir}")
+		else:
+			print(f"Saved LoRA adapters at: {adapter_dir}")
+	else:
+		print(f"Saved final model checkpoint at: {output_dir / 'final'}")
 
 if __name__ == "__main__":
 	main()

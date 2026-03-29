@@ -755,7 +755,7 @@ class T5ProteinModel:
         output_fasta_path: str,
         model_checkpoint_path: Optional[str] = None,
         batch_size: int = 4,
-        max_length: int = 1024,
+        max_length: int = None,
         max_tokens_per_batch: Optional[int] = None,
         device: Optional[str] = None,
         output_confidence_fasta: Optional[str] = None,

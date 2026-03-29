@@ -20,6 +20,7 @@ import sys
 import tempfile
 from pathlib import Path
 from typing import List, Tuple, Optional
+import tqdm
 
 import torch
 
@@ -52,104 +53,219 @@ def check_foldseek_installed() -> bool:
         return False
 
 
+
+
+
+
+def _open_if_is_name(filename_or_handle, mode="r"):
+	"""
+		if a file handle is passed, return the file handle
+		if a Path object or path string is passed, open and return a file handle to the file.
+		returns:
+			file_handle, input_type ("name" | "handle")
+	"""
+	out = filename_or_handle
+	input_type = "handle"
+	try:
+		out = open(filename_or_handle, mode)
+		input_type = "name"
+	except TypeError:
+		pass
+	except Exception as e:
+		raise(e)
+
+	return (out, input_type)
+
+
+
+def iter_fasta(filename, clean=None, full_name=False): 
+	"""
+		adapted from: https://bitbucket.org/seanrjohnson/srj_chembiolib/src/master/parsers.py
+		
+		input:
+			filename: the name of a fasta file or a filehandle to a fasta file.
+			return_names: if True then return two lists: (names, sequences), otherwise just return list of sequences
+			clean: {None, 'upper', 'delete', 'unalign'}
+					if 'delete' then delete all lowercase "." and "*" characters. This is usually if the input is an a2m file and you don't want to preserve the original length.
+					if 'upper' then delete "*" characters, convert lowercase to upper case, and "." to "-"
+					if 'unalign' then convert to upper, delete ".", "*", "-"
+			full_name: if True, then returns the entire name. By default only the part before the first whitespace is returned.
+		output: names, sequences
+	"""
+	
+	prev_len = 0
+	prev_name = None
+	prev_seq = ""
+	(input_handle, input_type) = _open_if_is_name(filename)
+
+	seq_cleaner = CleanSeq(clean)
+
+	for line in input_handle:
+		line = line.strip()
+		if len(line) == 0:
+			continue
+		if line[0] == ">":
+			if full_name:
+				name = line[1:]
+			else:
+				parts = line.split(None, 1)
+				name = parts[0][1:]
+			if (prev_name is not None):
+				yield prev_name, seq_cleaner(prev_seq)
+			prev_len = 0
+			prev_name = name
+			prev_seq = ""
+		else:
+			prev_len += len(line)
+			prev_seq += line
+	if (prev_name != None):
+		yield prev_name, seq_cleaner(prev_seq)
+		
+
+	if input_type == "name":
+		input_handle.close()
+
+
+class CleanSeq():
+	def __init__(self, clean=None):
+		self.clean = clean
+		if clean == 'delete':
+			# uses code from: https://github.com/facebookresearch/esm/blob/master/examples/contact_prediction.ipynb
+			deletekeys = dict.fromkeys(string.ascii_lowercase)
+			deletekeys["."] = None
+			deletekeys["*"] = None
+			translation = str.maketrans(deletekeys)
+			self.remove_insertions = lambda x: x.translate(translation)
+		elif clean == 'upper':
+			deletekeys = {'*': None, ".": "-"}
+			translation = str.maketrans(deletekeys)
+			self.remove_insertions = lambda x: x.upper().translate(translation)
+			
+
+		elif clean == 'unalign':
+			deletekeys = {'*': None, ".": None, "-": None}
+			
+			translation = str.maketrans(deletekeys)
+			self.remove_insertions = lambda x: x.upper().translate(translation)
+		
+		elif clean is None:
+			self.remove_insertions = lambda x: x
+		
+		else:
+			raise ValueError(f"unrecognized input for clean parameter: {clean}")
+		
+	def __call__(self, seq):
+		return self.remove_insertions(seq)
+
+	def __repr__(self):
+		return f"CleanSeq(clean={self.clean})"
+
+
+def fasta2foldseek(aa_fasta, tdi_fasta, output_basename):
+	# write the dbtypes
+	
+	#TODO: do I need to make the .lookup file?
+
+	# pep dbtype
+	with open(output_basename+".dbtype","wb") as pep_dbtype:
+		pep_dbtype.write(b'\x00\x00\x00\x00')
+
+	# 3Di dbtype
+	with open(output_basename+"_ss.dbtype","wb") as tdi_dbtype:
+		tdi_dbtype.write(b'\x00\x00\x00\x00')
+
+	# headers dbtype
+	with open(output_basename+"_h.dbtype","wb") as h_dbtype:
+		h_dbtype.write(b'\x00\x0c\x00\x00')
+		
+	
+	with open(f"{output_basename}","wb") as aa_h, open(f"{output_basename}_ss","wb") as tdi_h, open(f"{output_basename}_h","wb") as header_h, \
+		 open(f"{output_basename}.index","wb") as aa_index_h, open(f"{output_basename}_ss.index","wb") as tdi_index_h, open(f"{output_basename}_h.index","wb") as header_index_h, \
+		 open(f"{output_basename}.lookup","wb") as lookup_h, \
+		 open(tdi_fasta, "r") as tdi_in, open(aa_fasta, "r") as pep_in:
+		tdi_iter = iter_fasta(tdi_in, full_name=True)
+
+		seq_index = -1
+		for pep_header, pep_seq in iter_fasta(pep_in, full_name=True):
+			pep_name = pep_header.split(' ')[0]
+			tdi_header, tdi_seq = next(tdi_iter)
+			tdi_name = tdi_header.split(' ')[0]
+			assert pep_header == tdi_header, f"Headers do not match: {pep_header} != {tdi_header}"
+			assert pep_name == tdi_name, f"Names do not match: {pep_name} != {tdi_name}"
+			assert len(pep_seq) == len(tdi_seq), f"Sequences do not match in length: {len(pep_seq)} != {len(tdi_seq)}"
+
+			seq_index += 1
+			
+			# write the pep sequence
+			aa_start_pos = aa_h.tell()
+			aa_index_h.write(f"{seq_index}\t{aa_start_pos}\t".encode())
+			aa_h.write(pep_seq.encode())
+			aa_h.write(b'\x0a\x00')
+			aa_index_h.write(f"{aa_h.tell() - aa_start_pos}\n".encode())
+
+			# write the tdi sequence
+			tdi_start_pos = tdi_h.tell()
+			tdi_index_h.write(f"{seq_index}\t{tdi_start_pos}\t".encode())
+			tdi_h.write(tdi_seq.encode())
+			tdi_h.write(b'\x0a\x00')
+			tdi_index_h.write(f"{tdi_h.tell() - tdi_start_pos}\n".encode())
+
+			# write the header
+			header_start_pos = header_h.tell()
+			header_index_h.write(f"{seq_index}\t{header_start_pos}\t".encode())
+			header_h.write(pep_header.encode())
+			header_h.write(b'\x0a\x00')
+			header_index_h.write(f"{header_h.tell() - header_start_pos}\n".encode())
+
+			# write the lookup
+			lookup_h.write(f"{seq_index}\t{pep_name}\t{seq_index}\n".encode())
+	print(f"Finished writing Foldseek database to {output_basename}")
+	print(f"Total sequences: {seq_index + 1}")
+	#print files
+	print(f"Pep file: {output_basename}, size: {os.path.getsize(output_basename)} bytes")
+	print(f"TDI file: {output_basename}_ss, size: {os.path.getsize(output_basename+'_ss')} bytes")
+	print(f"Header file: {output_basename}_h, size: {os.path.getsize(output_basename+'_h')} bytes")
+	print(f"Pep index file: {output_basename}.index, size: {os.path.getsize(output_basename+'.index')} bytes")
+	print(f"TDI index file: {output_basename}_ss.index, size: {os.path.getsize(output_basename+'_ss.index')} bytes")
+	print(f"Header index file: {output_basename}_h.index, size: {os.path.getsize(output_basename+'_h.index')} bytes")
+
+
+
 def create_foldseek_db_from_fastas(
     aa_fasta: str,
     three_di_fasta: str,
     output_db: str,
-    foldseek_bin: str = "foldseek"
-) -> bool:
+    foldseek_bin: str = "foldseek",
+    aafile_tsv: Optional[str] = None,
+    three_di_tsv: Optional[str] = None,
+    header_tsv: Optional[str] = None
+    ) -> bool:
     """
-    Create a FoldSeek database from AA and 3Di FASTA files using TSV intermediate format.
-    
+    Create a FoldSeek database from AA and 3Di FASTA files.
+
+    This function delegates to the module-local `fasta2foldseek` implementation,
+    which writes binary FoldSeek files directly in the expected format.
+
     Args:
         aa_fasta: Path to amino acid FASTA
         three_di_fasta: Path to 3Di FASTA
         output_db: Path for output database (without extension)
-        foldseek_bin: Path to foldseek binary
-        
+
+    Optional Args (kept for API compatibility, not used):
+        foldseek_bin: ignored
+        aafile_tsv: ignored
+        three_di_tsv: ignored
+        header_tsv: ignored
+
     Returns:
         True if successful, False otherwise
     """
     try:
-        from Bio import SeqIO
-        import tempfile
-        
-        # Read amino acid sequences
-        sequences_aa = {}
-        for record in SeqIO.parse(aa_fasta, "fasta"):
-            sequences_aa[record.id] = str(record.seq)
-        
-        # Read 3Di sequences
-        sequences_3di = {}
-        for record in SeqIO.parse(three_di_fasta, "fasta"):
-            if record.id not in sequences_aa.keys():
-                print(f"Warning: ignoring 3Di entry {record.id}, since it is not in the amino-acid FASTA file")
-            else:
-                sequences_3di[record.id] = str(record.seq).upper()
-        
-        # Validate that all AA sequences have corresponding 3Di sequences
-        missing_3di = []
-        for seq_id in sequences_aa.keys():
-            if seq_id not in sequences_3di.keys():
-                missing_3di.append(seq_id)
-        
-        if missing_3di:
-            print(f"Error: {len(missing_3di)} entries in amino-acid FASTA have no corresponding 3Di string:")
-            for seq_id in missing_3di[:5]:  # Show first 5
-                print(f"  - {seq_id}")
-            if len(missing_3di) > 5:
-                print(f"  ... and {len(missing_3di) - 5} more")
-            return False
-        
-        # Create temporary TSV files
-        with tempfile.NamedTemporaryFile(mode='w', suffix='_aa.tsv', delete=False) as aa_tsv:
-            with tempfile.NamedTemporaryFile(mode='w', suffix='_3di.tsv', delete=False) as three_di_tsv:
-                with tempfile.NamedTemporaryFile(mode='w', suffix='_header.tsv', delete=False) as header_tsv:
-                    
-                    # Generate TSV content
-                    for i, seq_id in enumerate(sequences_aa.keys(), 1):
-                        aa_tsv.write(f"{i}\t{sequences_aa[seq_id]}\n")
-                        three_di_tsv.write(f"{i}\t{sequences_3di[seq_id]}\n")
-                        header_tsv.write(f"{i}\t{seq_id}\n")
-                    
-                    aa_tsv_path = aa_tsv.name
-                    three_di_tsv_path = three_di_tsv.name
-                    header_tsv_path = header_tsv.name
-        
-        try:
-            # Create FoldSeek databases using tsv2db
-            commands = [
-                [foldseek_bin, "tsv2db", aa_tsv_path, output_db, "--output-dbtype", "0"],
-                [foldseek_bin, "tsv2db", three_di_tsv_path, f"{output_db}_ss", "--output-dbtype", "0"],
-                [foldseek_bin, "tsv2db", header_tsv_path, f"{output_db}_h", "--output-dbtype", "12"]
-            ]
-            
-            for cmd in commands:
-                print(f"Running: {' '.join(cmd)}")
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    check=True
-                )
-                
-                if result.stdout:
-                    print(result.stdout)
-                if result.stderr:
-                    print(result.stderr, file=sys.stderr)
-            
-            print(f"✓ Successfully created FoldSeek database with {len(sequences_aa)} sequences")
-            return True
-            
-        finally:
-            # Clean up temporary TSV files
-            for temp_file in [aa_tsv_path, three_di_tsv_path, header_tsv_path]:
-                if os.path.exists(temp_file):
-                    os.unlink(temp_file)
-                    
-    except ImportError:
-        print("Error: BioPython is required. Install with: pip install biopython", file=sys.stderr)
-        return False
+        # Prefer the existing fasta2foldseek implementation for correctness and
+        # compatibility with the rest of this module.
+        fasta2foldseek(aa_fasta, three_di_fasta, output_db)
+        return True
+
     except subprocess.CalledProcessError as e:
         print(f"Error running foldseek: {e}", file=sys.stderr)
         print(f"stdout: {e.stdout}", file=sys.stderr)
@@ -158,6 +274,7 @@ def create_foldseek_db_from_fastas(
     except Exception as e:
         print(f"Unexpected error: {e}", file=sys.stderr)
         return False
+
 
 def _count_sequences(fasta_path: str) -> int:
     """
@@ -382,7 +499,7 @@ def _gpu_worker(gpu_id, shard_fasta, output_fasta, checkpoint_path, args_dict, p
             input_fasta_path=shard_fasta,
             output_fasta_path=output_fasta,
             model_checkpoint_path=checkpoint_path,
-            batch_size=4,
+            batch_size=2,  # Small batch size to reduce GPU memory usage per worker
             device=device
         )
         
@@ -729,7 +846,7 @@ Examples:
                 'use_cnn_head': use_cnn_head,
                 'use_transformer_head': use_transformer_head,
                 'use_plddt_prediction_head': use_plddt_prediction_head,
-                'plddt_num_bins': args_dict.get('plddt_num_bins', len(checkpoint.get('plddt_label_vocab', [])) or 10),
+                'plddt_num_bins': args_dict.get('plddt_num_bins', 10),
                 'plddt_prediction_mode': plddt_prediction_mode,
                 'use_iterative_transformer_head': args_dict.get('use_iterative_transformer_head', False),
                 'cnn_num_layers': args_dict.get('cnn_num_layers', 2),
@@ -821,7 +938,7 @@ Examples:
                         cnn_dropout=args_dict.get('cnn_dropout', 0.1),
                         use_transformer_head=use_transformer_head,
                         use_plddt_prediction_head=use_plddt_prediction_head,
-                        plddt_num_bins=args_dict.get('plddt_num_bins', len(checkpoint.get('plddt_label_vocab', [])) or 10),
+                        plddt_num_bins=args_dict.get('plddt_num_bins', 10),
                         plddt_prediction_mode=plddt_prediction_mode,
                         transformer_head_dim=args_dict.get('transformer_head_dim', 256),
                         transformer_head_layers=args_dict.get('transformer_head_layers', 2),

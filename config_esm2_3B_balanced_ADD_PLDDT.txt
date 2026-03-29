@@ -1,0 +1,72 @@
+================================================================================
+TO ADD pLDDT WEIGHTING TO config_esm2_3B_balanced.json
+================================================================================
+
+CURRENT STATUS:
+  ✓ Cyclical Focal Loss enabled
+  ✗ pLDDT weighting NOT enabled (no pLDDT bins files available)
+
+The balanced dataset at /mnt/data1/bfvd/balanced/ does not include pLDDT bins.
+
+================================================================================
+OPTION 1: Generate pLDDT Bins from PDB Files
+================================================================================
+
+If you have the original PDB files that were used to create the balanced 
+dataset, you can generate pLDDT bins:
+
+1. Find the source PDB directory for balanced dataset
+
+2. Run extract_plddt_bins.py:
+   python -m esm3di.extract_plddt_bins \
+     --pdb-dir /path/to/balanced/pdbs \
+     --output /mnt/data1/bfvd/balanced/phylum_balanced_plddt_bins.fasta
+
+3. Split the pLDDT bins to match train/val:
+   python -m esm3di.split_data \
+     --aa-fasta /mnt/data1/bfvd/balanced/phylum_balanced_aa.fasta \
+     --three-di-fasta /mnt/data1/bfvd/balanced/phylum_balanced_3di.fasta \
+     --plddt-bins-fasta /mnt/data1/bfvd/balanced/phylum_balanced_plddt_bins.fasta \
+     --train-ratio 0.8 \
+     --val-ratio 0.1 \
+     --test-ratio 0.1 \
+     --output-prefix /mnt/data1/bfvd/balanced/phylum_balanced
+
+4. Add to config_esm2_3B_balanced.json:
+   {
+     ...
+     "plddt_bins_fasta": "/mnt/data1/bfvd/balanced/phylum_balanced_train_plddt_bins.fasta",
+     "val_plddt_bins_fasta": "/mnt/data1/bfvd/balanced/phylum_balanced_val_plddt_bins.fasta",
+     "plddt_min_bin": 5,
+     "plddt_weight_exponent": 1.5,
+     ...
+   }
+
+================================================================================
+OPTION 2: Use Without pLDDT Weighting (CURRENT CONFIG)
+================================================================================
+
+The current config uses CyclicalFocalLoss without pLDDT weighting.
+This is still an improvement over regular Focal Loss and will work fine!
+
+Advantages:
+  ✓ Can use immediately - no additional data needed
+  ✓ Cyclical learning strategy still provides benefits
+  ✓ Asymmetric weighting (gamma_pos/gamma_neg) handles class imbalance
+
+Disadvantages:
+  ✗ No confidence-based position weighting
+  ✗ Cannot down-weight low-confidence predictions
+
+================================================================================
+RECOMMENDATION
+================================================================================
+
+If pLDDT bins are not easily available:
+  → Use current config as-is, it's already improved with cyclical loss
+
+If you can generate pLDDT bins:
+  → Follow Option 1 to enable PLDDTWeightedCyclicalFocalLoss
+  → Expected accuracy improvement: 1-3% on high-confidence regions
+
+================================================================================

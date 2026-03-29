@@ -48,6 +48,11 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+.sisyphus/
+tensorboard_logs*/
+tree_analysis_output/
+test_db/
+evaluation_results/
 
 # Environments
 .env
@@ -77,9 +82,10 @@ checkpoints/
 *.ckpt
 
 # Data files (uncomment if you don't want to track data)
-# *.fasta
-# *.fa
-# data/
+*.fasta
+*.fa
+data/
+*.json
 
 # Logs
 *.log

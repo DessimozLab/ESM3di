@@ -1,0 +1,53 @@
+{% set name = "esm3di" %}
+{% set version = "0.1.0" %}
+
+package:
+  name: {{ name|lower }}
+  version: {{ version }}
+
+source:
+  path: ..
+
+build:
+  number: 0
+  noarch: python
+  script: {{ PYTHON }} -m pip install . -vv
+  entry_points:
+    - esm3di-train = esm3di.esmretrain:main
+    - esm3di-makefoldseekdb = esm3di.fastas2foldseekdb:main
+    - esm3di-buildtrainingset = esm3di.build_trainingset:main
+    - esm3di-download-alphafold = esm3di.testdataset:main
+
+requirements:
+  host:
+    - python >=3.8
+    - pip
+    - setuptools >=61.0
+    - wheel
+  run:
+    - python >=3.8
+    - pytorch >=2.0.0
+    - transformers >=4.30.0
+    - peft >=0.5.0
+    - accelerate >=0.20.0
+
+test:
+  commands:
+    - esm3di-train --help
+    - esm3di-makefoldseekdb --help
+    - esm3di-buildtrainingset --help
+    - esm3di-download-alphafold --help
+
+about:
+  home: https://github.com/DessimozLab/ESM3di
+  license: MIT
+  license_file: LICENSE
+  summary: ESM + PEFT LoRA for 3Di per-residue prediction
+  description: |
+    ESM3di combines ESM protein language models with PEFT LoRA fine-tuning
+    for 3Di per-residue prediction tasks.
+  dev_url: https://github.com/DessimozLab/ESM3di
+
+extra:
+  recipe-maintainers:
+    - DessimozLab

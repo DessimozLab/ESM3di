@@ -23,7 +23,14 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from peft import LoraConfig, get_peft_model, TaskType
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
-from .ESM3di_model import ESM3DiModel, read_fasta, Seq3DiDataset, make_collate_fn, Lion
+from .ESM3di_model import (
+    ESM3DiModel,
+    read_fasta,
+    Seq3DiDataset,
+    make_collate_fn,
+    Lion,
+    load_esm3di_from_mlm_checkpoint,
+)
 from .T5Model import T5ProteinModel, is_t5_model
 from .model_outputs import PLDDT_BIN_VOCAB
 from .losses import (
@@ -57,6 +64,39 @@ def _load_esm3di_model_class(use_iterative_backbone_head: bool):
 
     print("Using ESM3DiModel from ESM3di_model copy.py")
     return module.ESM3DiModel
+
+
+def _find_latest_mlm_checkpoint(root_path: str) -> str:
+    """Given an MLM checkpoint root, return the latest available checkpoint directory/file."""
+    if os.path.isfile(root_path):
+        return root_path
+
+    if not os.path.isdir(root_path):
+        return root_path
+
+    # If root is itself an HF checkpoint folder (contains config.json/pytorch_model.bin), use it.
+    if os.path.exists(os.path.join(root_path, "config.json")) or os.path.exists(os.path.join(root_path, "pytorch_model.bin")):
+        return root_path
+
+    # Search epoch_* directories and files
+    best_epoch = -1
+    best_path = root_path
+    for entry in os.listdir(root_path):
+        entry_path = os.path.join(root_path, entry)
+        if entry.startswith("epoch_"):
+            try:
+                epoch_num = int(entry.split("epoch_")[1].split(".")[0])
+            except Exception:
+                continue
+            if epoch_num > best_epoch:
+                best_epoch = epoch_num
+                # Prefer directories over .pt files for transformers from_pretrained
+                if os.path.isdir(entry_path):
+                    best_path = entry_path
+                elif entry_path.endswith(".pt"):
+                    best_path = entry_path
+
+    return best_path if best_epoch >= 0 else root_path
 
 
 def _filtered_model_kwargs(model_cls, kwargs):
@@ -518,14 +558,132 @@ def train(args):
     target_modules = None
     if args.lora_target_modules:
         target_modules = [m.strip() for m in args.lora_target_modules.split(",")]
-    
+
+    # If MLM checkpoint path provided, initialize model from it and write config
+    mlm_loaded = False
+    if getattr(args, 'mlm_checkpoint', None):
+        mlm_checkpoint_path = _find_latest_mlm_checkpoint(args.mlm_checkpoint)
+        print(f"Loading MLM checkpoint for retraining: {mlm_checkpoint_path}")
+
+        os.makedirs(args.out_dir, exist_ok=True)
+        checkpoint_meta = {
+            "mlm_checkpoint": args.mlm_checkpoint,
+            "resolved_mlm_checkpoint": mlm_checkpoint_path,
+            "loaded_at": datetime.now().isoformat(),
+        }
+        with open(os.path.join(args.out_dir, "mlm_checkpoint_config.json"), "w") as f:
+            json.dump(checkpoint_meta, f, indent=2)
+
+        if is_t5_model(args.hf_model):
+            print("Warning: --mlm-checkpoint with T5 models is unsupported in this helper; using T5ProteinModel branch")
+        else:
+            esm_model = load_esm3di_from_mlm_checkpoint(
+                mlm_checkpoint_path=mlm_checkpoint_path,
+                hf_model_name=args.hf_model,
+                num_labels=len(dataset.label_vocab),
+                lora_r=args.lora_r,
+                lora_alpha=args.lora_alpha,
+                lora_dropout=args.lora_dropout,
+                target_modules=target_modules,
+                use_cnn_head=args.use_cnn_head,
+                cnn_num_layers=args.cnn_num_layers,
+                cnn_kernel_size=args.cnn_kernel_size,
+                cnn_dropout=args.cnn_dropout,
+                use_transformer_head=args.use_transformer_head,
+                transformer_head_dim=args.transformer_head_dim,
+                transformer_head_layers=args.transformer_head_layers,
+                transformer_head_dropout=args.transformer_head_dropout,
+                transformer_head_num_heads=args.transformer_head_num_heads,
+                use_iterative_transformer_head=getattr(args, 'use_iterative_transformer_head', False),
+                iterative_head_max_iterations=getattr(args, 'iterative_head_max_iterations', 5),
+                iterative_head_halt_threshold=getattr(args, 'iterative_head_halt_threshold', 0.95),
+                iterative_head_lambda_p=getattr(args, 'iterative_head_lambda_p', 0.01),
+                iterative_head_prior_p=getattr(args, 'iterative_head_prior_p', 0.5),
+                use_positional_encoding=getattr(args, 'use_positional_encoding', True),
+                use_hidden_state_feedback=getattr(args, 'use_hidden_state_feedback', True),
+                use_gru_gate=getattr(args, 'use_gru_gate', False),
+                use_plddt_prediction_head=getattr(args, 'use_plddt_prediction_head', False),
+                plddt_num_bins=len(PLDDT_BIN_VOCAB),
+                plddt_prediction_mode=getattr(args, 'plddt_prediction_mode', 'classification'),
+                aux_track_num_bins=aux_track_num_bins if use_aux_tracks else None,
+            )
+            mlm_loaded = True
+
     # Check if model is T5-based (ProstT5, ProtT5, Ankh)
     is_t5 = is_t5_model(args.hf_model)
     esm_model_cls = _load_esm3di_model_class(getattr(args, 'use_iterative_backbone_head', False))
-    
-    if is_t5:
-        if getattr(args, 'use_iterative_backbone_head', False):
-            # Use copy-class iterative backbone path for T5 models
+
+    if not mlm_loaded:
+        if is_t5:
+            if getattr(args, 'use_iterative_backbone_head', False):
+                # Use copy-class iterative backbone path for T5 models
+                esm_kwargs = dict(
+                    hf_model_name=args.hf_model,
+                    num_labels=len(dataset.label_vocab),
+                    lora_r=args.lora_r,
+                    lora_alpha=args.lora_alpha,
+                    lora_dropout=args.lora_dropout,
+                    target_modules=target_modules,
+                    use_cnn_head=args.use_cnn_head,
+                    cnn_num_layers=args.cnn_num_layers,
+                    cnn_kernel_size=args.cnn_kernel_size,
+                    cnn_dropout=args.cnn_dropout,
+                    use_transformer_head=args.use_transformer_head,
+                    transformer_head_dim=args.transformer_head_dim,
+                    transformer_head_layers=args.transformer_head_layers,
+                    transformer_head_dropout=args.transformer_head_dropout,
+                    transformer_head_num_heads=args.transformer_head_num_heads,
+                    use_iterative_transformer_head=getattr(args, 'use_iterative_transformer_head', False),
+                    iterative_head_max_iterations=getattr(args, 'iterative_head_max_iterations', 5),
+                    iterative_head_halt_threshold=getattr(args, 'iterative_head_halt_threshold', 0.95),
+                    iterative_head_lambda_p=getattr(args, 'iterative_head_lambda_p', 0.01),
+                    iterative_head_prior_p=getattr(args, 'iterative_head_prior_p', 0.5),
+                    use_positional_encoding=getattr(args, 'use_positional_encoding', True),
+                    use_hidden_state_feedback=getattr(args, 'use_hidden_state_feedback', True),
+                    use_gru_gate=getattr(args, 'use_gru_gate', False),
+                    use_plddt_prediction_head=use_plddt_prediction_head,
+                    plddt_num_bins=len(PLDDT_BIN_VOCAB),
+                    plddt_prediction_mode=plddt_prediction_mode,
+                    use_iterative_backbone_head=True,
+                    iterative_backbone_k_layers=getattr(args, 'iterative_backbone_k_layers', 2),
+                    aux_track_num_bins=aux_track_num_bins if use_aux_tracks else None,
+                )
+                esm_model = esm_model_cls(**_filtered_model_kwargs(esm_model_cls, esm_kwargs))
+            else:
+                # Use T5ProteinModel for T5-based models
+                esm_model = T5ProteinModel(
+                    hf_model_name=args.hf_model,
+                    num_labels=len(dataset.label_vocab),
+                    lora_r=args.lora_r,
+                    lora_alpha=args.lora_alpha,
+                    lora_dropout=args.lora_dropout,
+                    target_modules=target_modules,
+                    use_cnn_head=args.use_cnn_head,
+                    cnn_num_layers=args.cnn_num_layers,
+                    cnn_kernel_size=args.cnn_kernel_size,
+                    cnn_dropout=args.cnn_dropout,
+                    use_transformer_head=args.use_transformer_head,
+                    transformer_head_dim=args.transformer_head_dim,
+                    transformer_head_layers=args.transformer_head_layers,
+                    transformer_head_dropout=args.transformer_head_dropout,
+                    transformer_head_num_heads=args.transformer_head_num_heads,
+                    use_iterative_transformer_head=getattr(args, 'use_iterative_transformer_head', False),
+                    iterative_head_max_iterations=getattr(args, 'iterative_head_max_iterations', 5),
+                    iterative_head_halt_threshold=getattr(args, 'iterative_head_halt_threshold', 0.95),
+                    iterative_head_lambda_p=getattr(args, 'iterative_head_lambda_p', 0.01),
+                    iterative_head_prior_p=getattr(args, 'iterative_head_prior_p', 0.5),
+                    use_positional_encoding=getattr(args, 'use_positional_encoding', True),
+                    use_hidden_state_feedback=getattr(args, 'use_hidden_state_feedback', True),
+                    use_gru_gate=getattr(args, 'use_gru_gate', False),
+                    use_plddt_prediction_head=use_plddt_prediction_head,
+                    plddt_num_bins=len(PLDDT_BIN_VOCAB),
+                    plddt_prediction_mode=plddt_prediction_mode,
+                    half_precision=getattr(args, 'half_precision', False),
+                    gradient_checkpointing=getattr(args, 'gradient_checkpointing', False),
+                    aux_track_num_bins=aux_track_num_bins if use_aux_tracks else None,
+                )
+        else:
+            # Use ESM3DiModel for ESM2/ESM++ models
             esm_kwargs = dict(
                 hf_model_name=args.hf_model,
                 num_labels=len(dataset.label_vocab),
@@ -553,78 +711,11 @@ def train(args):
                 use_plddt_prediction_head=use_plddt_prediction_head,
                 plddt_num_bins=len(PLDDT_BIN_VOCAB),
                 plddt_prediction_mode=plddt_prediction_mode,
-                use_iterative_backbone_head=True,
+                use_iterative_backbone_head=getattr(args, 'use_iterative_backbone_head', False),
                 iterative_backbone_k_layers=getattr(args, 'iterative_backbone_k_layers', 2),
-            )
-            esm_model = esm_model_cls(**_filtered_model_kwargs(esm_model_cls, esm_kwargs))
-        else:
-            # Use T5ProteinModel for T5-based models
-            esm_model = T5ProteinModel(
-                hf_model_name=args.hf_model,
-                num_labels=len(dataset.label_vocab),
-                lora_r=args.lora_r,
-                lora_alpha=args.lora_alpha,
-                lora_dropout=args.lora_dropout,
-                target_modules=target_modules,
-                use_cnn_head=args.use_cnn_head,
-                cnn_num_layers=args.cnn_num_layers,
-                cnn_kernel_size=args.cnn_kernel_size,
-                cnn_dropout=args.cnn_dropout,
-                use_transformer_head=args.use_transformer_head,
-                transformer_head_dim=args.transformer_head_dim,
-                transformer_head_layers=args.transformer_head_layers,
-                transformer_head_dropout=args.transformer_head_dropout,
-                transformer_head_num_heads=args.transformer_head_num_heads,
-                use_iterative_transformer_head=getattr(args, 'use_iterative_transformer_head', False),
-                iterative_head_max_iterations=getattr(args, 'iterative_head_max_iterations', 5),
-                iterative_head_halt_threshold=getattr(args, 'iterative_head_halt_threshold', 0.95),
-                iterative_head_lambda_p=getattr(args, 'iterative_head_lambda_p', 0.01),
-                iterative_head_prior_p=getattr(args, 'iterative_head_prior_p', 0.5),
-                use_positional_encoding=getattr(args, 'use_positional_encoding', True),
-                use_hidden_state_feedback=getattr(args, 'use_hidden_state_feedback', True),
-                use_gru_gate=getattr(args, 'use_gru_gate', False),
-                use_plddt_prediction_head=use_plddt_prediction_head,
-                plddt_num_bins=len(PLDDT_BIN_VOCAB),
-                plddt_prediction_mode=plddt_prediction_mode,
-                half_precision=getattr(args, 'half_precision', False),
-                gradient_checkpointing=getattr(args, 'gradient_checkpointing', False),
                 aux_track_num_bins=aux_track_num_bins if use_aux_tracks else None,
             )
-    else:
-        # Use ESM3DiModel for ESM2/ESM++ models
-        esm_kwargs = dict(
-            hf_model_name=args.hf_model,
-            num_labels=len(dataset.label_vocab),
-            lora_r=args.lora_r,
-            lora_alpha=args.lora_alpha,
-            lora_dropout=args.lora_dropout,
-            target_modules=target_modules,
-            use_cnn_head=args.use_cnn_head,
-            cnn_num_layers=args.cnn_num_layers,
-            cnn_kernel_size=args.cnn_kernel_size,
-            cnn_dropout=args.cnn_dropout,
-            use_transformer_head=args.use_transformer_head,
-            transformer_head_dim=args.transformer_head_dim,
-            transformer_head_layers=args.transformer_head_layers,
-            transformer_head_dropout=args.transformer_head_dropout,
-            transformer_head_num_heads=args.transformer_head_num_heads,
-            use_iterative_transformer_head=getattr(args, 'use_iterative_transformer_head', False),
-            iterative_head_max_iterations=getattr(args, 'iterative_head_max_iterations', 5),
-            iterative_head_halt_threshold=getattr(args, 'iterative_head_halt_threshold', 0.95),
-            iterative_head_lambda_p=getattr(args, 'iterative_head_lambda_p', 0.01),
-            iterative_head_prior_p=getattr(args, 'iterative_head_prior_p', 0.5),
-            use_positional_encoding=getattr(args, 'use_positional_encoding', True),
-            use_hidden_state_feedback=getattr(args, 'use_hidden_state_feedback', True),
-            use_gru_gate=getattr(args, 'use_gru_gate', False),
-            use_plddt_prediction_head=use_plddt_prediction_head,
-            plddt_num_bins=len(PLDDT_BIN_VOCAB),
-            plddt_prediction_mode=plddt_prediction_mode,
-            use_iterative_backbone_head=getattr(args, 'use_iterative_backbone_head', False),
-            iterative_backbone_k_layers=getattr(args, 'iterative_backbone_k_layers', 2),
-            aux_track_num_bins=aux_track_num_bins if use_aux_tracks else None,
-        )
-        esm_model = esm_model_cls(**_filtered_model_kwargs(esm_model_cls, esm_kwargs))
-    
+            esm_model = esm_model_cls(**_filtered_model_kwargs(esm_model_cls, esm_kwargs))
     # Setup loss function (pLDDT-weighted, Focal Loss, or Cross-Entropy)
     if use_plddt:
         if args.use_cyclical_focal:
@@ -1557,6 +1648,27 @@ def train(args):
     
     # Close TensorBoard writer and print final instructions
     writer.close()
+
+    # Save Hugging Face compatible model outputs
+    hf_output_dir = os.path.join(args.out_dir, "hf_compatible")
+    os.makedirs(hf_output_dir, exist_ok=True)
+    model_to_save = model.module if multi_gpu else model
+    try:
+        if hasattr(model_to_save, "save_pretrained"):
+            model_to_save.save_pretrained(hf_output_dir)
+            print(f"Saved HF compatible model to: {hf_output_dir}")
+        elif hasattr(getattr(model_to_save, 'base_model', None), 'save_pretrained'):
+            model_to_save.base_model.save_pretrained(hf_output_dir)
+            print(f"Saved HF compatible base model to: {hf_output_dir}")
+        else:
+            print("Warning: model has no save_pretrained; HF format not saved")
+
+        if 'tokenizer' in locals() and tokenizer is not None and hasattr(tokenizer, "save_pretrained"):
+            tokenizer.save_pretrained(hf_output_dir)
+            print(f"Saved tokenizer to: {hf_output_dir}")
+    except Exception as exc:
+        print(f"Warning: failed to save HF compatible model: {exc}")
+
     print(f"\n{'='*60}")
     print(f"Training Complete!")
     print(f"{'='*60}")
@@ -1896,6 +2008,8 @@ def parse_args():
                    help="Log training progress every N optimization steps")
     p.add_argument("--resume-from-checkpoint", type=str, default=None,
                    help="Path to checkpoint (.pt file) to resume training from. ")
+    p.add_argument("--mlm-checkpoint", type=str, default=None,
+                   help="Path to MLM checkpoint directory (or MLM output root) to initialize 3Di model weights from.")
     
     # Learning rate scheduler
     p.add_argument("--scheduler-type", type=str, default='cosine',
