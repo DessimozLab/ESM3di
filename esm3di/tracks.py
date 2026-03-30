@@ -387,15 +387,20 @@ def fasta_record(name: str, seq: str, width: int = 80) -> str:
 
 def process_one(
     path_str: str,
-    cutoff: float,
-    local_seq_sep: int,
-    contact_edges: list[float],
-    chain_mode: str,
-    bend_n_bins: int,
-    torsion_n_bins: int,
+    cutoff: float = 8.0,
+    local_seq_sep: int = 8,
+    contact_edges: list[float] = [1, 3, 5, 8, 12, 16, 24],
+    chain_mode: str = "separate",
+    bend_n_bins: int = 8,
+    torsion_n_bins: int = 12,
+    verbose = False,
 ):
     path = Path(path_str)
-
+    if verbose:
+        print(f"[INFO] processing {path} with cutoff={cutoff}, local_seq_sep={local_seq_sep}, "
+              f"contact_edges={contact_edges}, chain_mode={chain_mode}, bend_n_bins={bend_n_bins}, "
+              f"torsion_n_bins={torsion_n_bins}")
+    
     aa_chunks = []
     plddt_chunks = []
     contact_chunks = []
@@ -442,6 +447,7 @@ def process_one(
         )
 
     except Exception as e:
+        
         print(f"[WARN] failed on {path}: {e}")
         return ("", "", "", "", "", "", "")
 
