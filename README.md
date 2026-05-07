@@ -42,6 +42,17 @@ conda activate esm3di_blackwell
 
 **Note:** For exact reproducibility, use `environment_frozen.yml` which has pinned versions.
 
+### Building a Conda package
+
+The repository ships with a conda recipe in `conda-recipe/meta.yaml`.
+
+```bash
+conda install -n base conda-build
+conda build conda-recipe
+```
+
+The resulting package can be inspected and installed from the local conda build cache.
+
 ### Option 2: Using pip
 
 1. Create a virtual environment:
@@ -377,6 +388,37 @@ checkpoint = hf_hub_download(
 )
 ```
 
+### Publishing your trained model to Hugging Face Hub
+
+ESM3Di now includes a dedicated publisher CLI and optional in-training upload hooks.
+
+#### 1) Upload an exported HF-compatible directory
+
+```bash
+export HF_TOKEN="<your-hf-token>"
+esm3di-push-to-hub \
+  --repo-id your-org/esm3di-custom \
+  --local-dir checkpoints/hf_compatible
+```
+
+#### 2) Upload a single checkpoint file
+
+```bash
+esm3di-push-to-hub \
+  --repo-id your-org/esm3di-custom \
+  --local-file checkpoints/epoch_10.pt \
+  --path-in-repo checkpoints/epoch_10.pt
+```
+
+#### 3) Auto-publish during training
+
+Both training entry points support Hub upload flags:
+
+- `python -m esm3di.esmretrain --push-to-hub --hub-repo-id <org/repo> ...`
+- `python -m esm3di.esmretrain_mlm --push-to-hub --hub-repo-id <org/repo> ...`
+
+When enabled, the scripts upload `hf_compatible/` exports, and `esmretrain.py` also uploads per-epoch `.pt` checkpoints under `checkpoints/` in the model repo.
+
 ### Available Pre-trained Checkpoints
 
 | HuggingFace Repository | Model | Size | Description |
@@ -401,7 +443,7 @@ This will check that:
 
 ## Requirements
 
-- Python ≥ 3.8
+- Python ≥ 3.10
 - PyTorch ≥ 2.0.0
 - transformers ≥ 4.30.0
 - peft ≥ 0.5.0

@@ -37,6 +37,7 @@ from transformers import (
 )
 from tqdm import tqdm
 from peft import LoraConfig, TaskType, get_peft_model, PeftModel
+from .hf_publish import publish_directory_to_hub
 
 from .ESM3di_model import read_fasta, discover_lora_target_modules
 
@@ -367,12 +368,12 @@ def save_checkpoint(model, tokenizer, output_dir: Path, tag: str):
 
 
 def parse_args():
-		parser = argparse.ArgumentParser(
-				description="Masked language model retraining for protein sequences (ESM/ESM++).\n\n"
-										"Fine-tunes a HuggingFace protein language model on custom AA sequences using MLM.\n"
-										"Supports LoRA adapters, config file overrides, and multi-GPU training.",
-				formatter_class=argparse.RawDescriptionHelpFormatter,
-				epilog="""
+	parser = argparse.ArgumentParser(
+		description="Masked language model retraining for protein sequences (ESM/ESM++).\n\n"
+					"Fine-tunes a HuggingFace protein language model on custom AA sequences using MLM.\n"
+					"Supports LoRA adapters, config file overrides, and multi-GPU training.",
+		formatter_class=argparse.RawDescriptionHelpFormatter,
+		epilog="""
 Examples:
 	# Train with FASTA
 	python -m esm3di.esmretrain_mlm --input-fasta train.fasta --model-name facebook/esm2_t33_650M_UR50D --output-dir checkpoints/
@@ -382,8 +383,8 @@ Examples:
 
 	# Use config file
 	python -m esm3di.esmretrain_mlm --config configs/config_mlm.json
-"""
-		)
+""",
+	)
 	parser.add_argument("--input-fasta", type=str, help="Path to input FASTA with AA sequences.")
 	parser.add_argument("--input-txt", type=str, help="Path to input text with one sequence per line.")
 	parser.add_argument("--val-fasta", type=str, help="Optional FASTA for validation sequences.")
@@ -415,6 +416,11 @@ Examples:
 		action="store_true",
 		help="Merge LoRA weights into base model at the end and save a full ESMC checkpoint.",
 	)
+	parser.add_argument("--push-to-hub", action="store_true", help="Upload saved artifacts to Hugging Face Hub")
+	parser.add_argument("--hub-repo-id", type=str, default=None, help="Hugging Face repo id, e.g. org/esm3di-mlm")
+	parser.add_argument("--hub-private", action="store_true", help="Create private Hugging Face repo if needed")
+	parser.add_argument("--hub-revision", type=str, default="main", help="Target Hugging Face revision/branch")
+	parser.add_argument("--hub-token-env-var", type=str, default="HF_TOKEN", help="Environment variable for HF token")
 	return parser.parse_args()
 
 
@@ -424,8 +430,9 @@ def load_config_if_present(args):
 	with open(args.config, "r") as handle:
 		config = json.load(handle)
 	for key, value in config.items():
-		if hasattr(args, key):
-			setattr(args, key, value)
+		normalized_key = key.replace("-", "_")
+		if hasattr(args, normalized_key):
+			setattr(args, normalized_key, value)
 	return args
 
 
@@ -476,6 +483,8 @@ def main():
 		raise ValueError("Provide --model-name and --output-dir (or set them in the config file).")
 	if not args.input_fasta and not args.input_txt:
 		raise ValueError("Provide --input-fasta or --input-txt with sequences.")
+	if args.push_to_hub and not args.hub_repo_id:
+		raise ValueError("--push-to-hub requires --hub-repo-id")
 
 	set_seed(args.seed)
 
@@ -686,6 +695,19 @@ def main():
 		if tokenizer is not None and hasattr(tokenizer, "save_pretrained"):
 			tokenizer.save_pretrained(hf_output_dir)
 		logger.info("Saved Hugging Face compatible model to %s", hf_output_dir)
+		if args.push_to_hub and args.hub_repo_id:
+			try:
+				repo_url = publish_directory_to_hub(
+					local_dir=hf_output_dir,
+					repo_id=args.hub_repo_id,
+					private=args.hub_private,
+					revision=args.hub_revision,
+					commit_message="Upload MLM hf_compatible export",
+					token_env_var=args.hub_token_env_var,
+				)
+				logger.info("Published Hugging Face compatible model to %s", repo_url)
+			except Exception as exc:
+				logger.warning("Failed to publish HF-compatible export to Hub: %s", exc)
 	except Exception as exc:
 		logger.warning("Failed to export HF compatible model: %s", exc)
 

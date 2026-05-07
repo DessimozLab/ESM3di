@@ -46,6 +46,7 @@ dependencies = [
     
     # Utilities
     "tqdm>=4.65.0",
+    "pebble>=5.1.0",
     "huggingface-hub>=0.20.0",
     "einops>=0.7.0",
     "tensorboard>=2.14.0",
@@ -82,9 +83,11 @@ Issues = "https://github.com/DessimozLab/ESM3di/issues"
 
 [project.scripts]
 esm3di-train = "esm3di.esmretrain:main"
+esm3di-train-mlm = "esm3di.esmretrain_mlm:main"
 esm3di-makefoldseekdb = "esm3di.fastas2foldseekdb:main"
 esm3di-buildtrainingset = "esm3di.build_trainingset:main"
 esm3di-download-alphafold = "esm3di.testdataset:main"
+esm3di-push-to-hub = "esm3di.hf_publish:main"
 
 [tool.setuptools]
 packages = ["esm3di"]

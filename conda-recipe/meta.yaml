@@ -14,29 +14,51 @@ build:
   script: {{ PYTHON }} -m pip install . -vv
   entry_points:
     - esm3di-train = esm3di.esmretrain:main
+    - esm3di-train-mlm = esm3di.esmretrain_mlm:main
     - esm3di-makefoldseekdb = esm3di.fastas2foldseekdb:main
     - esm3di-buildtrainingset = esm3di.build_trainingset:main
     - esm3di-download-alphafold = esm3di.testdataset:main
+    - esm3di-push-to-hub = esm3di.hf_publish:main
 
 requirements:
   host:
-    - python >=3.8
+    - python >=3.10
     - pip
     - setuptools >=61.0
     - wheel
   run:
-    - python >=3.8
+    - python >=3.10
     - pytorch >=2.0.0
-    - transformers >=4.30.0
-    - peft >=0.5.0
+    - transformers >=4.40.0
+    - peft >=0.10.0
     - accelerate >=0.20.0
+    - huggingface_hub >=0.20.0
+    - sentencepiece >=0.2.0
+    - tokenizers >=0.15.0
+    - protobuf >=4.0.0
+    - numpy >=1.24.0
+    - scipy >=1.10.0
+    - scikit-learn >=1.3.0
+    - safetensors >=0.4.0
+    - tqdm >=4.65.0
+    - einops >=0.7.0
+    - pyyaml >=6.0
+    - fsspec >=2023.1.0
+    - tensorboard >=2.14.0
+    - biopython >=1.80
+    - pebble >=5.1.0
+    - pandas >=2.0.0
+    - requests >=2.28.0
 
 test:
   commands:
+    - python -c "import esm3di; print(esm3di.__version__)"
     - esm3di-train --help
+    - esm3di-train-mlm --help
     - esm3di-makefoldseekdb --help
     - esm3di-buildtrainingset --help
     - esm3di-download-alphafold --help
+    - esm3di-push-to-hub --help
 
 about:
   home: https://github.com/DessimozLab/ESM3di

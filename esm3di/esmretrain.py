@@ -10,6 +10,7 @@ import socket
 from typing import List, Tuple
 from datetime import datetime
 from pathlib import Path
+from .hf_publish import publish_directory_to_hub, publish_file_to_hub
 
 # Set CUDA memory allocator config before importing torch
 # This helps reduce memory fragmentation on large models
@@ -1639,6 +1640,24 @@ def train(args):
         )
         
         print(f"Saved checkpoint to {ckpt_path}")
+
+        if args.push_to_hub and args.hub_repo_id:
+            try:
+                published_url = publish_file_to_hub(
+                    local_file=ckpt_path,
+                    repo_id=args.hub_repo_id,
+                    path_in_repo=f"checkpoints/epoch_{epoch}.pt",
+                    private=args.hub_private,
+                    revision=args.hub_revision,
+                    commit_message=f"Upload ESM3Di epoch {epoch} checkpoint",
+                    token_env_var=args.hub_token_env_var,
+                )
+                print(
+                    f"Published epoch checkpoint to {published_url} "
+                    f"(checkpoints/epoch_{epoch}.pt)"
+                )
+            except Exception as exc:
+                print(f"Warning: failed to publish epoch checkpoint to Hugging Face Hub: {exc}")
         
         # Clear GPU cache at end of epoch to free fragmented memory
         if torch.cuda.is_available():
@@ -1666,6 +1685,20 @@ def train(args):
         if 'tokenizer' in locals() and tokenizer is not None and hasattr(tokenizer, "save_pretrained"):
             tokenizer.save_pretrained(hf_output_dir)
             print(f"Saved tokenizer to: {hf_output_dir}")
+
+        if args.push_to_hub and args.hub_repo_id:
+            try:
+                published_url = publish_directory_to_hub(
+                    local_dir=hf_output_dir,
+                    repo_id=args.hub_repo_id,
+                    private=args.hub_private,
+                    revision=args.hub_revision,
+                    commit_message="Upload hf_compatible model export",
+                    token_env_var=args.hub_token_env_var,
+                )
+                print(f"Published HF-compatible export to {published_url}")
+            except Exception as exc:
+                print(f"Warning: failed to publish HF-compatible export to Hugging Face Hub: {exc}")
     except Exception as exc:
         print(f"Warning: failed to save HF compatible model: {exc}")
 
@@ -2077,6 +2110,16 @@ def parse_args():
                    help="Directory to save model checkpoints")
     p.add_argument("--tensorboard-log-dir", type=str, default="tensorboard_logs",
                    help="Directory to save TensorBoard logs")
+    p.add_argument("--push-to-hub", action="store_true",
+                   help="Upload produced artifacts to Hugging Face Hub after saving")
+    p.add_argument("--hub-repo-id", type=str, default=None,
+                   help="Hugging Face model repository id, e.g. org/esm3di-model")
+    p.add_argument("--hub-private", action="store_true",
+                   help="Create target Hugging Face repo as private if missing")
+    p.add_argument("--hub-revision", type=str, default="main",
+                   help="Target branch/revision for Hugging Face uploads")
+    p.add_argument("--hub-token-env-var", type=str, default="HF_TOKEN",
+                   help="Environment variable containing Hugging Face token")
     
     args = p.parse_args()
     
@@ -2097,6 +2140,9 @@ def parse_args():
     if not args.aa_fasta or not args.three_di_fasta:
         p.error("--aa-fasta and --three-di-fasta are required "
                 "(or must be in config file)")
+
+    if args.push_to_hub and not args.hub_repo_id:
+        p.error("--push-to-hub requires --hub-repo-id")
 
     if args.use_cnn_head and args.use_transformer_head:
         p.error("--use-cnn-head and --use-transformer-head are mutually exclusive")
