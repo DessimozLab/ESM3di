@@ -1763,8 +1763,29 @@ def load_config_file(config_path: str) -> dict:
 
 def parse_args():
     p = argparse.ArgumentParser(
-        description="ESM (HuggingFace) + PEFT LoRA 3Di per-residue classifier",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        description="Train ESM3Di model with LoRA adapters for 3Di prediction.\n\n"
+                    "This script supports ESM-2 and ESM++ models, LoRA fine-tuning, CNN/Transformer/Iterative heads, "
+                    "pLDDT-weighted loss, and multi-GPU training.\n\n"
+                    "Input: Paired AA and 3Di FASTA files (headers and lengths must match).\n"
+                    "Output: Model checkpoints, TensorBoard logs, and validation metrics.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+    Examples:
+    # Train with config file
+    python -m esm3di.esmretrain --config configs/config_esmpp_small_full_transformer.json
+
+    # Quick test
+    python -m esm3di.esmretrain --aa-fasta test_aa.fasta --three-di-fasta test_3di.fasta --epochs 1 --batch-size 2
+
+    # Resume from checkpoint
+    python -m esm3di.esmretrain --config configs/config_esmpp_small_full_transformer.json --resume-from-checkpoint checkpoints/epoch_2.pt
+
+    # Use pLDDT bins for weighted loss
+    python -m esm3di.esmretrain --aa-fasta train_aa.fasta --three-di-fasta train_3di.fasta --plddt-bins-fasta train_plddt_bins.fasta
+
+    # Multi-GPU training
+    CUDA_VISIBLE_DEVICES=0,1 python -m esm3di.esmretrain --config configs/config_esmpp_small_full_transformer.json
+    """
     )
     
     # Config file option

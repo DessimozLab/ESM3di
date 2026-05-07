@@ -1,4 +1,13 @@
-#!/usr/bin/env python3
+
+"""
+Extract auxiliary structural tracks (bend, torsion, contact, burial, etc.) from structure files.
+
+This script processes a directory of PDB/CIF files and outputs FASTA files for each track.
+
+Example usage:
+    python -m esm3di.tracks --indir structures/ --outdir tracks/ --workers 8
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -38,10 +47,12 @@ BIN_ALPHABET_BASE = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvw
 
 
 def read_structure_any(path: Path) -> gemmi.Structure:
+    """Read structure file (PDB, CIF, etc.) using gemmi."""
     return gemmi.read_structure(str(path))
 
 
 def structure_id_from_path(path: Path) -> str:
+    """Extract structure ID from file path, removing known suffixes."""
     name = path.name
     for suf in (".pdb.gz", ".cif.gz", ".mmcif.gz", ".pdb", ".cif", ".mmcif"):
         if name.endswith(suf):
@@ -50,12 +61,14 @@ def structure_id_from_path(path: Path) -> str:
 
 
 def pick_model(structure: gemmi.Structure) -> gemmi.Model:
+    """Pick first model from structure (raises if none)."""
     if len(structure) == 0:
         raise ValueError("structure contains no models")
     return structure[0]
 
 
 def is_polymer_residue(res: gemmi.Residue) -> bool:
+    """Return True if residue is a polymer (amino acid)."""
     return res.name.upper() in AA3_TO_1
 
 

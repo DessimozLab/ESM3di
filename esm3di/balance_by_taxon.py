@@ -1,22 +1,18 @@
-#!/usr/bin/env python3
+
 """
 Create a taxonomically balanced subset of BFVD data.
 
-Balances the dataset by sampling equal numbers of sequences from each taxon
-at a specified taxonomic level (phylum, class, family, etc.).
+Balances the dataset by sampling equal numbers of sequences from each taxon at a specified taxonomic level (phylum, class, family, etc.).
 
 Example usage:
-    # Balance by phylum, sampling up to 500 sequences per phylum
-    python -m esm3di.balance_by_taxon --level phylum --max-per-taxon 500 \
-        --output-prefix /mnt/data1/bfvd/balanced/phylum_balanced
+  # Balance by phylum, sampling up to 500 sequences per phylum
+  python -m esm3di.balance_by_taxon --level phylum --max-per-taxon 500 --output-prefix /mnt/data1/bfvd/balanced/phylum_balanced
 
-    # Balance by class with minimum 50 sequences per class
-    python -m esm3di.balance_by_taxon --level class --max-per-taxon 1000 \
-        --min-per-taxon 50 --output-prefix balanced_class
+  # Balance by class with minimum 50 sequences per class
+  python -m esm3di.balance_by_taxon --level class --max-per-taxon 1000 --min-per-taxon 50 --output-prefix balanced_class
 
-    # Use the minimum taxon count as the sample size (perfect balance)
-    python -m esm3di.balance_by_taxon --level phylum --use-min \
-        --output-prefix perfectly_balanced
+  # Use the minimum taxon count as the sample size (perfect balance)
+  python -m esm3di.balance_by_taxon --level phylum --use-min --output-prefix perfectly_balanced
 """
 
 import argparse
@@ -62,8 +58,12 @@ def group_accessions_by_taxon(
     level: str,
     verbose: bool = False
 ) -> Dict[str, List[str]]:
-    """Group accessions by taxon at the specified level.
-    
+    """
+    Group accessions by taxon at the specified level.
+    Args:
+        metadata_path: Path to metadata TSV
+        level: Taxonomic level (e.g., 'phylum')
+        verbose: Print progress info
     Returns:
         Dict mapping taxon name to list of accession IDs
     """
@@ -99,15 +99,14 @@ def sample_balanced(
     use_min: bool = False,
     seed: int = 42
 ) -> Tuple[Set[str], Dict[str, int]]:
-    """Sample balanced set of accessions.
-    
+    """
+    Sample balanced set of accessions.
     Args:
         taxon_accessions: Dict mapping taxon to list of accessions
         max_per_taxon: Maximum sequences to sample per taxon
         min_per_taxon: Minimum sequences required (taxa with fewer are excluded)
         use_min: If True, sample exactly min(counts) from each taxon
         seed: Random seed
-        
     Returns:
         Tuple of (set of selected accessions, dict of taxon: count sampled)
     """

@@ -15,7 +15,7 @@ from .iterative_head import (
 from transformers import T5Tokenizer, T5EncoderModel
 from transformers.modeling_outputs import TokenClassifierOutput
 from peft import get_peft_model, LoraConfig, TaskType, PeftModel
-from typing import List, Tuple, Optional
+from typing import Any, List, Tuple, Optional
 from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer
 from peft import LoraConfig, get_peft_model, TaskType
@@ -1474,6 +1474,188 @@ class ESM3DiModel:
         print(f"✓ Prediction complete! {len(predictions)} sequences "
               f"written to {output_fasta_path}")
         return predictions
+
+    def output_per_position_perplexity_from_fasta(
+        self,
+        input_fasta_path: str,
+        output_tsv_path: str,
+        model_checkpoint_path: Optional[str] = None,
+        batch_size: int = 4,
+        device: Optional[str] = None,
+    ):
+        """
+        Compute per-position predictive perplexity for each input sequence and
+        write results to a TSV file.
+
+        Per-position perplexity is computed from the model distribution at each
+        residue:
+            perplexity_i = exp(H(p_i))
+        where H(p_i) is the entropy of the class distribution at position i.
+
+        Lower values indicate higher confidence. Range is [1, num_labels].
+
+        Args:
+            input_fasta_path: Path to input amino acid FASTA file.
+            output_tsv_path: Output TSV path with columns:
+                             sequence_id, position, aa, perplexity.
+            model_checkpoint_path: Optional checkpoint path to load before
+                                   inference.
+            batch_size: Batch size for inference.
+            device: Device to run on ('cuda' or 'cpu'). Auto-detect if None.
+
+        Returns:
+            List of records with per-position perplexity values.
+        """
+        # Auto-detect device
+        if device is None:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        print(f"Using device: {device}")
+
+        # Load checkpoint if provided
+        if model_checkpoint_path:
+            print(f"Loading model from: {model_checkpoint_path}")
+            checkpoint = torch.load(model_checkpoint_path, map_location=device)
+            print("✓ Checkpoint loaded")
+
+            if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+                model_state_dict = checkpoint['model_state_dict']
+                if any(k.startswith("module.") for k in model_state_dict.keys()):
+                    model_state_dict = {
+                        k.replace("module.", "", 1): v
+                        for k, v in model_state_dict.items()
+                    }
+
+                result = self.model.load_state_dict(model_state_dict, strict=False)
+                epoch = checkpoint.get('epoch', 'unknown')
+                print(f"✓ Loaded model from epoch {epoch}")
+                if result.missing_keys:
+                    print(
+                        f"  (Note: {len(result.missing_keys)} frozen weights "
+                        f"not in checkpoint - this is expected)"
+                    )
+            else:
+                if any(k.startswith("module.") for k in checkpoint.keys()):
+                    checkpoint = {
+                        k.replace("module.", "", 1): v
+                        for k, v in checkpoint.items()
+                    }
+                result = self.model.load_state_dict(checkpoint, strict=False)
+                print("✓ Loaded model checkpoint")
+                if result.missing_keys:
+                    print(
+                        f"  (Note: {len(result.missing_keys)} frozen weights "
+                        f"not in checkpoint - this is expected)"
+                    )
+        else:
+            print("No checkpoint provided, using current model state")
+
+        self.model = self.model.to(device)
+        self.model.eval()
+
+        # Initialize tokenizer
+        tokenizer: Any = None
+        try:
+            if hasattr(self.model, 'base_model') and hasattr(self.model.base_model, 'tokenizer'):
+                tokenizer = self.model.base_model.tokenizer
+        except AttributeError:
+            pass
+
+        if tokenizer is None:
+            if self.is_t5:
+                tokenizer = T5Tokenizer.from_pretrained(
+                    self.hf_model_name,
+                    legacy=True,
+                    trust_remote_code=True,
+                )
+            else:
+                tokenizer = AutoTokenizer.from_pretrained(
+                    self.hf_model_name,
+                    do_lower_case=False,
+                    trust_remote_code=True,
+                )
+
+        # Read input FASTA
+        print(f"Reading input FASTA: {input_fasta_path}")
+        aa_records = read_fasta(input_fasta_path)
+        print(f"Found {len(aa_records)} sequences")
+
+        perplexity_records = []
+
+        print(f"Writing per-position perplexity TSV to: {output_tsv_path}")
+        with open(output_tsv_path, 'w') as out_f:
+            out_f.write("sequence_id\tposition\taa\tperplexity\n")
+
+            with torch.no_grad():
+                for i in range(0, len(aa_records), batch_size):
+                    batch_records = aa_records[i:i + batch_size]
+                    headers, raw_seqs = zip(*batch_records)
+
+                    # T5 models require space-separated amino acids
+                    if self.is_t5:
+                        seqs = [' '.join(list(seq)) for seq in raw_seqs]
+                    else:
+                        seqs = list(raw_seqs)
+
+                    enc = tokenizer(
+                        list(seqs),
+                        return_tensors="pt",
+                        padding=True,
+                        truncation=True,
+                        add_special_tokens=True,
+                        return_special_tokens_mask=True,
+                    )
+
+                    input_ids = enc["input_ids"].to(device)
+                    attention_mask = enc["attention_mask"].to(device)
+                    special_mask = enc["special_tokens_mask"]
+
+                    outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
+                    logits = outputs.logits
+
+                    # Entropy-based perplexity at each token: exp(-sum p * log(p))
+                    log_probs = F.log_softmax(logits, dim=-1)
+                    probs = torch.exp(log_probs)
+                    token_entropy = -(probs * log_probs).sum(dim=-1)
+                    token_perplexity = torch.exp(token_entropy)
+
+                    for j, (header, raw_seq) in enumerate(zip(headers, raw_seqs)):
+                        per_pos_ppl = []
+                        k = 0  # Index into original sequence
+
+                        for pos in range(token_perplexity.shape[1]):
+                            if special_mask[j, pos] == 0:
+                                if k < len(raw_seq):
+                                    ppl = float(token_perplexity[j, pos].item())
+                                    per_pos_ppl.append(ppl)
+                                    out_f.write(
+                                        f"{header}\t{k + 1}\t{raw_seq[k]}\t{ppl:.6f}\n"
+                                    )
+                                    k += 1
+
+                        if len(per_pos_ppl) != len(raw_seq):
+                            print(
+                                f"Warning: Length mismatch for {header}: "
+                                f"AA={len(raw_seq)}, PPL={len(per_pos_ppl)}"
+                            )
+
+                        perplexity_records.append(
+                            {
+                                "header": header,
+                                "aa_seq": raw_seq,
+                                "perplexity_per_position": per_pos_ppl,
+                            }
+                        )
+
+                    if (i + batch_size) % (batch_size * 10) == 0 or (i + batch_size) >= len(aa_records):
+                        processed = min(i + batch_size, len(aa_records))
+                        print(f"Processed {processed}/{len(aa_records)} sequences")
+
+        print(
+            f"✓ Per-position perplexity complete! {len(perplexity_records)} sequences "
+            f"written to {output_tsv_path}"
+        )
+        return perplexity_records
 
 # -----------------------------
 # Dataset

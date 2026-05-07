@@ -1,16 +1,20 @@
-#!/usr/bin/env python
+
 """
 Generate FoldSeek database from amino acid FASTA using ESM 3Di predictions.
 
 This script:
-1. Takes an amino acid FASTA file
-2. Runs ESM inference to predict 3Di sequences
-3. Creates temporary AA and 3Di FASTA files
-4. Builds a FoldSeek database using foldseek createdb
+    1. Takes an amino acid FASTA file
+    2. Runs ESM inference to predict 3Di sequences
+    3. Creates temporary AA and 3Di FASTA files
+    4. Builds a FoldSeek database using foldseek createdb
 
 Requirements:
-- Trained ESM 3Di model checkpoint
-- FoldSeek installed and in PATH
+    - Trained ESM 3Di model checkpoint
+    - FoldSeek installed and in PATH
+
+Example usage:
+    python -m esm3di.fastas2foldseekdb --aa-fasta proteins.fasta --model-ckpt checkpoints/epoch_3.pt --output-db my_db
+    python -m esm3di.fastas2foldseekdb --aa-fasta large.fasta --model-ckpt ckpt.pt --output-db db --multi-gpu --num-gpus 4
 """
 
 import argparse

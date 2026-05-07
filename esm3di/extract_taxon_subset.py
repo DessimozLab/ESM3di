@@ -1,26 +1,25 @@
-#!/usr/bin/env python3
+
 """
 Extract a subset of BFVD data based on taxonomic criteria.
 
-This script filters the BFVD metadata by taxon name (searching in scientific name
-or lineage) and extracts the corresponding sequences from the AA and 3Di FASTA files.
+This script filters the BFVD metadata by taxon name (searching in scientific name or lineage) and extracts the corresponding sequences from the AA and 3Di FASTA files.
 
 Example usage:
-    # Extract all Coronaviridae
-    python -m esm3di.extract_taxon_subset --taxon "Coronaviridae" --output-prefix coronaviridae
+  # Extract all Coronaviridae
+  python -m esm3di.extract_taxon_subset --taxon "Coronaviridae" --output-prefix coronaviridae
 
-    # Extract by genus
-    python -m esm3di.extract_taxon_subset --taxon "Betacoronavirus" --output-prefix betacov
+  # Extract by genus
+  python -m esm3di.extract_taxon_subset --taxon "Betacoronavirus" --output-prefix betacov
 
-    # Use custom paths
-    python -m esm3di.extract_taxon_subset --taxon "Flaviviridae" \
-        --metadata /path/to/metadata.tsv \
-        --aa-fasta /path/to/aa.fasta \
-        --three-di-fasta /path/to/3di.fasta \
-        --output-prefix flavi
+  # Use custom paths
+  python -m esm3di.extract_taxon_subset --taxon "Flaviviridae" \
+      --metadata /path/to/metadata.tsv \
+      --aa-fasta /path/to/aa.fasta \
+      --three-di-fasta /path/to/3di.fasta \
+      --output-prefix flavi
 
-    # Case-sensitive exact match
-    python -m esm3di.extract_taxon_subset --taxon "Orthocoronavirinae" --exact-match
+  # Case-sensitive exact match
+  python -m esm3di.extract_taxon_subset --taxon "Orthocoronavirinae" --exact-match
 """
 
 import argparse
@@ -39,9 +38,10 @@ DEFAULT_PLDDT_BINS_FASTA = "/mnt/data1/bfvd/training_set/bfvd_data_plddt_bins.fa
 
 
 def parse_metadata_line(line: str) -> Optional[Dict]:
-    """Parse a line from the metadata TSV file.
-    
+    """
+    Parse a line from the metadata TSV file.
     Format: pdb_filename<TAB>taxid<TAB>rank<TAB>scientific_name<TAB>lineage
+    Returns dict with keys: pdb_filename, accession, taxid, rank, scientific_name, lineage
     """
     parts = line.strip().split('\t')
     if len(parts) < 5:
@@ -69,15 +69,14 @@ def find_matching_accessions(
     search_field: str = 'all',
     verbose: bool = False
 ) -> Set[str]:
-    """Find all accessions matching the given taxon query.
-    
+    """
+    Find all accessions matching the given taxon query.
     Args:
         metadata_path: Path to the metadata TSV file
         taxon: Taxon name to search for
         exact_match: If True, require exact substring match (case-sensitive)
         search_field: Which field to search: 'all', 'name', 'lineage'
         verbose: Print matching info
-        
     Returns:
         Set of accession IDs matching the query
     """

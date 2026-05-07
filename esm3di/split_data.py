@@ -1,17 +1,17 @@
-#!/usr/bin/env python
+
 """
 Utility script to split paired AA/3Di FASTA files into train/test/validation sets.
 Optionally also splits a pLDDT bins FASTA file.
 
-Usage:
-    python -m esm3di.split_data \
-        --aa-fasta data_aa.fasta \
-        --three-di-fasta data_3di.fasta \
-        --plddt-bins-fasta data_plddt_bins.fasta \
-        --output-prefix split_data \
-        --train-ratio 0.8 \
-        --val-ratio 0.1 \
-        --test-ratio 0.1
+Example usage:
+  python -m esm3di.split_data \
+      --aa-fasta data_aa.fasta \
+      --three-di-fasta data_3di.fasta \
+      --plddt-bins-fasta data_plddt_bins.fasta \
+      --output-prefix split_data \
+      --train-ratio 0.8 \
+      --val-ratio 0.1 \
+      --test-ratio 0.1
 """
 
 import argparse
@@ -59,7 +59,10 @@ def write_fasta(sequences: List[Tuple[str, str]], output_path: str, line_width: 
 def validate_paired_fastas(aa_seqs: List[Tuple[str, str]], 
                            threedi_seqs: List[Tuple[str, str]],
                            plddt_seqs: List[Tuple[str, str]] = None) -> None:
-    """Validate that AA, 3Di, and optional pLDDT FASTAs have matching headers and lengths."""
+    """
+    Validate that AA, 3Di, and optional pLDDT FASTAs have matching headers and lengths.
+    Raises ValueError if mismatches are found.
+    """
     if len(aa_seqs) != len(threedi_seqs):
         raise ValueError(
             f"Number of sequences mismatch: AA has {len(aa_seqs)}, "
@@ -107,7 +110,6 @@ def split_data(
 ) -> Dict[str, Tuple[List, ...]]:
     """
     Split paired sequences into train/val/test sets.
-    
     Returns:
         Dict with keys 'train', 'val', 'test', each containing
         (aa_sequences, threedi_sequences) or (aa_sequences, threedi_sequences, plddt_sequences) tuple

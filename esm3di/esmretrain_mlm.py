@@ -1,4 +1,21 @@
-#!/usr/bin/env python
+
+"""
+Masked language model retraining for protein sequences (ESM/ESM++).
+
+This script fine-tunes a HuggingFace protein language model (ESM2/ESM++) on custom AA sequences using masked language modeling (MLM).
+Supports LoRA adapters, config file overrides, and multi-GPU training.
+
+Example usage:
+	# Train with FASTA
+	python -m esm3di.esmretrain_mlm --input-fasta train.fasta --model-name facebook/esm2_t33_650M_UR50D --output-dir checkpoints/
+
+	# Train with LoRA adapters
+	python -m esm3di.esmretrain_mlm --input-fasta train.fasta --model-name facebook/esm2_t33_650M_UR50D --output-dir checkpoints/ --use-lora
+
+	# Use config file
+	python -m esm3di.esmretrain_mlm --config configs/config_mlm.json
+"""
+
 import argparse
 import json
 import logging
@@ -13,10 +30,10 @@ from typing import List, Optional, Tuple
 import torch
 from torch.utils.data import DataLoader, Dataset, random_split
 from transformers import (
-	AutoModelForMaskedLM,
-	AutoTokenizer,
-	DataCollatorForLanguageModeling,
-	get_linear_schedule_with_warmup,
+		AutoModelForMaskedLM,
+		AutoTokenizer,
+		DataCollatorForLanguageModeling,
+		get_linear_schedule_with_warmup,
 )
 from tqdm import tqdm
 from peft import LoraConfig, TaskType, get_peft_model, PeftModel
@@ -30,15 +47,18 @@ class TrainStats:
 	steps: int = 0
 
 	def update(self, loss_value: float):
+		"""Update running loss statistics."""
 		self.loss_sum += loss_value
 		self.steps += 1
 
 	def average(self) -> float:
+		"""Return average loss."""
 		return self.loss_sum / max(self.steps, 1)
 
 
 class SequenceDataset(Dataset):
 	def __init__(self, sequences: List[str]):
+		"""Dataset for a list of protein sequences."""
 		self.sequences = sequences
 
 	def __len__(self) -> int:
@@ -49,6 +69,7 @@ class SequenceDataset(Dataset):
 
 
 def set_seed(seed: int):
+	"""Set random seed for reproducibility."""
 	random.seed(seed)
 	torch.manual_seed(seed)
 	if torch.cuda.is_available():
@@ -56,6 +77,7 @@ def set_seed(seed: int):
 
 
 def load_sequences_from_fasta(fasta_path: str, min_length: int = 1) -> List[str]:
+	"""Load sequences from a FASTA file, filtering by min_length."""
 	records = read_fasta(fasta_path)
 	sequences = []
 	for _, seq in records:
@@ -66,6 +88,7 @@ def load_sequences_from_fasta(fasta_path: str, min_length: int = 1) -> List[str]
 
 
 def load_sequences_from_txt(txt_path: str, min_length: int = 1) -> List[str]:
+	"""Load sequences from a plain text file, one per line."""
 	sequences = []
 	with open(txt_path, "r") as handle:
 		for line in handle:
@@ -78,6 +101,7 @@ def load_sequences_from_txt(txt_path: str, min_length: int = 1) -> List[str]:
 
 
 def resolve_dtype(dtype_str: str):
+	"""Convert dtype string to torch dtype."""
 	if dtype_str == "fp16":
 		return torch.float16
 	if dtype_str == "bf16":
@@ -86,6 +110,7 @@ def resolve_dtype(dtype_str: str):
 
 
 def load_tokenizer_with_fallback(model_name: str):
+	"""Load HuggingFace tokenizer, fallback to model.tokenizer for ESM++ if needed."""
 	try:
 		return AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 	except ValueError as exc:
@@ -104,6 +129,7 @@ def load_tokenizer_with_fallback(model_name: str):
 
 
 def make_collate_fn(tokenizer, mlm_probability: float, max_length: Optional[int]):
+	"""Create a collate function for MLM DataLoader."""
 	data_collator = DataCollatorForLanguageModeling(
 		tokenizer=tokenizer,
 		mlm_probability=mlm_probability,
@@ -192,6 +218,10 @@ def build_loaders(
 	seed: int,
 	num_workers: int,
 ):
+	"""
+	Build DataLoader objects for training and validation splits.
+	Returns (train_loader, val_loader)
+	"""
 	dataset = SequenceDataset(sequences)
 	if val_split <= 0:
 		train_dataset = dataset
@@ -234,6 +264,9 @@ def build_eval_loader(
 	batch_size: int,
 	num_workers: int,
 ):
+	"""
+	Build DataLoader for evaluation (no shuffling).
+	"""
 	dataset = SequenceDataset(sequences)
 	collate_fn = make_collate_fn(tokenizer, mlm_probability, max_length)
 	return DataLoader(
@@ -259,6 +292,9 @@ def train_one_epoch(
 	log_every: int,
 	epoch: int,
 ):
+	"""
+	Train for one epoch. Returns average loss.
+	"""
 	model.train()
 	stats = TrainStats()
 	optimizer.zero_grad(set_to_none=True)
@@ -301,6 +337,9 @@ def train_one_epoch(
 
 @torch.no_grad()
 def validate(model, val_loader, device, use_amp: bool, epoch: int):
+	"""
+	Run validation loop. Returns average loss.
+	"""
 	model.eval()
 	stats = TrainStats()
 	progress = tqdm(val_loader, desc=f"Epoch {epoch} [val]", leave=False)
@@ -315,10 +354,12 @@ def validate(model, val_loader, device, use_amp: bool, epoch: int):
 
 
 def _is_peft_model(model) -> bool:
+	"""Check if model is a PEFT (LoRA) model."""
 	return hasattr(model, "peft_config")
 
 
 def save_checkpoint(model, tokenizer, output_dir: Path, tag: str):
+	"""Save model and tokenizer to output_dir/tag."""
 	target_dir = output_dir / tag
 	target_dir.mkdir(parents=True, exist_ok=True)
 	model.save_pretrained(target_dir)
@@ -326,13 +367,29 @@ def save_checkpoint(model, tokenizer, output_dir: Path, tag: str):
 
 
 def parse_args():
-	parser = argparse.ArgumentParser(description="Masked language model retraining for protein sequences.")
+		parser = argparse.ArgumentParser(
+				description="Masked language model retraining for protein sequences (ESM/ESM++).\n\n"
+										"Fine-tunes a HuggingFace protein language model on custom AA sequences using MLM.\n"
+										"Supports LoRA adapters, config file overrides, and multi-GPU training.",
+				formatter_class=argparse.RawDescriptionHelpFormatter,
+				epilog="""
+Examples:
+	# Train with FASTA
+	python -m esm3di.esmretrain_mlm --input-fasta train.fasta --model-name facebook/esm2_t33_650M_UR50D --output-dir checkpoints/
+
+	# Train with LoRA adapters
+	python -m esm3di.esmretrain_mlm --input-fasta train.fasta --model-name facebook/esm2_t33_650M_UR50D --output-dir checkpoints/ --use-lora
+
+	# Use config file
+	python -m esm3di.esmretrain_mlm --config configs/config_mlm.json
+"""
+		)
 	parser.add_argument("--input-fasta", type=str, help="Path to input FASTA with AA sequences.")
 	parser.add_argument("--input-txt", type=str, help="Path to input text with one sequence per line.")
 	parser.add_argument("--val-fasta", type=str, help="Optional FASTA for validation sequences.")
 	parser.add_argument("--test-fasta", type=str, help="Optional FASTA for test sequences.")
-	parser.add_argument("--model-name", type=str, required=True, help="HF model name (ESMC/ESM++).")
-	parser.add_argument("--output-dir", type=str, required=True, help="Directory to save checkpoints.")
+	parser.add_argument("--model-name", type=str, default=None, help="HF model name (ESMC/ESM++).")
+	parser.add_argument("--output-dir", type=str, default=None, help="Directory to save checkpoints.")
 	parser.add_argument("--epochs", type=int, default=3)
 	parser.add_argument("--batch-size", type=int, default=4)
 	parser.add_argument("--learning-rate", type=float, default=2e-5)
@@ -415,6 +472,8 @@ def load_model_checkpoint(model, checkpoint_dir: Path, args, tokenizer, dtype):
 def main():
 	args = load_config_if_present(parse_args())
 
+	if not args.model_name or not args.output_dir:
+		raise ValueError("Provide --model-name and --output-dir (or set them in the config file).")
 	if not args.input_fasta and not args.input_txt:
 		raise ValueError("Provide --input-fasta or --input-txt with sequences.")
 

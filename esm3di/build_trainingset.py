@@ -1,17 +1,20 @@
-#!/usr/bin/env python
+
 """
 Build training dataset from PDB files with pLDDT-based masking.
 
 This script:
-1. Reads a directory of PDB files
-2. Uses FoldSeek to generate 3Di sequences
-3. Extracts pLDDT scores from PDB B-factors
-4. Masks low-confidence positions in 3Di sequences
-5. Outputs amino acid and masked 3Di FASTA files for training
+    1. Reads a directory of PDB files
+    2. Uses FoldSeek to generate 3Di sequences
+    3. Extracts pLDDT scores from PDB B-factors
+    4. Masks low-confidence positions in 3Di sequences
+    5. Outputs amino acid and masked 3Di FASTA files for training
 
 Requirements:
-- FoldSeek installed and in PATH
-- PDB files with pLDDT scores in B-factor column (e.g., AlphaFold predictions)
+    - FoldSeek installed and in PATH
+    - PDB files with pLDDT scores in B-factor column (e.g., AlphaFold predictions)
+
+Example usage:
+    python -m esm3di.build_trainingset --pdb-dir structures/ --output-prefix train_data --plddt-threshold 70
 """
 
 import argparse
@@ -35,7 +38,8 @@ class PDBParser:
     def parse_pdb(pdb_path: str) -> Dict[str, Tuple[str, List[float]]]:
         """
         Parse PDB file and extract sequence and pLDDT scores per chain.
-        
+        Args:
+            pdb_path: Path to PDB file
         Returns:
             Dictionary mapping chain_id -> (sequence, plddt_scores)
         """
@@ -108,7 +112,7 @@ class PDBParser:
 
 
 def check_foldseek_installed(foldseek_bin: str = "foldseek") -> bool:
-    """Check if foldseek is available."""
+    """Check if foldseek is available in PATH."""
     try:
         result = subprocess.run(
             [foldseek_bin, "version"],
