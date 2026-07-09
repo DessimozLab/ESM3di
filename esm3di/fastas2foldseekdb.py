@@ -1005,9 +1005,9 @@ Examples:
     finally:
         # Clean up temporary files if needed
         if use_temp and not args.skip_inference:
-            if aa_fasta_path and os.path.exists(aa_fasta_path):
-                os.unlink(aa_fasta_path)
-                print(f"Cleaned up temporary file: {aa_fasta_path}")
+            # if aa_fasta_path and os.path.exists(aa_fasta_path):
+            #    os.unlink(aa_fasta_path)
+            #    print(f"Cleaned up temporary file: {aa_fasta_path}")
             if three_di_fasta_path and os.path.exists(three_di_fasta_path):
                 os.unlink(three_di_fasta_path)
                 print(f"Cleaned up temporary file: {three_di_fasta_path}")

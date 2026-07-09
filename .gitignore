@@ -80,6 +80,7 @@ checkpoints/
 *.pt
 *.pth
 *.ckpt
+ckp/
 
 # Data files (uncomment if you don't want to track data)
 *.fasta
