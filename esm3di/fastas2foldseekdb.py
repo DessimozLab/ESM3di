@@ -472,29 +472,29 @@ def _gpu_worker(gpu_id, shard_fasta, output_fasta, checkpoint_path, args_dict, p
                 num_labels=num_labels,
                 lora_r=lora_r,
                 lora_alpha=lora_alpha,
-                lora_dropout=lora_dropout,
-                target_modules=target_modules,
-                use_cnn_head=use_cnn_head,
+                lora_dropout=lora_dropout,      ###
+                target_modules=target_modules,  ###
+                use_cnn_head=use_cnn_head,      ###
                 cnn_num_layers=args_dict.get('cnn_num_layers', 2),
                 cnn_kernel_size=args_dict.get('cnn_kernel_size', 3),
-                cnn_dropout=args_dict.get('cnn_dropout', 0.1),
-                use_transformer_head=use_transformer_head,
-                use_plddt_prediction_head=use_plddt_prediction_head,
+                cnn_dropout=args_dict.get('cnn_dropout', 0.1),      ###
+                use_transformer_head=use_transformer_head,          ###
+                use_plddt_prediction_head=use_plddt_prediction_head,        ###
                 plddt_num_bins=args_dict.get('plddt_num_bins', len(checkpoint.get('plddt_label_vocab', [])) or 10),
                 plddt_prediction_mode=plddt_prediction_mode,
                 transformer_head_dim=args_dict.get('transformer_head_dim', 256),
                 transformer_head_layers=args_dict.get('transformer_head_layers', 2),
-                transformer_head_dropout=args_dict.get('transformer_head_dropout', 0.1),
-                transformer_head_num_heads=args_dict.get('transformer_head_num_heads', None),
-                use_iterative_transformer_head=use_iterative_transformer_head,
-                iterative_head_max_iterations=args_dict.get('iterative_head_max_iterations', 5),
-                iterative_head_halt_threshold=args_dict.get('iterative_head_halt_threshold', 0.95),
-                iterative_head_lambda_p=args_dict.get('iterative_head_lambda_p', 0.01),
-                iterative_head_prior_p=args_dict.get('iterative_head_prior_p', 0.5),
-                use_positional_encoding=args_dict.get('use_positional_encoding', True),
-                use_hidden_state_feedback=args_dict.get('use_hidden_state_feedback', True),
-                use_gru_gate=args_dict.get('use_gru_gate', False),
-                aux_track_num_bins=args_dict.get('aux_track_num_bins', None) or
+                transformer_head_dropout=args_dict.get('transformer_head_dropout', 0.1),        ###
+                transformer_head_num_heads=args_dict.get('transformer_head_num_heads', None),   ###
+                use_iterative_transformer_head=use_iterative_transformer_head,      ###
+                iterative_head_max_iterations=args_dict.get('iterative_head_max_iterations', 5),    ###
+                iterative_head_halt_threshold=args_dict.get('iterative_head_halt_threshold', 0.95), ###
+                iterative_head_lambda_p=args_dict.get('iterative_head_lambda_p', 0.01),             ###
+                iterative_head_prior_p=args_dict.get('iterative_head_prior_p', 0.5),                ###
+                use_positional_encoding=args_dict.get('use_positional_encoding', True),             ###
+                use_hidden_state_feedback=args_dict.get('use_hidden_state_feedback', True),         ###
+                use_gru_gate=args_dict.get('use_gru_gate', False),      ###
+                aux_track_num_bins=args_dict.get('aux_track_num_bins', None) or     ###
                                    checkpoint.get('aux_track_num_bins', None),
             )
         

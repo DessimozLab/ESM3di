@@ -41,17 +41,36 @@ class ESM3DiPredictor:
         hf_model_name = args.get('hf_model_name', args.get('hf_model', 'facebook/esm2_t12_35M_UR50D'))
 
         # 3. Reconstruct exact model configuration arguments
+        # 3. Reconstruct exact model configuration arguments
         model_kwargs = {
             "hf_model_name": hf_model_name,
             "num_labels": len(label_vocab),
             "lora_r": args.get("lora_r", 8),
             "lora_alpha": args.get("lora_alpha", 16.0),
+
+            # CNN Configs
             "cnn_num_layers": args.get("cnn_num_layers", 2),
             "cnn_kernel_size": args.get("cnn_kernel_size", 3),
+            "cnn_dropout": args.get("cnn_dropout", 0.1),
+
+            # Transformer Configs
             "transformer_head_dim": args.get("transformer_head_dim", 256),
             "transformer_head_layers": args.get("transformer_head_layers", 2),
+            "transformer_head_dropout": args.get("transformer_head_dropout", 0.1),
+            "transformer_head_num_heads": args.get("transformer_head_num_heads", None),
+
+            # Iterative Configs
+            "iterative_head_max_iterations": args.get("iterative_head_max_iterations", 5),
+            "iterative_head_halt_threshold": args.get("iterative_head_halt_threshold", 0.95),
+            "use_positional_encoding": args.get("use_positional_encoding", True),
+            "use_hidden_state_feedback": args.get("use_hidden_state_feedback", True),
+            "use_gru_gate": args.get("use_gru_gate", False),
+
+            # PLDDT Configs
             "plddt_prediction_mode": args.get("plddt_prediction_mode", "classification"),
             "plddt_num_bins": args.get("plddt_num_bins", 10),
+
+            # Feature Flags
             **{k: args.get(k, False) for k in [
                 "use_cnn_head", "use_transformer_head",
                 "use_iterative_transformer_head", "use_plddt_prediction_head"

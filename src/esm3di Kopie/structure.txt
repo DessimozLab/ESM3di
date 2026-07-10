@@ -1,3 +1,5 @@
+This Copie is more complete with all heads etc.
+
 esm3di/
 ├── src/
     └── pyproject.toml
