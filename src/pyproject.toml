@@ -35,7 +35,7 @@ dependencies = [
 # dev = [...]
 
 [project.scripts]
-esm3di-foldseek = "esm3di.cli:main"
+esm3di-foldseek = "esm3di_new.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["esm3di"]  # FIXED: Pointing directly to the root package directory (removed "src/")
