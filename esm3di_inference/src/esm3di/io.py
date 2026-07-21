@@ -1,5 +1,79 @@
 import string
 from typing import List, Tuple, Union
+import sys
+from pathlib import Path
+
+
+# Placeholder imports matching your existing workflow
+# def fasta2foldseek(aa_input, tdi_input, output_basename): pass
+
+def resolve_user_path(path_str: str) -> Path:
+    """Resolves a user-provided file or folder path argument.
+
+    Ensures that if the IDE runs inside 'src' or 'src/esm3di', it steps
+    out to the repository workspace root automatically.
+    """
+    path = Path(path_str)
+    if path.is_absolute():
+        return path
+
+    cwd = Path.cwd()
+    if cwd.name == "src":
+        cwd = cwd.parent
+    elif cwd.parent.name == "src":
+        cwd = cwd.parent.parent
+
+    return (cwd / path).resolve()
+
+
+def resolve_output_path(path_str: str, default_dir: str = "outputs") -> Path:
+    """Resolves output target paths.
+
+    If the user inputs just a plain filename without directories, it defaults
+    it inside `outputs/`. Custom explicit paths are kept intact.
+    """
+    path = Path(path_str)
+
+    # If it is a bare file without parents (e.g., "output_3di.fasta")
+    if len(path.parts) == 1:
+        resolved_dir = resolve_user_path(default_dir)
+        return resolved_dir / path
+
+    return resolve_user_path(path_str)
+
+
+def resolve_checkpoint_path(ckpt_str: str) -> str:
+    """Resolves local or remote model checkpoint locations."""
+    if "/" in ckpt_str and not Path(ckpt_str).exists():
+        return ckpt_str
+
+    path = Path(ckpt_str)
+    if path.is_absolute():
+        return str(path)
+
+    corrected_cwd = Path.cwd()
+    if corrected_cwd.name == "src":
+        corrected_cwd = corrected_cwd.parent
+    elif corrected_cwd.parent.name == "src":
+        corrected_cwd = corrected_cwd.parent.parent
+
+    cwd_path = (corrected_cwd / path).resolve()
+    if cwd_path.is_dir():
+        return str(cwd_path)
+
+    current_dir = Path(__file__).resolve().parent
+    repo_root = None
+    for parent in [current_dir] + list(current_dir.parents):
+        if (parent / "pyproject.toml").exists():
+            repo_root = parent
+            break
+
+    if repo_root:
+        repo_path = (repo_root / path).resolve()
+        if repo_path.is_dir():
+            return str(repo_path)
+
+    return str(cwd_path)
 
 
 def read_fasta(path: str) -> List[Tuple[str, str]]:

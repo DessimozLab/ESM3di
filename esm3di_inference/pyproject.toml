@@ -18,16 +18,25 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 
+# don't forget to add gpu libs again
 dependencies = [
-    "torch>=2.0.0",
-    "transformers>=4.40.0,<5.0.0",  # Capped: Prevents Transformers 5.x structural breaks
-    "numpy>=1.24.0,<2.0.0",         # Capped: Prevents NumPy 2.x from crashing PyTorch 2.2
-    "peft>=0.10.0",                 # Parameter-efficient fine-tuning base
-    "accelerate>=0.20.0",           # Explicitly required by Transformers for device allocation
-    "biopython>=1.80",              # Handled for FASTA/FoldSeek database serialization
+    "torch>=2.0.0",                  # Fully supports legacy systems (including Intel Mac PyTorch 2.2)
+    "transformers>=4.40.0,<5.0.0",   # Keeps up-to-date with HF ecosystem
+    "numpy>=1.24.0,<2.0.0",
+    "peft>=0.10.0",
+    "accelerate>=0.20.0",
+    "biopython>=1.80",
     "tqdm>=4.65.0",
     "huggingface_hub>=0.20.0",
-    "safetensors>=0.4.0",           # Ensures clean parsing of .safetensors adapters
+    "safetensors>=0.4.0",
+    "einops>=0.7.0",
+]
+
+# Development and testing dependencies
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pandas>=2.0.0",
 ]
 
 [project.scripts]

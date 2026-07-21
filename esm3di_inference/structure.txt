@@ -1,0 +1,21 @@
+
+Lean Package Structure (Github repo)
+
+esm3di_inference/
+├── src/
+│   └── esm3di/
+│       ├── __init__.py          # Exposes ESM3DiPredictor
+│       ├── cli.py               # The CLI execution routing (intact)
+        ├── model.py
+│       ├── inference.py         # The lean, modernized Predictor wrapper
+│       ├── io.py                # FASTA parsing & writing utilities
+│       └── preprocessing.py     # Simple sequence/sharding tools (for Multi-GPU)
+│
+├── checkpoints/
+│   └── hf_compatible/           # Included directly in the repo (tracked with Git LFS)
+│
+├── pyproject.toml
+├── README.md
+├── input.fasta                 # is this the right spot
+├── outputs/                    # empty (should I keep this or remove it)
+└── tests/                      # empty for now

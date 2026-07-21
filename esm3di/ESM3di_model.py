@@ -1099,6 +1099,7 @@ class ESM3DiModel:
                     self.hf_model_name,
                     num_labels=self.num_labels,
                     trust_remote_code=True,  # Required for ESM++ custom code
+                    low_cpu_mem_usage=True
 
                 )
                 print("✓ Base model loaded (TokenClassification)")
