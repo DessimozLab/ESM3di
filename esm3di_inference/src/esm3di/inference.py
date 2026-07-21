@@ -69,7 +69,7 @@ class ESM3DiPredictor:
             if self.device.type == "cuda"
             else self.device.type.upper()
         )
-        logger.info(f"Predictor safely initialized on target device: {self.device} ({device_name})")
+        logger.info(f"Using device: {self.device} ({device_name})")
 
     def _initialize_model_backbone(self) -> None:
         """Internal helper logic to reconstruct and load the composite model structure."""
