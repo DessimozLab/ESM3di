@@ -74,20 +74,6 @@ venv.bak/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# Model checkpoints and output directories
-esm_hf_peft_3di_ckpts/
-checkpoints/
-*.pt
-*.pth
-*.ckpt
-ckp/
-
-# Data files (uncomment if you don't want to track data)
-*.fasta
-*.fa
-data/
-*.json
-
 # Logs
 *.log
 
