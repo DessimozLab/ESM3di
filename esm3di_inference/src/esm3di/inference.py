@@ -3,21 +3,26 @@ import queue
 import logging
 import tempfile
 import shutil
+from tqdm import tqdm
 from pathlib import Path
 from typing import List, Union, Optional, Any
 
 import torch
 import torch.nn.functional as F
 from transformers import AutoModelForTokenClassification
+from transformers import logging as hf_logging
 from peft import PeftModel, PeftConfig
 
 from .io import read_fasta, write_fasta
 from .model import CNNClassificationHead, ESMWithCNNHead
 
-# Configure logging framework
+# Internal logger for this module
 logger = logging.getLogger(__name__)
 
-# Resolve the physical directory where this file sits: src/esm3di/
+# Suppress default HF head init warnings
+hf_logging.set_verbosity_error()
+
+# Resolve physical directory where this file sits: src/esm3di/
 PACKAGE_ROOT = Path(__file__).resolve().parent
 
 # Production-grade package defaults
@@ -58,44 +63,48 @@ class ESM3DiPredictor:
 
         # Build lookup translation map
         self.idx2char = {i: c for i, c in enumerate(VOCAB_3DI)}
-        logger.info(f"✓ Predictor engine safely launched on execution frame: {self.device}")
+
+        device_name = (
+            torch.cuda.get_device_name(self.device)
+            if self.device.type == "cuda"
+            else self.device.type.upper()
+        )
+        logger.info(f"Predictor safely initialized on target device: {self.device} ({device_name})")
 
     def _initialize_model_backbone(self) -> None:
         """Internal helper logic to reconstruct and load the composite model structure."""
         if not Path(self.model_checkpoint_path).exists():
             raise FileNotFoundError(f"Configuration directory not found: {self.model_checkpoint_path}")
 
-        # 1. Read the base model path and configurations directly from the folder
-        logger.info(f"Loading adapter configuration from: {self.model_checkpoint_path}")
+        # 1. Read base model configuration
+        logger.debug(f"Loading adapter configuration from: {self.model_checkpoint_path}")
         peft_config = PeftConfig.from_pretrained(self.model_checkpoint_path)
         base_model_name = peft_config.base_model_name_or_path
 
-        # 2. Initialize the exact base model structure
-        logger.info(f"Loading base structural backbone: {base_model_name}")
+        # 2. Initialize base model
+        logger.debug(f"Loading base structural backbone: {base_model_name}")
         base_model = AutoModelForTokenClassification.from_pretrained(
             base_model_name,
             num_labels=len(VOCAB_3DI),
             trust_remote_code=True,
         )
-
-        # Extract native tokenizer directly
         self.tokenizer = base_model.tokenizer
 
-        # 3. Use PEFT to cleanly load and map adapter weights from the HF folder
-        logger.info("Loading and applying adapter weights from HF folder...")
+        # 3. Apply PEFT adapters
+        logger.debug("Applying PEFT adapter weights...")
         peft_model = PeftModel.from_pretrained(base_model, self.model_checkpoint_path)
 
-        # 4. Instantiate the CNN classification head
+        # 4. Instantiate custom CNN classification head
         hidden_size = base_model.config.hidden_size
         cnn_head = CNNClassificationHead(hidden_size=hidden_size)
 
-        # 5. Wrap them in ESMWithCNNHead to match the original training tree structure
+        # 5. Wrap model components
         self.model = ESMWithCNNHead(peft_model=peft_model, cnn_head=cnn_head)
 
-        # 6. Load the custom CNN head weights from the HF folder if they exist
+        # 6. Load custom CNN weights if present
         cnn_weights_path = Path(self.model_checkpoint_path) / "cnn_head.bin"
         if cnn_weights_path.exists():
-            logger.info("Loading saved CNN head weights from HF folder...")
+            logger.debug("Loading saved CNN head weights...")
             self.model.cnn_head.load_state_dict(
                 torch.load(cnn_weights_path, map_location=self.device)
             )
@@ -105,7 +114,7 @@ class ESM3DiPredictor:
                 "Inference will run on untrained/random CNN weights."
             )
 
-        # Move to target device and set to evaluation mode
+        # Move to device and set evaluation mode
         self.model.to(self.device).eval()
 
     @classmethod
@@ -153,7 +162,12 @@ class ESM3DiPredictor:
         predicted_strings: List[str] = []
 
         with torch.no_grad():
-            for i in range(0, len(sequences), batch_size):
+            for i in tqdm(
+                range(0, len(sequences), batch_size),
+                desc="Generating 3Di tokens",
+                unit="batch",
+                leave=False
+            ):
                 batch_seqs = sequences[i: i + batch_size]
 
                 # Tokenize raw sequence batch
@@ -162,6 +176,7 @@ class ESM3DiPredictor:
                     return_tensors="pt",
                     padding=True,
                     truncation=True,
+                    max_length=1024,
                     add_special_tokens=True,
                     return_special_tokens_mask=True
                 )
@@ -231,7 +246,7 @@ class ESM3DiPredictor:
     ) -> None:
         """Calculates prediction perplexity streams per sequence position and saves to a TSV file.
 
-        Perplexity tracks structural prediction confidence across the sequence coordinates.
+        Perplexity tracks structural prediction confidence across sequence coordinates.
 
         Args:
             input_fasta_path: Path to input amino acid FASTA file.
@@ -246,7 +261,12 @@ class ESM3DiPredictor:
             out_f.write("sequence_id\tposition\taa\tperplexity\n")
 
             with torch.no_grad():
-                for i in range(0, len(aa_records), batch_size):
+                for i in tqdm(
+                    range(0, len(aa_records), batch_size),
+                    desc="Computing position perplexity",
+                    unit="batch",
+                    leave=False
+                ):
                     headers, raw_seqs = zip(*aa_records[i: i + batch_size])
 
                     enc = self.tokenizer(
@@ -254,6 +274,7 @@ class ESM3DiPredictor:
                         return_tensors="pt",
                         padding=True,
                         truncation=True,
+                        max_length=1024,
                         add_special_tokens=True,
                         return_special_tokens_mask=True
                     )
@@ -270,7 +291,7 @@ class ESM3DiPredictor:
                     entropy = -(probs * log_probs).sum(dim=-1)
                     token_perplexity = torch.exp(entropy)
 
-                    # Align token perplexity metrics back to the real input residues
+                    # Align token perplexity metrics back to real input residues
                     for j, (header, raw_seq) in enumerate(zip(headers, raw_seqs)):
                         k = 0
                         for pos in range(token_perplexity.shape[1]):

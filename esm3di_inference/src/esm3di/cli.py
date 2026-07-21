@@ -5,7 +5,18 @@ compiling FoldSeek compatible databases, and exporting per-token model predictio
 """
 
 import argparse
+import logging
 import sys
+import os
+import contextlib
+import warnings
+
+# Suppress harmless third-party runtime warnings (e.g., NetworkX duplication)
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+
+# Suppress default Hugging Face initialization verbosity warnings
+from transformers import logging as hf_logging
+hf_logging.set_verbosity_error()
 
 from .io import (
     fasta2foldseek,
@@ -15,9 +26,28 @@ from .io import (
 )
 from .inference import ESM3DiPredictor, DEFAULT_HF_REPO, DEFAULT_BATCH_SIZE
 
+# Configure central logger for CLI execution
+logger = logging.getLogger("esm3di")
+
+
+def setup_logging():
+    """Initializes the global logging format for CLI execution."""
+    handler = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter(
+        fmt="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%H:%M:%S"
+    )
+    handler.setFormatter(formatter)
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    root_logger.addHandler(handler)
+
 
 def main():
     """Main execution engine responsible for CLI parsing and high-level routing."""
+    setup_logging()
+
     parser = argparse.ArgumentParser(
         description="ESM3Di Toolkit: Structural Sequence Predictions and FoldSeek Database Pipelines"
     )
@@ -134,40 +164,38 @@ def main():
     model_path_or_id = resolve_checkpoint_path(args.model_ckpt)
 
     if not input_path.is_file():
-        print(f"✕ Verification Failure: Source file could not be found at: '{input_path}'", file=sys.stderr)
+        logger.error(f"✕ Verification Failure: Source file could not be found at: '{input_path}'")
         sys.exit(1)
 
     try:
-        print(f"Initializing engine mapping against tracking state target: {model_path_or_id}")
-        predictor = ESM3DiPredictor.from_pretrained(model_path_or_id)
+        logger.info(f"Initializing engine mapping against tracking state target: {model_path_or_id}")
+        # Temporarily mute raw print() statements from remote model code (e.g. Synthyra's attention logs)
+        with open(os.devnull, 'w') as fnull, contextlib.redirect_stdout(fnull):
+            predictor = ESM3DiPredictor.from_pretrained(model_path_or_id)
 
         # Route Context Track 1: Standard sequence execution mapping
         if args.command == "predict":
             output_fasta_path = resolve_output_path(args.output_fasta)
-
-            # Create folder ONLY when actual execution runs
             output_fasta_path.parent.mkdir(parents=True, exist_ok=True)
 
-            print("Beginning sequence evaluation loop streaming passes...")
+            logger.info("Beginning sequence evaluation loop streaming passes...")
             predictor.predict_fasta(
                 input_fasta_path=input_path,
                 output_fasta_path=output_fasta_path,
                 batch_size=args.batch_size,
                 num_gpus=args.num_gpus
             )
-            print(f"✓ Inference sequence complete. Records saved to: {output_fasta_path}")
+            logger.info(f"✓ Inference sequence complete. Records saved to: {output_fasta_path}")
 
         # Route Context Track 2: Compound sequence alignments and FoldSeek formatting
         elif args.command == "foldseek":
             output_db_path = resolve_output_path(args.output_db)
-
-            # Create folder ONLY when actual execution runs
             output_db_path.parent.mkdir(parents=True, exist_ok=True)
 
             temp_3di_fasta = output_db_path.parent / f"{output_db_path.name}_temp_3di.fasta"
 
             try:
-                print("Step 1/2: Evaluating sequence tracking pipelines...")
+                logger.info("Step 1/2: Evaluating sequence tracking pipelines...")
                 predictor.predict_fasta(
                     input_fasta_path=input_path,
                     output_fasta_path=temp_3di_fasta,
@@ -175,13 +203,13 @@ def main():
                     num_gpus=args.num_gpus
                 )
 
-                print(f"Step 2/2: Building binary tracking alignment headers at: {output_db_path}")
+                logger.info(f"Step 2/2: Building binary tracking alignment headers at: {output_db_path}")
                 fasta2foldseek(
                     aa_input=str(input_path),
                     tdi_input=str(temp_3di_fasta),
                     output_basename=str(output_db_path)
                 )
-                print("✓ Compilation execution pipeline complete. FoldSeek objects built successfully.")
+                logger.info("✓ Compilation execution pipeline complete. FoldSeek objects built successfully.")
             finally:
                 if temp_3di_fasta.exists():
                     temp_3di_fasta.unlink()
@@ -189,20 +217,18 @@ def main():
         # Route Context Track 3: Export token confidence metrics
         elif args.command == "perplexity":
             output_tsv_path = resolve_output_path(args.output_tsv)
-
-            # Create folder ONLY when actual execution runs
             output_tsv_path.parent.mkdir(parents=True, exist_ok=True)
 
-            print("Processing per-token track algorithms...")
+            logger.info("Processing per-token track algorithms...")
             predictor.output_per_position_perplexity(
                 input_fasta_path=input_path,
                 output_tsv_path=output_tsv_path,
                 batch_size=args.batch_size
             )
-            print(f"✓ Evaluation analytics successfully mapped to path target: {output_tsv_path}")
+            logger.info(f"✓ Evaluation analytics successfully mapped to path target: {output_tsv_path}")
 
     except Exception as e:
-        print(f"✕ Engine Runtime Failure: {str(e)}", file=sys.stderr)
+        logger.error(f"✕ Engine Runtime Failure: {str(e)}")
         sys.exit(1)
 
 
