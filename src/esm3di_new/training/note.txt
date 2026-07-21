@@ -1,4 +1,0 @@
-Inlucde training in package?
-
-In case we want this repository to eventually support both inference (for users) and training (for yourself or advanced users),
-might want to add this training directory, but to separate it so the deployment pipeline stays lightweight.
