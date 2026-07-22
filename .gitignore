@@ -79,3 +79,4 @@ venv.bak/
 
 # PyTorch
 *.tar.gz
+/esm3di_inference/outputs

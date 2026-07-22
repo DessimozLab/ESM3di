@@ -1,11 +1,21 @@
+"""Inference engine and prediction interface for ESM3Di structural token generation."""
+
 import os
+import sys
 import queue
 import logging
 import tempfile
 import shutil
+import warnings
+import contextlib
 from tqdm import tqdm
 from pathlib import Path
 from typing import List, Union, Optional, Any
+
+# Mute third-party library noise early during import
+warnings.filterwarnings("ignore", category=UserWarning, module="bitsandbytes")
+warnings.filterwarnings("ignore", message=".*bitsandbytes.*")
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 import torch
 import torch.nn.functional as F
@@ -13,57 +23,38 @@ from transformers import AutoModelForTokenClassification
 from transformers import logging as hf_logging
 from peft import PeftModel, PeftConfig
 
+# Silence Hugging Face and PyTorch backend chatter
+hf_logging.set_verbosity_error()
+logging.getLogger("torch.nn.attention").setLevel(logging.ERROR)
+
 from .io import read_fasta, write_fasta
 from .model import CNNClassificationHead, ESMWithCNNHead
 
-# Internal logger for this module
-logger = logging.getLogger(__name__)
+# Module logger
+logger = logging.getLogger("esm3di")
 
-# Suppress default HF head init warnings
-hf_logging.set_verbosity_error()
-
-# Resolve physical directory where this file sits: src/esm3di/
+# Path resolution defaults
 PACKAGE_ROOT = Path(__file__).resolve().parent
-
-# Production-grade package defaults
 DEFAULT_HF_REPO = PACKAGE_ROOT.parents[1] / "checkpoints" / "hf_compatible"
 DEFAULT_BATCH_SIZE = 4
 VOCAB_3DI = list("ACDEFGHIKLMNPQRSTVWY")
 
 
 class ESM3DiPredictor:
-    """Production wrapper for ESM++ with fine-tuned LoRA adapters and a custom CNN classification head.
-
-    This class serves as the main high-level inference interface. It configures the
-    underlying token classification backbone, applies parameter-efficient adapters,
-    binds the custom convolutional classification layers, and handles batch predictions
-    both in-memory and via streaming processes.
-    """
+    """High-level predictor interface for ESM3Di sequence-to-3Di translation."""
 
     def __init__(
-            self,
-            model_checkpoint_path: Union[str, Path] = DEFAULT_HF_REPO,
-            device: Optional[str] = None
+        self,
+        model_checkpoint_path: Union[str, Path] = DEFAULT_HF_REPO,
+        device: Optional[str] = None
     ):
-        """Initializes the predictor, builds the model hierarchy, and maps saved weights.
-
-        Args:
-            model_checkpoint_path: Folder containing adapter configurations, tokenizers,
-                and custom model checkpoint weights.
-            device: Runtime target device (e.g., 'cuda', 'cpu', 'mps'). If None,
-                it is automatically selected based on hardware support.
-
-        Raises:
-            FileNotFoundError: If the provided configuration directory is invalid.
-        """
+        """Initializes the predictor, loads model components, and registers runtime device."""
         self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
         self.model_checkpoint_path = str(model_checkpoint_path)
 
         self._initialize_model_backbone()
 
-        # Build lookup translation map
         self.idx2char = {i: c for i, c in enumerate(VOCAB_3DI)}
-
         device_name = (
             torch.cuda.get_device_name(self.device)
             if self.device.type == "cuda"
@@ -72,105 +63,73 @@ class ESM3DiPredictor:
         logger.info(f"Using device: {self.device} ({device_name})")
 
     def _initialize_model_backbone(self) -> None:
-        """Internal helper logic to reconstruct and load the composite model structure."""
+        """Internal worker to construct model hierarchy and load trained weights."""
         if not Path(self.model_checkpoint_path).exists():
             raise FileNotFoundError(f"Configuration directory not found: {self.model_checkpoint_path}")
 
-        # 1. Read base model configuration
-        logger.debug(f"Loading adapter configuration from: {self.model_checkpoint_path}")
-        peft_config = PeftConfig.from_pretrained(self.model_checkpoint_path)
-        base_model_name = peft_config.base_model_name_or_path
+        # Redirect standard output to suppress implicit model instantiation prints
+        with open(os.devnull, 'w') as fnull, contextlib.redirect_stdout(fnull):
+            peft_config = PeftConfig.from_pretrained(self.model_checkpoint_path)
+            base_model_name = peft_config.base_model_name_or_path
 
-        # 2. Initialize base model
-        logger.debug(f"Loading base structural backbone: {base_model_name}")
-        base_model = AutoModelForTokenClassification.from_pretrained(
-            base_model_name,
-            num_labels=len(VOCAB_3DI),
-            trust_remote_code=True,
-        )
-        self.tokenizer = base_model.tokenizer
-
-        # 3. Apply PEFT adapters
-        logger.debug("Applying PEFT adapter weights...")
-        peft_model = PeftModel.from_pretrained(base_model, self.model_checkpoint_path)
-
-        # 4. Instantiate custom CNN classification head
-        hidden_size = base_model.config.hidden_size
-        cnn_head = CNNClassificationHead(hidden_size=hidden_size)
-
-        # 5. Wrap model components
-        self.model = ESMWithCNNHead(peft_model=peft_model, cnn_head=cnn_head)
-
-        # 6. Load custom CNN weights if present
-        cnn_weights_path = Path(self.model_checkpoint_path) / "cnn_head.bin"
-        if cnn_weights_path.exists():
-            logger.debug("Loading saved CNN head weights...")
-            self.model.cnn_head.load_state_dict(
-                torch.load(cnn_weights_path, map_location=self.device)
+            base_model = AutoModelForTokenClassification.from_pretrained(
+                base_model_name,
+                num_labels=len(VOCAB_3DI),
+                trust_remote_code=True,
             )
-        else:
-            logger.warning(
-                "Missing 'cnn_head.bin' in HF folder! "
-                "Inference will run on untrained/random CNN weights."
-            )
+            self.tokenizer = base_model.tokenizer
 
-        # Move to device and set evaluation mode
+            peft_model = PeftModel.from_pretrained(base_model, self.model_checkpoint_path)
+            hidden_size = base_model.config.hidden_size
+            cnn_head = CNNClassificationHead(hidden_size=hidden_size)
+
+            self.model = ESMWithCNNHead(peft_model=peft_model, cnn_head=cnn_head)
+
+            cnn_weights_path = Path(self.model_checkpoint_path) / "cnn_head.bin"
+            if cnn_weights_path.exists():
+                self.model.cnn_head.load_state_dict(
+                    torch.load(cnn_weights_path, map_location=self.device)
+                )
+            else:
+                logger.warning("Missing 'cnn_head.bin' in checkpoint folder. Running with uninitialized CNN weights.")
+
         self.model.to(self.device).eval()
 
     @classmethod
     def from_pretrained(
-            cls,
-            model_checkpoint_path: Union[str, Path] = DEFAULT_HF_REPO,
-            device: Optional[str] = None
+        cls,
+        model_checkpoint_path: Union[str, Path] = DEFAULT_HF_REPO,
+        device: Optional[str] = None
     ) -> "ESM3DiPredictor":
-        """Syntactic sugar wrapper matching Hugging Face hub conventions.
-
-        Args:
-            model_checkpoint_path: Folder holding configurations and checkpoint models.
-            device: Runtime target device.
-
-        Returns:
-            An instantiated ESM3DiPredictor pipeline.
-        """
+        """Factory method to construct an ESM3DiPredictor instance from local or HF weights."""
+        logger.info(f"Loading model from: {model_checkpoint_path}")
         return cls(model_checkpoint_path=model_checkpoint_path, device=device)
 
     # =========================================================================
-    # CORE INFERENCE INTERFACES
+    # CORE INFERENCE METHODS
     # =========================================================================
 
     def predict(self, sequence: str) -> str:
-        """Predicts the structural 3Di token string for an individual raw amino acid sequence.
-
-        Args:
-            sequence: Raw single-letter code amino acid string (e.g., "MKKV...").
-
-        Returns:
-            A decoded string of predicted 3Di tokens matching the input length.
-        """
-        return self.predict_batch([sequence], batch_size=1)[0]
+        """Predicts 3Di tokens for a single raw amino acid sequence string."""
+        res = self.predict_batch([sequence], batch_size=1)[0]
+        sys.stdout.flush()
+        return res
 
     def predict_batch(self, sequences: List[str], batch_size: int = DEFAULT_BATCH_SIZE) -> List[str]:
-        """Predicts structural 3Di token characters across an in-memory batch list of sequences.
-
-        Args:
-            sequences: List of raw amino acid strings.
-            batch_size: Number of sequences to forward-pass simultaneously.
-
-        Returns:
-            A list of predicted 3Di sequences in identical order.
-        """
+        """Predicts 3Di structural tokens for a list of in-memory protein sequences."""
         predicted_strings: List[str] = []
+        disable_pbar = len(sequences) <= 1
 
         with torch.no_grad():
             for i in tqdm(
                 range(0, len(sequences), batch_size),
+                disable=disable_pbar,
                 desc="Generating 3Di tokens",
                 unit="batch",
                 leave=False
             ):
                 batch_seqs = sequences[i: i + batch_size]
 
-                # Tokenize raw sequence batch
                 enc = self.tokenizer(
                     list(batch_seqs),
                     return_tensors="pt",
@@ -188,7 +147,6 @@ class ESM3DiPredictor:
                 outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
                 pred_labels = torch.argmax(outputs.logits, dim=-1)
 
-                # Map token indexes back to vocabulary characters, ignoring special tokens
                 for j, raw_seq in enumerate(batch_seqs):
                     pred_3di = []
                     k = 0
@@ -201,69 +159,66 @@ class ESM3DiPredictor:
         return predicted_strings
 
     def predict_fasta(
-            self,
-            input_fasta_path: Union[str, Path],
-            output_fasta_path: Union[str, Path],
-            batch_size: int = DEFAULT_BATCH_SIZE,
-            num_gpus: Optional[int] = None
+        self,
+        input_fasta_path: Union[str, Path],
+        output_fasta_path: Union[str, Path],
+        batch_size: int = DEFAULT_BATCH_SIZE,
+        num_gpus: Optional[int] = None
     ) -> None:
-        """Streaming pipeline endpoint for processing input FASTA structures.
-
-        Args:
-            input_fasta_path: Path to input amino acid FASTA file.
-            output_fasta_path: Destination path where predicted 3Di FASTA will be saved.
-            batch_size: Execution batch sizing.
-            num_gpus: Count of local GPUs to deploy. Auto-detected if None.
-        """
+        """Processes an input amino acid FASTA file and writes predicted 3Di outputs to FASTA."""
         input_fasta_path = Path(input_fasta_path)
         output_fasta_path = Path(output_fasta_path)
 
         resolved_gpus = torch.cuda.device_count() if num_gpus is None else num_gpus
 
-        # Delegate execution if multi-GPU distributed options are present
         if resolved_gpus > 1:
             success = _run_multi_gpu_inference(
                 str(input_fasta_path), str(output_fasta_path),
                 self.model_checkpoint_path, resolved_gpus, batch_size=batch_size
             )
             if success:
+                logger.info(f"Saved predicted 3Di sequences to: {output_fasta_path}")
                 return
 
+        logger.info(f"Reading sequence inputs from: {input_fasta_path}")
         aa_records = read_fasta(str(input_fasta_path))
+
+        output_fasta_path.parent.mkdir(parents=True, exist_ok=True)
         if not aa_records:
             write_fasta([], str(output_fasta_path))
+            logger.info(f"Saved predicted 3Di sequences to: {output_fasta_path}")
             return
 
         headers, raw_seqs = zip(*aa_records)
         predicted_3dis = self.predict_batch(list(raw_seqs), batch_size=batch_size)
+
         write_fasta(list(zip(headers, predicted_3dis)), str(output_fasta_path))
+        logger.info(f"Saved predicted 3Di sequences to: {output_fasta_path}")
 
     def output_per_position_perplexity(
-            self,
-            input_fasta_path: Union[str, Path],
-            output_tsv_path: Union[str, Path],
-            batch_size: int = DEFAULT_BATCH_SIZE
+        self,
+        input_fasta_path: Union[str, Path],
+        output_tsv_path: Union[str, Path],
+        batch_size: int = DEFAULT_BATCH_SIZE
     ) -> None:
-        """Calculates prediction perplexity streams per sequence position and saves to a TSV file.
-
-        Perplexity tracks structural prediction confidence across sequence coordinates.
-
-        Args:
-            input_fasta_path: Path to input amino acid FASTA file.
-            output_tsv_path: Path to the tab-separated outputs file.
-            batch_size: Execution batch sizing.
-        """
+        """Calculates residue-level prediction perplexities and exports them to a TSV file."""
         input_fasta_path = Path(input_fasta_path)
         output_tsv_path = Path(output_tsv_path)
+
+        logger.info(f"Reading sequence inputs from: {input_fasta_path}")
         aa_records = read_fasta(str(input_fasta_path))
+
+        output_tsv_path.parent.mkdir(parents=True, exist_ok=True)
 
         with open(output_tsv_path, 'w') as out_f:
             out_f.write("sequence_id\tposition\taa\tperplexity\n")
 
+            disable_pbar = len(aa_records) <= 1
             with torch.no_grad():
                 for i in tqdm(
                     range(0, len(aa_records), batch_size),
-                    desc="Computing position perplexity",
+                    disable=disable_pbar,
+                    desc="Computing perplexity",
                     unit="batch",
                     leave=False
                 ):
@@ -287,11 +242,9 @@ class ESM3DiPredictor:
                     probs = torch.softmax(logits, dim=-1)
                     log_probs = F.log_softmax(logits, dim=-1)
 
-                    # Compute Shannon entropy metrics tracking structural perplexity indices
                     entropy = -(probs * log_probs).sum(dim=-1)
                     token_perplexity = torch.exp(entropy)
 
-                    # Align token perplexity metrics back to real input residues
                     for j, (header, raw_seq) in enumerate(zip(headers, raw_seqs)):
                         k = 0
                         for pos in range(token_perplexity.shape[1]):
@@ -300,9 +253,11 @@ class ESM3DiPredictor:
                                 out_f.write(f"{header}\t{k + 1}\t{raw_seq[k]}\t{val:.6f}\n")
                                 k += 1
 
+        logger.info(f"Saved perplexity metrics to: {output_tsv_path}")
+
 
 # =========================================================================
-# ASYNC WORKERS FOR COMBINED HORIZONTAL SCALE ARRAYS
+# MULTI-GPU DISTRIBUTED INFERENCE WORKERS
 # =========================================================================
 
 def _gpu_worker(gpu_id: int, shard_fasta: str, output_fasta: str, checkpoint_path: str, batch_size: int,
@@ -355,7 +310,7 @@ def _run_multi_gpu_inference(input_fasta: str, output_3di_fasta: str, checkpoint
             except queue.Empty:
                 pass
             if error_event.is_set():
-                raise RuntimeError("Distributed worker context crashed tracking inference metrics.")
+                raise RuntimeError("Worker process failed during parallel inference execution.")
 
         for p in processes:
             p.join()
