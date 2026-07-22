@@ -8,26 +8,6 @@
 
 ---
 
-## 📋 Table of Contents
-
-- [Features](#-features)
-- [Installation](#-installation)
-  - [Prerequisites](#prerequisites)
-  - [Conda Environment Setup](#conda-environment-setup)
-- [Quick Start](#-quick-start)
-- [Command Line Interface (CLI)](#-command-line-interface-cli)
-  - [1. `predict` — Generate 3Di FASTA](#1-predict--generate-3di-fasta)
-  - [2. `foldseek` — Build Foldseek Database](#2-foldseek--build-foldseek-database)
-  - [3. `perplexity` — Per-Residue Confidence Metrics](#3-perplexity--per-residue-confidence-metrics)
-- [Python API Usage](#-python-api-usage)
-  - [Inference & FASTA Exports](#inference--fasta-exports)
-  - [Per-Residue Perplexity Assessment](#per-residue-perplexity-assessment)
-- [Repository Structure](#-repository-structure)
-- [Citation & Credits](#-citation--credits)
-- [License](#-license)
-
----
-
 ## ✨ Features
 
 - **Direct Sequence-to-3Di Prediction:** Translates protein amino acid FASTA inputs to Foldseek 3Di strings in seconds.
