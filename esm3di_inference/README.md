@@ -25,25 +25,22 @@
 - **Python:** `≥ 3.9`
 - **PyTorch:** `≥ 2.0`
 
-### Conda Environment Setup
 
-We recommend creating a fresh Conda environment:
+### 📥 Installation
 
 ```bash
-# Clone repository
+# Clone the repository
 git clone [https://github.com/DessimozLab/ESM3di.git](https://github.com/DessimozLab/ESM3di.git)
 cd ESM3di
 
-# Create and activate conda environment
+# Create and activate environment
 conda create -n esm3di python=3.10 -y
 conda activate esm3di
 
-# Install PyTorch (adjust CUDA version to match your system GPU drivers)
-pip install torch torchvision torchaudio --index-url [https://download.pytorch.org/whl/cu121](https://download.pytorch.org/whl/cu121)
-
-# Install ESM3Di package in editable mode
+# Install ESM3Di
 pip install -e .
 ```
+> **Note on GPU Acceleration:** Standard `pip install -e .` will pull the default PyTorch wheel. If your GPU cluster requires a specific CUDA toolkit version (e.g., CUDA 12.1), pre-install PyTorch via the [official PyTorch guide](https://pytorch.org/get-started/locally/) prior to running `pip install -e .`.
 
 ---
 
