@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyTorch](https://img.shields.io/badge/PyTorch-%22.0%2B-ee4c2c.svg)](https://pytorch.org/)
 
-**ESM3Di** predicts 3D interaction (3Di) structural alphabets directly from primary amino acid sequences using fine-tuned ESM models. By bypassing explicit 3D atomic coordinate prediction, `esm3di` enables ultra-fast structural alignment and database construction for [Foldseek](https://github.com/steineggerlab/foldseek) at scale.
+**ESM3Di** predicts 3D interaction (3Di) structural alphabets directly from primary amino acid sequences using fine-tuned ESM models. By bypassing explicit 3D atomic coordinate prediction, `esm3di` enables ultra-fast structural alignment and database construction for [Foldseek](https://github.com/steineggerlab/foldseek) at scale. ++NEED TO SPECIFY THAT IT IS FINE TUNED FOR VIRAL STRUCTURES++
 
 ---
 
