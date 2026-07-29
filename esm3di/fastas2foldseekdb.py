@@ -435,9 +435,13 @@ def _gpu_worker(gpu_id, shard_fasta, output_fasta, checkpoint_path, args_dict, p
         target_modules = checkpoint.get('lora_target_modules', None)
         
         is_t5 = is_t5_model(hf_model_name)
+        model_revision = args_dict.get('model_revision', args_dict.get('base_revision', None))
+
+        
         if is_t5:
             model = T5ProteinModel(
                 hf_model_name=hf_model_name,
+                revision=model_revision,
                 num_labels=num_labels,
                 lora_r=lora_r,
                 lora_alpha=lora_alpha,
@@ -469,6 +473,7 @@ def _gpu_worker(gpu_id, shard_fasta, output_fasta, checkpoint_path, args_dict, p
         else:
             model = ESM3DiModel(
                 hf_model_name=hf_model_name,
+                revision=model_revision,
                 num_labels=num_labels,
                 lora_r=lora_r,
                 lora_alpha=lora_alpha,
@@ -696,7 +701,15 @@ Examples:
         default=None,
         help="Number of GPUs for inference (default: auto-detect all available)"
     )
-    
+
+    parser.add_argument(
+        "--revision",
+        "--model-revision",
+        dest="revision",
+        type=str,
+        default=None,
+        help="Hugging Face model revision (branch/tag/commit SHA) for base model loading. Overrides checkpoint-stored revision when provided."
+    )
     # Output
     parser.add_argument(
         "--output-db",
@@ -818,6 +831,14 @@ Examples:
                 'hf_model_name',
                 args_dict.get('hf_model', 'facebook/esm2_t33_650M_UR50D')
             )
+            checkpoint_revision = args_dict.get('base_revision', None)
+            resolved_model_revision = args.revision or checkpoint_revision
+
+            if resolved_model_revision:
+                print(f"Using model revision: {resolved_model_revision}")
+            elif args.revision:
+                # Defensive branch for odd falsy values; parser default is None.
+                print("WARNING: Empty --revision value provided; falling back to default revision")
 
 
             num_labels = len(checkpoint.get('label_vocab', []))
@@ -844,6 +865,8 @@ Examples:
             coordinator_args_dict = {
                 'hf_model': hf_model_name,
                 'hf_model_name': hf_model_name,
+                'base_revision': checkpoint_revision,
+                'model_revision': resolved_model_revision,
                 'lora_r': lora_r,
                 'lora_alpha': lora_alpha,
                 'lora_dropout': lora_dropout,
@@ -899,6 +922,7 @@ Examples:
                     print(f"Initializing T5ProteinModel with {hf_model_name}...")
                     model = T5ProteinModel(
                         hf_model_name=hf_model_name,
+                        revision=resolved_model_revision,
                         num_labels=num_labels,
                         lora_r=lora_r,
                         lora_alpha=lora_alpha,
@@ -931,6 +955,7 @@ Examples:
                     print(f"Initializing ESM3DiModel with {hf_model_name}...")
                     model = ESM3DiModel(
                         hf_model_name=hf_model_name,
+                        revision=resolved_model_revision,
                         num_labels=num_labels,
                         lora_r=lora_r,
                         lora_alpha=lora_alpha,

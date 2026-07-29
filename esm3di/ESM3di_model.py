@@ -752,6 +752,7 @@ def load_esm3di_from_mlm_checkpoint(
     mlm_checkpoint_path: str,
     hf_model_name: str,
     num_labels: int,
+    base_revision: Optional[str] = None,
     lora_r: int = 8,
     lora_alpha: float = 16.0,
     lora_dropout: float = 0.05,
@@ -782,6 +783,7 @@ def load_esm3di_from_mlm_checkpoint(
     # Create ESM3DiModel wrapper with LoRA/heads as desired.
     esm3di = ESM3DiModel(
         hf_model_name=hf_model_name,
+        model_revision=base_revision,
         num_labels=num_labels,
         lora_r=lora_r,
         lora_alpha=lora_alpha,
@@ -816,6 +818,7 @@ def load_esm3di_from_mlm_checkpoint(
     source_backbone_model = AutoModelForMaskedLM.from_pretrained(
         hf_model_name,
         trust_remote_code=True,
+        revision=base_revision
     )
 
     state_dict = None
@@ -903,7 +906,8 @@ class ESM3DiModel:
     Wrapper class for ESM model with LoRA adaptation for 3Di prediction.
     Supports ESM-2, ESM++, and other HuggingFace models.
     """
-    def __init__(self, hf_model_name: str, num_labels: int, lora_r: int = 8,
+    def __init__(self,
+                    hf_model_name: str, num_labels: int, lora_r: int = 8,
                     lora_alpha: float = 16.0, lora_dropout: float = 0.05,
                     target_modules: List[str] = None,
                     use_cnn_head: bool = False, cnn_num_layers: int = 2,
@@ -924,7 +928,9 @@ class ESM3DiModel:
                     use_plddt_prediction_head: bool = False,
                     plddt_num_bins: int = 10,
                     plddt_prediction_mode: str = "classification",
-                    aux_track_num_bins: Optional[dict] = None):
+                    aux_track_num_bins: Optional[dict] = None,
+                    revision: Optional[str] = None, 
+):
         """
         Initialize ESM model with LoRA configuration.
 
@@ -963,6 +969,7 @@ class ESM3DiModel:
         if plddt_prediction_mode not in {"classification", "regression"}:
             raise ValueError("plddt_prediction_mode must be 'classification' or 'regression'")
 
+        self.revision = revision
         self.hf_model_name = hf_model_name
         self.num_labels = num_labels
         self.lora_r = lora_r
@@ -1099,7 +1106,7 @@ class ESM3DiModel:
                     self.hf_model_name,
                     num_labels=self.num_labels,
                     trust_remote_code=True,  # Required for ESM++ custom code
-
+                    revision=self.revision
                 )
                 print("✓ Base model loaded (TokenClassification)")
                 
@@ -1110,8 +1117,13 @@ class ESM3DiModel:
                 self.base_model = AutoModel.from_pretrained(
                     self.hf_model_name,
                     trust_remote_code=True,  # Required for ESM++ custom code
+                    revision=self.revision
                 )
-                self.tokenizer = self.base_model.tokenizer
+                self.tokenizer = AutoTokenizer.from_pretrained(
+                    self.hf_model_name,
+                    trust_remote_code=True,
+                    revision=self.revision
+                )
                 print("✓ Base model loaded (AutoModel)")
         
 
@@ -1656,6 +1668,259 @@ class ESM3DiModel:
             f"written to {output_tsv_path}"
         )
         return perplexity_records
+
+    def mutation_screen_perplexity_from_fasta(
+        self,
+        input_fasta_path: str,
+        output_tsv_path: str,
+        model_checkpoint_path: Optional[str] = None,
+        batch_size: int = 4,
+        device: Optional[str] = None,
+    ):
+        """
+        Perform a saturation mutagenesis screen over each input sequence.
+
+        For every residue position, the method mutates that position to every
+        canonical amino acid other than the original residue, computes the
+        per-position perplexity vector for each mutant, and then summarizes the
+        perplexity values across all positions except the mutated one using
+        scipy.stats.describe.
+
+        Args:
+            input_fasta_path: Path to input amino acid FASTA file.
+            output_tsv_path: Output TSV path with one row per mutant.
+            model_checkpoint_path: Optional checkpoint path to load before
+                                   inference.
+            batch_size: Batch size for inference.
+            device: Device to run on ('cuda' or 'cpu'). Auto-detect if None.
+
+        Returns:
+            List of records with mutation-screen summary statistics.
+        """
+        canonical_aas = "ACDEFGHIKLMNPQRSTVWY"
+
+        try:
+            import importlib
+
+            describe_fn = importlib.import_module("scipy.stats").describe
+        except Exception:
+            describe_fn = None
+
+        def _safe_describe(values: List[float]):
+            if not values:
+                return {
+                    "nobs": 0,
+                    "minmax": (float("nan"), float("nan")),
+                    "mean": float("nan"),
+                    "variance": float("nan"),
+                    "skewness": float("nan"),
+                    "kurtosis": float("nan"),
+                }
+
+            if describe_fn is None:
+                raise RuntimeError(
+                    "scipy.stats.describe is not available in the current Python environment"
+                )
+
+            summary = describe_fn(values)
+            return {
+                "nobs": summary.nobs,
+                "minmax": summary.minmax,
+                "mean": float(summary.mean),
+                "variance": float(summary.variance) if summary.variance is not None else float("nan"),
+                "skewness": float(summary.skewness) if summary.skewness is not None else float("nan"),
+                "kurtosis": float(summary.kurtosis) if summary.kurtosis is not None else float("nan"),
+            }
+
+        # Auto-detect device
+        if device is None:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        print(f"Using device: {device}")
+
+        # Load checkpoint if provided
+        if model_checkpoint_path:
+            print(f"Loading model from: {model_checkpoint_path}")
+            checkpoint = torch.load(model_checkpoint_path, map_location=device)
+            print("✓ Checkpoint loaded")
+
+            if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+                model_state_dict = checkpoint['model_state_dict']
+                if any(k.startswith("module.") for k in model_state_dict.keys()):
+                    model_state_dict = {
+                        k.replace("module.", "", 1): v
+                        for k, v in model_state_dict.items()
+                    }
+
+                result = self.model.load_state_dict(model_state_dict, strict=False)
+                epoch = checkpoint.get('epoch', 'unknown')
+                print(f"✓ Loaded model from epoch {epoch}")
+                if result.missing_keys:
+                    print(
+                        f"  (Note: {len(result.missing_keys)} frozen weights "
+                        f"not in checkpoint - this is expected)"
+                    )
+            else:
+                if any(k.startswith("module.") for k in checkpoint.keys()):
+                    checkpoint = {
+                        k.replace("module.", "", 1): v
+                        for k, v in checkpoint.items()
+                    }
+                result = self.model.load_state_dict(checkpoint, strict=False)
+                print("✓ Loaded model checkpoint")
+                if result.missing_keys:
+                    print(
+                        f"  (Note: {len(result.missing_keys)} frozen weights "
+                        f"not in checkpoint - this is expected)"
+                    )
+        else:
+            print("No checkpoint provided, using current model state")
+
+        self.model = self.model.to(device)
+        self.model.eval()
+
+        # Initialize tokenizer
+        tokenizer: Any = None
+        try:
+            if hasattr(self.model, 'base_model') and hasattr(self.model.base_model, 'tokenizer'):
+                tokenizer = self.model.base_model.tokenizer
+        except AttributeError:
+            pass
+
+        if tokenizer is None:
+            if self.is_t5:
+                tokenizer = T5Tokenizer.from_pretrained(
+                    self.hf_model_name,
+                    legacy=True,
+                    trust_remote_code=True,
+                )
+            else:
+                tokenizer = AutoTokenizer.from_pretrained(
+                    self.hf_model_name,
+                    do_lower_case=False,
+                    trust_remote_code=True,
+                )
+
+        # Read input FASTA
+        print(f"Reading input FASTA: {input_fasta_path}")
+        aa_records = read_fasta(input_fasta_path)
+        print(f"Found {len(aa_records)} sequences")
+
+        mutant_records = []
+        for header, raw_seq in aa_records:
+            for pos, original_aa in enumerate(raw_seq):
+                for mutant_aa in canonical_aas:
+                    if mutant_aa == original_aa:
+                        continue
+                    mutated_seq = raw_seq[:pos] + mutant_aa + raw_seq[pos + 1:]
+                    mutant_records.append(
+                        {
+                            "header": header,
+                            "aa_seq": raw_seq,
+                            "mutation_position": pos + 1,
+                            "original_aa": original_aa,
+                            "mutant_aa": mutant_aa,
+                            "mutated_seq": mutated_seq,
+                        }
+                    )
+
+        print(f"Generated {len(mutant_records)} single-site mutants")
+
+        mutation_screen_records = []
+
+        print(f"Writing mutation screen TSV to: {output_tsv_path}")
+        with open(output_tsv_path, 'w') as out_f:
+            out_f.write(
+                "sequence_id\tposition\toriginal_aa\tmutant_aa\t"
+                "n_other_positions\tmin_perplexity\tmax_perplexity\t"
+                "mean_perplexity\tvariance_perplexity\tskewness_perplexity\t"
+                "kurtosis_perplexity\n"
+            )
+
+            with torch.no_grad():
+                for i in range(0, len(mutant_records), batch_size):
+                    batch_records = mutant_records[i:i + batch_size]
+                    raw_seqs = [record["mutated_seq"] for record in batch_records]
+
+                    # T5 models require space-separated amino acids
+                    if self.is_t5:
+                        seqs = [' '.join(list(seq)) for seq in raw_seqs]
+                    else:
+                        seqs = list(raw_seqs)
+
+                    enc = tokenizer(
+                        list(seqs),
+                        return_tensors="pt",
+                        padding=True,
+                        truncation=True,
+                        add_special_tokens=True,
+                        return_special_tokens_mask=True,
+                    )
+
+                    input_ids = enc["input_ids"].to(device)
+                    attention_mask = enc["attention_mask"].to(device)
+                    special_mask = enc["special_tokens_mask"]
+
+                    outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
+                    logits = outputs.logits
+
+                    # Entropy-based perplexity at each token: exp(-sum p * log(p))
+                    log_probs = F.log_softmax(logits, dim=-1)
+                    probs = torch.exp(log_probs)
+                    token_entropy = -(probs * log_probs).sum(dim=-1)
+                    token_perplexity = torch.exp(token_entropy)
+
+                    for j, record in enumerate(batch_records):
+                        raw_seq = record["mutated_seq"]
+                        per_pos_ppl = []
+                        k = 0  # Index into original sequence
+
+                        for pos in range(token_perplexity.shape[1]):
+                            if special_mask[j, pos] == 0:
+                                if k < len(raw_seq):
+                                    ppl = float(token_perplexity[j, pos].item())
+                                    per_pos_ppl.append(ppl)
+                                    k += 1
+
+                        mutation_index = record["mutation_position"] - 1
+                        other_position_ppl = [
+                            value for idx, value in enumerate(per_pos_ppl)
+                            if idx != mutation_index
+                        ]
+                        stats = _safe_describe(other_position_ppl)
+
+                        out_f.write(
+                            f"{record['header']}\t{record['mutation_position']}\t"
+                            f"{record['original_aa']}\t{record['mutant_aa']}\t"
+                            f"{stats['nobs']}\t{stats['minmax'][0]:.6f}\t"
+                            f"{stats['minmax'][1]:.6f}\t{stats['mean']:.6f}\t"
+                            f"{stats['variance']:.6f}\t{stats['skewness']:.6f}\t"
+                            f"{stats['kurtosis']:.6f}\n"
+                        )
+
+                        mutation_screen_records.append(
+                            {
+                                "header": record["header"],
+                                "aa_seq": record["aa_seq"],
+                                "mutation_position": record["mutation_position"],
+                                "original_aa": record["original_aa"],
+                                "mutant_aa": record["mutant_aa"],
+                                "mutated_seq": record["mutated_seq"],
+                                "perplexity_per_position": per_pos_ppl,
+                                "perplexity_other_positions": other_position_ppl,
+                                "perplexity_stats": stats,
+                            }
+                        )
+
+                    if (i + batch_size) % (batch_size * 10) == 0 or (i + batch_size) >= len(mutant_records):
+                        processed = min(i + batch_size, len(mutant_records))
+                        print(f"Processed {processed}/{len(mutant_records)} mutants")
+
+        print(
+            f"✓ Mutation screen complete! {len(mutation_screen_records)} mutants "
+            f"written to {output_tsv_path}"
+        )
+        return mutation_screen_records
 
 # -----------------------------
 # Dataset

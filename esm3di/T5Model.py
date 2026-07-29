@@ -405,6 +405,7 @@ class T5ProteinModel:
         self,
         hf_model_name: str,
         num_labels: int,
+        revision: Optional[str] = None,
         lora_r: int = 8,
         lora_alpha: float = 16.0,
         lora_dropout: float = 0.1,
@@ -438,6 +439,7 @@ class T5ProteinModel:
         
         Args:
             hf_model_name: HuggingFace model identifier
+            revision: Hugging Face model revision (branch/tag/commit SHA)
             num_labels: Number of output labels (3Di vocabulary size)
             lora_r: LoRA rank
             lora_alpha: LoRA alpha scaling factor
@@ -475,6 +477,7 @@ class T5ProteinModel:
             raise ValueError("plddt_prediction_mode must be 'classification' or 'regression'")
 
         self.hf_model_name = hf_model_name
+        self.revision = revision
         self.num_labels = num_labels
         self.lora_r = lora_r
         self.lora_alpha = lora_alpha
@@ -560,6 +563,7 @@ class T5ProteinModel:
         # Load config first to check settings
         config = AutoConfig.from_pretrained(
             self.hf_model_name,
+            revision=self.revision,
             trust_remote_code=True
         )
         
@@ -567,6 +571,7 @@ class T5ProteinModel:
         self.base_model = T5EncoderModel.from_pretrained(
             self.hf_model_name,
             config=config,
+            revision=self.revision,
             torch_dtype=dtype,
             trust_remote_code=True
         )
@@ -601,6 +606,7 @@ class T5ProteinModel:
             # Try AutoTokenizer first (works for most models)
             self.tokenizer = AutoTokenizer.from_pretrained(
                 self.hf_model_name,
+                revision=self.revision,
                 trust_remote_code=True
             )
             print("  Tokenizer: AutoTokenizer")
@@ -610,6 +616,7 @@ class T5ProteinModel:
                 self.tokenizer = T5Tokenizer.from_pretrained(
                     self.hf_model_name,
                     legacy=True,
+                    revision=self.revision,
                     trust_remote_code=True
                 )
                 print("  Tokenizer: T5Tokenizer (legacy)")
