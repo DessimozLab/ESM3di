@@ -1,12 +1,3 @@
-Here is your updated `README.md`.
-
-The core changes made:
-
-1. Updated the description to explicitly highlight fine-tuning on **viral structures**.
-2. Standardized all subcommand references to `build-foldseek-db` (with `foldseek-db` and `foldseek` noted as supported aliases).
-3. Added the `--revision` flag to CLI options tables with its default (`46c5f7d`).
-4. Updated the Python API snippet to demonstrate passing `revision` to `from_pretrained(...)`.
-
 # ESM3Di
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
