@@ -19,7 +19,7 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 import torch
 import torch.nn.functional as F
-from transformers import AutoModelForTokenClassification
+from transformers import AutoModel, AutoTokenizer
 from transformers import logging as hf_logging
 from peft import PeftModel, PeftConfig
 
@@ -46,11 +46,13 @@ class ESM3DiPredictor:
     def __init__(
         self,
         model_checkpoint_path: Union[str, Path] = DEFAULT_HF_REPO,
+        revision: Optional[str] = None,
         device: Optional[str] = None
     ):
         """Initializes the predictor, loads model components, and registers runtime device."""
         self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
         self.model_checkpoint_path = str(model_checkpoint_path)
+        self.revision = revision
 
         self._initialize_model_backbone()
 
@@ -72,12 +74,21 @@ class ESM3DiPredictor:
             peft_config = PeftConfig.from_pretrained(self.model_checkpoint_path)
             base_model_name = peft_config.base_model_name_or_path
 
-            base_model = AutoModelForTokenClassification.from_pretrained(
+            base_model = AutoModel.from_pretrained(
                 base_model_name,
                 num_labels=len(VOCAB_3DI),
                 trust_remote_code=True,
+                revision=self.revision
             )
-            self.tokenizer = base_model.tokenizer
+
+            if hasattr(base_model, "tokenizer"):
+                self.tokenizer = base_model.tokenizer
+            else:
+                self.tokenizer = AutoTokenizer.from_pretrained(
+                    base_model_name,
+                    trust_remote_code=True,
+                    revision=self.revision,
+                )
 
             peft_model = PeftModel.from_pretrained(base_model, self.model_checkpoint_path)
             hidden_size = base_model.config.hidden_size
@@ -99,11 +110,12 @@ class ESM3DiPredictor:
     def from_pretrained(
         cls,
         model_checkpoint_path: Union[str, Path] = DEFAULT_HF_REPO,
+        revision: Optional[str] = None,
         device: Optional[str] = None
     ) -> "ESM3DiPredictor":
         """Factory method to construct an ESM3DiPredictor instance from local or HF weights."""
         logger.info(f"Loading model from: {model_checkpoint_path}")
-        return cls(model_checkpoint_path=model_checkpoint_path, device=device)
+        return cls(model_checkpoint_path=model_checkpoint_path, revision=revision, device=device)
 
     # =========================================================================
     # CORE INFERENCE METHODS

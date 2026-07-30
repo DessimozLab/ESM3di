@@ -20,6 +20,8 @@ from .inference import ESM3DiPredictor, DEFAULT_HF_REPO, DEFAULT_BATCH_SIZE
 
 logger = logging.getLogger("esm3di")
 
+DEFAULT_REVISION = "46c5f7d"
+
 
 def setup_logging():
     """Sets up standard logger format for terminal output."""
@@ -33,6 +35,26 @@ def setup_logging():
     root_logger = logging.getLogger("esm3di")
     root_logger.setLevel(logging.INFO)
     root_logger.addHandler(handler)
+
+
+def add_common_args(subparser: argparse.ArgumentParser):
+    """Adds arguments shared across subcommands."""
+    subparser.add_argument(
+        "--model-ckpt",
+        default=str(DEFAULT_HF_REPO),
+        help=f"Path to local checkpoint or Hugging Face repo ID (default: {DEFAULT_HF_REPO})"
+    )
+    subparser.add_argument(
+        "--revision",
+        default=DEFAULT_REVISION,
+        help=f"Base model Hugging Face revision/commit SHA (default: {DEFAULT_REVISION})"
+    )
+    subparser.add_argument(
+        "--batch-size",
+        type=int,
+        default=DEFAULT_BATCH_SIZE,
+        help=f"Inference batch size per device (default: {DEFAULT_BATCH_SIZE})"
+    )
 
 
 def main():
@@ -65,26 +87,16 @@ def main():
         help="Path to save output 3Di FASTA file (default: outputs/output_3di.fasta)"
     )
     predict_parser.add_argument(
-        "--model-ckpt",
-        default=str(DEFAULT_HF_REPO),
-        help=f"Path to local checkpoint or Hugging Face repo ID (default: {DEFAULT_HF_REPO})"
-    )
-    predict_parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=DEFAULT_BATCH_SIZE,
-        help=f"Inference batch size per device (default: {DEFAULT_BATCH_SIZE})"
-    )
-    predict_parser.add_argument(
         "--num-gpus",
         type=int,
         default=None,
         help="Number of GPUs to use (default: use all available)"
     )
+    add_common_args(predict_parser)
 
-    # Subcommand: foldseek
+    # Subcommand: build-foldseek-db
     foldseek_parser = subparsers.add_parser(
-        "foldseek",
+        "foldseek-db",
         help="Predict 3Di sequences and compile directly into a Foldseek-compatible database."
     )
     foldseek_parser.add_argument(
@@ -98,22 +110,12 @@ def main():
         help="Prefix path for output Foldseek database files (default: outputs/foldseek_db)"
     )
     foldseek_parser.add_argument(
-        "--model-ckpt",
-        default=str(DEFAULT_HF_REPO),
-        help=f"Path to local checkpoint or Hugging Face repo ID (default: {DEFAULT_HF_REPO})"
-    )
-    foldseek_parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=DEFAULT_BATCH_SIZE,
-        help=f"Inference batch size per device (default: {DEFAULT_BATCH_SIZE})"
-    )
-    foldseek_parser.add_argument(
         "--num-gpus",
         type=int,
         default=None,
         help="Number of GPUs to use (default: use all available)"
     )
+    add_common_args(foldseek_parser)
 
     # Subcommand: perplexity
     perplexity_parser = subparsers.add_parser(
@@ -130,17 +132,7 @@ def main():
         default="outputs/output_confidence.tsv",
         help="Path to save output TSV file (default: outputs/output_confidence.tsv)"
     )
-    perplexity_parser.add_argument(
-        "--model-ckpt",
-        default=str(DEFAULT_HF_REPO),
-        help=f"Path to local checkpoint or Hugging Face repo ID (default: {DEFAULT_HF_REPO})"
-    )
-    perplexity_parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=DEFAULT_BATCH_SIZE,
-        help=f"Inference batch size (default: {DEFAULT_BATCH_SIZE})"
-    )
+    add_common_args(perplexity_parser)
 
     args = parser.parse_args()
 
@@ -152,7 +144,11 @@ def main():
         sys.exit(1)
 
     try:
-        predictor = ESM3DiPredictor.from_pretrained(model_path_or_id)
+        # Pass the revision down to ESM3DiPredictor
+        predictor = ESM3DiPredictor.from_pretrained(
+            model_path_or_id,
+            revision=args.revision
+        )
 
         if args.command == "predict":
             output_fasta_path = resolve_output_path(args.output_fasta)
@@ -163,7 +159,7 @@ def main():
                 num_gpus=args.num_gpus
             )
 
-        elif args.command == "foldseek":
+        elif args.command == "foldseek-db":
             output_db_path = resolve_output_path(args.output_db)
             output_db_path.parent.mkdir(parents=True, exist_ok=True)
 
