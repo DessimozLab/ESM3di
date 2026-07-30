@@ -1,10 +1,19 @@
+Here is your updated `README.md`.
+
+The core changes made:
+
+1. Updated the description to explicitly highlight fine-tuning on **viral structures**.
+2. Standardized all subcommand references to `build-foldseek-db` (with `foldseek-db` and `foldseek` noted as supported aliases).
+3. Added the `--revision` flag to CLI options tables with its default (`46c5f7d`).
+4. Updated the Python API snippet to demonstrate passing `revision` to `from_pretrained(...)`.
+
 # ESM3Di
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyTorch](https://img.shields.io/badge/PyTorch-%22.0%2B-ee4c2c.svg)](https://pytorch.org/)
 
-**ESM3Di** predicts 3D interaction (3Di) structural alphabets directly from primary amino acid sequences using fine-tuned ESM models. By bypassing explicit 3D atomic coordinate prediction, `esm3di` enables ultra-fast structural alignment and database construction for [Foldseek](https://github.com/steineggerlab/foldseek) at scale. ++NEED TO SPECIFY THAT IT IS FINE TUNED FOR VIRAL STRUCTURES++
+**ESM3Di** predicts 3D interaction (3Di) structural alphabets directly from primary amino acid sequences using fine-tuned ESM models (specifically optimized for viral protein structures). By bypassing explicit 3D atomic coordinate prediction, `esm3di` enables ultra-fast structural alignment and database construction for [Foldseek](https://github.com/steineggerlab/foldseek) at scale.
 
 ---
 
@@ -25,7 +34,6 @@
 - **Python:** `≥ 3.9`
 - **PyTorch:** `≥ 2.0`
 
-
 ### 📥 Installation
 
 ```bash
@@ -39,7 +47,9 @@ conda activate esm3di
 
 # Install ESM3Di
 pip install -e .
+
 ```
+
 > **Note on GPU Acceleration:** Standard `pip install -e .` will pull the default PyTorch wheel. If your GPU cluster requires a specific CUDA toolkit version (e.g., CUDA 12.1), pre-install PyTorch via the [official PyTorch guide](https://pytorch.org/get-started/locally/) prior to running `pip install -e .`.
 
 ---
@@ -53,7 +63,7 @@ Run 3Di predictions on an example FASTA file:
 esm3di predict --input-fasta example_input.fasta --output-fasta outputs/output_3di.fasta
 
 # Build a Foldseek database directly
-esm3di foldseek --input-fasta example_input.fasta --output-db outputs/foldseek_db
+esm3di build-foldseek-db --input-fasta example_input.fasta --output-db outputs/foldseek_db
 
 ```
 
@@ -61,15 +71,15 @@ esm3di foldseek --input-fasta example_input.fasta --output-db outputs/foldseek_d
 
 ## 💻 Command Line Interface (CLI)
 
-`esm3di` provides three core subcommands: `predict`, `foldseek`, and `perplexity`.
+`esm3di` provides three core subcommands: `predict`, `build-foldseek-db` (aliases: `foldseek-db`, `foldseek`), and `perplexity`.
 
 ```text
-usage: esm3di [-h] {predict,foldseek,perplexity} ...
+usage: esm3di [-h] {predict,build-foldseek-db,perplexity} ...
 
 positional arguments:
-  {predict,foldseek,perplexity}
+  {predict,build-foldseek-db,perplexity}
     predict             Predict 3Di structural sequences from an amino acid FASTA file and save as FASTA.
-    foldseek            Predict 3Di sequences and compile directly into a Foldseek-compatible database.
+    build-foldseek-db   Predict 3Di sequences and compile directly into a Foldseek-compatible database (aliases: foldseek-db, foldseek).
     perplexity          Calculate model confidence (perplexity) for each residue position and export to TSV.
 
 ```
@@ -90,22 +100,23 @@ esm3di predict \
 
 **Options:**
 
-| Flag | Type | Default                    | Description |
-| --- | --- |----------------------------| --- |
-| `--input-fasta` | `str` | `example_input.fasta`      | Input protein amino acid FASTA file. |
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--input-fasta` | `str` | `example_input.fasta` | Input protein amino acid FASTA file. |
 | `--output-fasta` | `str` | `outputs/output_3di.fasta` | Destination path for output 3Di FASTA file. |
-| `--model-ckpt` | `str` | *[Default Weights]*        | Optional path to local checkpoint or Hugging Face repo ID. |
-| `--batch-size` | `int` | `4`                        | Inference batch size per device. |
-| `--num-gpus` | `int` | `None`                     | Number of GPUs to use (default: use all available). |
+| `--model-ckpt` | `str` | *[Default Weights]* | Optional path to local checkpoint or Hugging Face repo ID. |
+| `--revision` | `str` | `46c5f7d` | Base model Hugging Face revision/commit SHA for base model loading. |
+| `--batch-size` | `int` | `4` | Inference batch size per device. |
+| `--num-gpus` | `int` | `None` | Number of GPUs to use (default: use all available). |
 
 ---
 
-### 2. `foldseek-db` — Build Foldseek Database
+### 2. `build-foldseek-db` — Build Foldseek Database
 
-Runs sequence prediction and automatically formats output into a binary Foldseek structure database ready for immediate alignment searches.
+Runs sequence prediction and automatically formats output into a binary Foldseek structure database ready for immediate alignment searches. *(Aliases: `foldseek-db`, `foldseek`)*
 
 ```bash
-esm3di foldseek \
+esm3di build-foldseek-db \
   --input-fasta example_input.fasta \
   --output-db outputs/foldseek_db
 
@@ -113,13 +124,14 @@ esm3di foldseek \
 
 **Options:**
 
-| Flag | Type | Default               | Description |
-| --- | --- |-----------------------| --- |
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
 | `--input-fasta` | `str` | `example_input.fasta` | Input protein amino acid FASTA file. |
 | `--output-db` | `str` | `outputs/foldseek_db` | Prefix path for output Foldseek database files. |
-| `--model-ckpt` | `str` | *[Default Weights]*   | Optional path to local checkpoint or Hugging Face repo ID. |
-| `--batch-size` | `int` | `4`                   | Inference batch size per device. |
-| `--num-gpus` | `int` | `None`                | Number of GPUs to use (default: use all available). |
+| `--model-ckpt` | `str` | *[Default Weights]* | Optional path to local checkpoint or Hugging Face repo ID. |
+| `--revision` | `str` | `46c5f7d` | Base model Hugging Face revision/commit SHA for base model loading. |
+| `--batch-size` | `int` | `4` | Inference batch size per device. |
+| `--num-gpus` | `int` | `None` | Number of GPUs to use (default: use all available). |
 
 ---
 
@@ -136,12 +148,13 @@ esm3di perplexity \
 
 **Options:**
 
-| Flag | Type | Default                         | Description |
-| --- | --- |---------------------------------| --- |
-| `--input-fasta` | `str` | `example_input.fasta`           | Input protein amino acid FASTA file. |
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--input-fasta` | `str` | `example_input.fasta` | Input protein amino acid FASTA file. |
 | `--output-tsv` | `str` | `outputs/output_confidence.tsv` | Target path to export TSV metrics file. |
-| `--model-ckpt` | `str` | *[Default Weights]*             | Optional path to local checkpoint or Hugging Face repo ID. |
-| `--batch-size` | `int` | `4`                             | Inference batch size. |
+| `--model-ckpt` | `str` | *[Default Weights]* | Optional path to local checkpoint or Hugging Face repo ID. |
+| `--revision` | `str` | `46c5f7d` | Base model Hugging Face revision/commit SHA for base model loading. |
+| `--batch-size` | `int` | `4` | Inference batch size per device. |
 
 ---
 
@@ -159,8 +172,8 @@ logging.basicConfig(
     datefmt="%H:%M:%S"
 )
 
-# Initialize predictor
-predictor = ESM3DiPredictor.from_pretrained()
+# Initialize predictor (optionally pass revision="46c5f7d")
+predictor = ESM3DiPredictor.from_pretrained(revision="46c5f7d")
 
 # 1. In-Memory Sequence Prediction
 sequence = "MKTVRQERLKSIVRILERSKEPVSGAQLAEELSVSRQVIVQDIAYLRSLGYNIVATPRGYVLAGG"
@@ -181,6 +194,7 @@ predictor.output_per_position_perplexity(
     output_tsv_path="outputs/output_confidence.tsv",
     batch_size=16
 )
+
 ```
 
 ---
@@ -202,6 +216,7 @@ esm3di_inference/
 ├── example_input.fasta      # Example amino acid FASTA file
 ├── pyproject.toml           # Package configuration & dependencies
 └── README.md                # Project documentation
+
 ```
 
 ---
