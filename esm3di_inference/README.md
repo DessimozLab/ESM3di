@@ -100,7 +100,7 @@ esm3di predict \
 
 ---
 
-### 2. `foldseek` — Build Foldseek Database
+### 2. `foldseek-db` — Build Foldseek Database
 
 Runs sequence prediction and automatically formats output into a binary Foldseek structure database ready for immediate alignment searches.
 
