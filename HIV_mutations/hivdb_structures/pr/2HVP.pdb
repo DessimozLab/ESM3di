@@ -1,0 +1,387 @@
+HEADER    HYDROLASE(ACID PROTEINASE)              10-APR-89   2HVP              
+TITLE     THREE-DIMENSIONAL STRUCTURE OF ASPARTYL PROTEASE FROM HUMAN           
+TITLE    2 IMMUNODEFICIENCY VIRUS HIV-1                                         
+COMPND    MOL_ID: 1;                                                            
+COMPND   2 MOLECULE: HIV-1 PROTEASE;                                            
+COMPND   3 CHAIN: A;                                                            
+COMPND   4 ENGINEERED: YES                                                      
+SOURCE    MOL_ID: 1;                                                            
+SOURCE   2 ORGANISM_SCIENTIFIC: HUMAN IMMUNODEFICIENCY VIRUS 1;                 
+SOURCE   3 ORGANISM_TAXID: 11676                                                
+KEYWDS    HYDROLASE(ACID PROTEINASE)                                            
+EXPDTA    X-RAY DIFFRACTION                                                     
+MDLTYP    CA ATOMS ONLY, CHAIN A                                                
+AUTHOR    M.A.NAVIA,P.M.D.FITZGERALD,B.M.MCKEEVER,J.P.SPRINGER                  
+REVDAT   6   14-FEB-24 2HVP    1       REMARK                                   
+REVDAT   5   24-FEB-09 2HVP    1       VERSN                                    
+REVDAT   4   01-APR-03 2HVP    1       JRNL                                     
+REVDAT   3   15-OCT-89 2HVP    1       HEADER                                   
+REVDAT   2   12-JUL-89 2HVP    1       REMARK                                   
+REVDAT   1   19-APR-89 2HVP    0                                                
+JRNL        AUTH   M.A.NAVIA,P.M.FITZGERALD,B.M.MCKEEVER,C.T.LEU,J.C.HEIMBACH,  
+JRNL        AUTH 2 W.K.HERBER,I.S.SIGAL,P.L.DARKE,J.P.SPRINGER                  
+JRNL        TITL   THREE-DIMENSIONAL STRUCTURE OF ASPARTYL PROTEASE FROM HUMAN  
+JRNL        TITL 2 IMMUNODEFICIENCY VIRUS HIV-1.                                
+JRNL        REF    NATURE                        V. 337   615 1989              
+JRNL        REFN                   ISSN 0028-0836                               
+JRNL        PMID   2645523                                                      
+JRNL        DOI    10.1038/337615A0                                             
+REMARK   1                                                                      
+REMARK   1 REFERENCE 1                                                          
+REMARK   1  AUTH   B.M.MCKEEVER,M.A.NAVIA,P.M.D.FITZGERALD,J.P.SPRINGER,        
+REMARK   1  AUTH 2 C.-T.LEU,J.C.HEIMBACH,W.K.HERBER,I.S.SIGAL,P.L.DARKE         
+REMARK   1  TITL   CRYSTALLIZATION OF THE ASPARTYLPROTEASE FROM THE HUMAN       
+REMARK   1  TITL 2 IMMUNODEFICIENCY VIRUS, HIV-1                                
+REMARK   1  REF    J.BIOL.CHEM.                  V. 264  1919 1989              
+REMARK   1  REFN                   ISSN 0021-9258                               
+REMARK   2                                                                      
+REMARK   2 RESOLUTION.    3.00 ANGSTROMS.                                       
+REMARK   3                                                                      
+REMARK   3 REFINEMENT.                                                          
+REMARK   3   PROGRAM     : CORELS                                               
+REMARK   3   AUTHORS     : SUSSMAN                                              
+REMARK   3                                                                      
+REMARK   3  DATA USED IN REFINEMENT.                                            
+REMARK   3   RESOLUTION RANGE HIGH (ANGSTROMS) : 3.00                           
+REMARK   3   RESOLUTION RANGE LOW  (ANGSTROMS) : NULL                           
+REMARK   3   DATA CUTOFF            (SIGMA(F)) : NULL                           
+REMARK   3   DATA CUTOFF HIGH         (ABS(F)) : NULL                           
+REMARK   3   DATA CUTOFF LOW          (ABS(F)) : NULL                           
+REMARK   3   COMPLETENESS (WORKING+TEST)   (%) : NULL                           
+REMARK   3   NUMBER OF REFLECTIONS             : NULL                           
+REMARK   3                                                                      
+REMARK   3  FIT TO DATA USED IN REFINEMENT.                                     
+REMARK   3   CROSS-VALIDATION METHOD          : NULL                            
+REMARK   3   FREE R VALUE TEST SET SELECTION  : NULL                            
+REMARK   3   R VALUE            (WORKING SET) : NULL                            
+REMARK   3   FREE R VALUE                     : NULL                            
+REMARK   3   FREE R VALUE TEST SET SIZE   (%) : NULL                            
+REMARK   3   FREE R VALUE TEST SET COUNT      : NULL                            
+REMARK   3   ESTIMATED ERROR OF FREE R VALUE  : NULL                            
+REMARK   3                                                                      
+REMARK   3  FIT IN THE HIGHEST RESOLUTION BIN.                                  
+REMARK   3   TOTAL NUMBER OF BINS USED           : NULL                         
+REMARK   3   BIN RESOLUTION RANGE HIGH       (A) : NULL                         
+REMARK   3   BIN RESOLUTION RANGE LOW        (A) : NULL                         
+REMARK   3   BIN COMPLETENESS (WORKING+TEST) (%) : NULL                         
+REMARK   3   REFLECTIONS IN BIN    (WORKING SET) : NULL                         
+REMARK   3   BIN R VALUE           (WORKING SET) : NULL                         
+REMARK   3   BIN FREE R VALUE                    : NULL                         
+REMARK   3   BIN FREE R VALUE TEST SET SIZE  (%) : NULL                         
+REMARK   3   BIN FREE R VALUE TEST SET COUNT     : NULL                         
+REMARK   3   ESTIMATED ERROR OF BIN FREE R VALUE : NULL                         
+REMARK   3                                                                      
+REMARK   3  NUMBER OF NON-HYDROGEN ATOMS USED IN REFINEMENT.                    
+REMARK   3   PROTEIN ATOMS            : 94                                      
+REMARK   3   NUCLEIC ACID ATOMS       : 0                                       
+REMARK   3   HETEROGEN ATOMS          : 0                                       
+REMARK   3   SOLVENT ATOMS            : 0                                       
+REMARK   3                                                                      
+REMARK   3  B VALUES.                                                           
+REMARK   3   FROM WILSON PLOT           (A**2) : NULL                           
+REMARK   3   MEAN B VALUE      (OVERALL, A**2) : NULL                           
+REMARK   3   OVERALL ANISOTROPIC B VALUE.                                       
+REMARK   3    B11 (A**2) : NULL                                                 
+REMARK   3    B22 (A**2) : NULL                                                 
+REMARK   3    B33 (A**2) : NULL                                                 
+REMARK   3    B12 (A**2) : NULL                                                 
+REMARK   3    B13 (A**2) : NULL                                                 
+REMARK   3    B23 (A**2) : NULL                                                 
+REMARK   3                                                                      
+REMARK   3  ESTIMATED COORDINATE ERROR.                                         
+REMARK   3   ESD FROM LUZZATI PLOT        (A) : NULL                            
+REMARK   3   ESD FROM SIGMAA              (A) : NULL                            
+REMARK   3   LOW RESOLUTION CUTOFF        (A) : NULL                            
+REMARK   3                                                                      
+REMARK   3  CROSS-VALIDATED ESTIMATED COORDINATE ERROR.                         
+REMARK   3   ESD FROM C-V LUZZATI PLOT    (A) : NULL                            
+REMARK   3   ESD FROM C-V SIGMAA          (A) : NULL                            
+REMARK   3                                                                      
+REMARK   3  RMS DEVIATIONS FROM IDEAL VALUES.                                   
+REMARK   3   BOND LENGTHS                 (A) : NULL                            
+REMARK   3   BOND ANGLES            (DEGREES) : NULL                            
+REMARK   3   DIHEDRAL ANGLES        (DEGREES) : NULL                            
+REMARK   3   IMPROPER ANGLES        (DEGREES) : NULL                            
+REMARK   3                                                                      
+REMARK   3  ISOTROPIC THERMAL MODEL : NULL                                      
+REMARK   3                                                                      
+REMARK   3  ISOTROPIC THERMAL FACTOR RESTRAINTS.    RMS    SIGMA                
+REMARK   3   MAIN-CHAIN BOND              (A**2) : NULL  ; NULL                 
+REMARK   3   MAIN-CHAIN ANGLE             (A**2) : NULL  ; NULL                 
+REMARK   3   SIDE-CHAIN BOND              (A**2) : NULL  ; NULL                 
+REMARK   3   SIDE-CHAIN ANGLE             (A**2) : NULL  ; NULL                 
+REMARK   3                                                                      
+REMARK   3  NCS MODEL : NULL                                                    
+REMARK   3                                                                      
+REMARK   3  NCS RESTRAINTS.                         RMS   SIGMA/WEIGHT          
+REMARK   3   GROUP  1  POSITIONAL            (A) : NULL  ; NULL                 
+REMARK   3   GROUP  1  B-FACTOR           (A**2) : NULL  ; NULL                 
+REMARK   3                                                                      
+REMARK   3  PARAMETER FILE  1  : NULL                                           
+REMARK   3  TOPOLOGY FILE  1   : NULL                                           
+REMARK   3                                                                      
+REMARK   3  OTHER REFINEMENT REMARKS: NULL                                      
+REMARK   4                                                                      
+REMARK   4 2HVP COMPLIES WITH FORMAT V. 3.30, 13-JUL-11                         
+REMARK 100                                                                      
+REMARK 100 THIS ENTRY HAS BEEN PROCESSED BY BNL.                                
+REMARK 100 THE DEPOSITION ID IS D_1000178229.                                   
+REMARK 200                                                                      
+REMARK 200 EXPERIMENTAL DETAILS                                                 
+REMARK 200  EXPERIMENT TYPE                : X-RAY DIFFRACTION                  
+REMARK 200  DATE OF DATA COLLECTION        : NULL                               
+REMARK 200  TEMPERATURE           (KELVIN) : NULL                               
+REMARK 200  PH                             : NULL                               
+REMARK 200  NUMBER OF CRYSTALS USED        : NULL                               
+REMARK 200                                                                      
+REMARK 200  SYNCHROTRON              (Y/N) : NULL                               
+REMARK 200  RADIATION SOURCE               : NULL                               
+REMARK 200  BEAMLINE                       : NULL                               
+REMARK 200  X-RAY GENERATOR MODEL          : NULL                               
+REMARK 200  MONOCHROMATIC OR LAUE    (M/L) : NULL                               
+REMARK 200  WAVELENGTH OR RANGE        (A) : NULL                               
+REMARK 200  MONOCHROMATOR                  : NULL                               
+REMARK 200  OPTICS                         : NULL                               
+REMARK 200                                                                      
+REMARK 200  DETECTOR TYPE                  : NULL                               
+REMARK 200  DETECTOR MANUFACTURER          : NULL                               
+REMARK 200  INTENSITY-INTEGRATION SOFTWARE : NULL                               
+REMARK 200  DATA SCALING SOFTWARE          : NULL                               
+REMARK 200                                                                      
+REMARK 200  NUMBER OF UNIQUE REFLECTIONS   : NULL                               
+REMARK 200  RESOLUTION RANGE HIGH      (A) : NULL                               
+REMARK 200  RESOLUTION RANGE LOW       (A) : NULL                               
+REMARK 200  REJECTION CRITERIA  (SIGMA(I)) : NULL                               
+REMARK 200                                                                      
+REMARK 200 OVERALL.                                                             
+REMARK 200  COMPLETENESS FOR RANGE     (%) : NULL                               
+REMARK 200  DATA REDUNDANCY                : NULL                               
+REMARK 200  R MERGE                    (I) : NULL                               
+REMARK 200  R SYM                      (I) : NULL                               
+REMARK 200  <I/SIGMA(I)> FOR THE DATA SET  : NULL                               
+REMARK 200                                                                      
+REMARK 200 IN THE HIGHEST RESOLUTION SHELL.                                     
+REMARK 200  HIGHEST RESOLUTION SHELL, RANGE HIGH (A) : NULL                     
+REMARK 200  HIGHEST RESOLUTION SHELL, RANGE LOW  (A) : NULL                     
+REMARK 200  COMPLETENESS FOR SHELL     (%) : NULL                               
+REMARK 200  DATA REDUNDANCY IN SHELL       : NULL                               
+REMARK 200  R MERGE FOR SHELL          (I) : NULL                               
+REMARK 200  R SYM FOR SHELL            (I) : NULL                               
+REMARK 200  <I/SIGMA(I)> FOR SHELL         : NULL                               
+REMARK 200                                                                      
+REMARK 200 DIFFRACTION PROTOCOL: NULL                                           
+REMARK 200 METHOD USED TO DETERMINE THE STRUCTURE: NULL                         
+REMARK 200 SOFTWARE USED: NULL                                                  
+REMARK 200 STARTING MODEL: NULL                                                 
+REMARK 200                                                                      
+REMARK 200 REMARK: NULL                                                         
+REMARK 280                                                                      
+REMARK 280 CRYSTAL                                                              
+REMARK 280 SOLVENT CONTENT, VS   (%): 60.52                                     
+REMARK 280 MATTHEWS COEFFICIENT, VM (ANGSTROMS**3/DA): 3.12                     
+REMARK 280                                                                      
+REMARK 280 CRYSTALLIZATION CONDITIONS: NULL                                     
+REMARK 290                                                                      
+REMARK 290 CRYSTALLOGRAPHIC SYMMETRY                                            
+REMARK 290 SYMMETRY OPERATORS FOR SPACE GROUP: P 41 21 2                        
+REMARK 290                                                                      
+REMARK 290      SYMOP   SYMMETRY                                                
+REMARK 290     NNNMMM   OPERATOR                                                
+REMARK 290       1555   X,Y,Z                                                   
+REMARK 290       2555   -X,-Y,Z+1/2                                             
+REMARK 290       3555   -Y+1/2,X+1/2,Z+1/4                                      
+REMARK 290       4555   Y+1/2,-X+1/2,Z+3/4                                      
+REMARK 290       5555   -X+1/2,Y+1/2,-Z+1/4                                     
+REMARK 290       6555   X+1/2,-Y+1/2,-Z+3/4                                     
+REMARK 290       7555   Y,X,-Z                                                  
+REMARK 290       8555   -Y,-X,-Z+1/2                                            
+REMARK 290                                                                      
+REMARK 290     WHERE NNN -> OPERATOR NUMBER                                     
+REMARK 290           MMM -> TRANSLATION VECTOR                                  
+REMARK 290                                                                      
+REMARK 290 CRYSTALLOGRAPHIC SYMMETRY TRANSFORMATIONS                            
+REMARK 290 THE FOLLOWING TRANSFORMATIONS OPERATE ON THE ATOM/HETATM             
+REMARK 290 RECORDS IN THIS ENTRY TO PRODUCE CRYSTALLOGRAPHICALLY                
+REMARK 290 RELATED MOLECULES.                                                   
+REMARK 290   SMTRY1   1  1.000000  0.000000  0.000000        0.00000            
+REMARK 290   SMTRY2   1  0.000000  1.000000  0.000000        0.00000            
+REMARK 290   SMTRY3   1  0.000000  0.000000  1.000000        0.00000            
+REMARK 290   SMTRY1   2 -1.000000  0.000000  0.000000        0.00000            
+REMARK 290   SMTRY2   2  0.000000 -1.000000  0.000000        0.00000            
+REMARK 290   SMTRY3   2  0.000000  0.000000  1.000000       53.40000            
+REMARK 290   SMTRY1   3  0.000000 -1.000000  0.000000       25.14500            
+REMARK 290   SMTRY2   3  1.000000  0.000000  0.000000       25.14500            
+REMARK 290   SMTRY3   3  0.000000  0.000000  1.000000       26.70000            
+REMARK 290   SMTRY1   4  0.000000  1.000000  0.000000       25.14500            
+REMARK 290   SMTRY2   4 -1.000000  0.000000  0.000000       25.14500            
+REMARK 290   SMTRY3   4  0.000000  0.000000  1.000000       80.10000            
+REMARK 290   SMTRY1   5 -1.000000  0.000000  0.000000       25.14500            
+REMARK 290   SMTRY2   5  0.000000  1.000000  0.000000       25.14500            
+REMARK 290   SMTRY3   5  0.000000  0.000000 -1.000000       26.70000            
+REMARK 290   SMTRY1   6  1.000000  0.000000  0.000000       25.14500            
+REMARK 290   SMTRY2   6  0.000000 -1.000000  0.000000       25.14500            
+REMARK 290   SMTRY3   6  0.000000  0.000000 -1.000000       80.10000            
+REMARK 290   SMTRY1   7  0.000000  1.000000  0.000000        0.00000            
+REMARK 290   SMTRY2   7  1.000000  0.000000  0.000000        0.00000            
+REMARK 290   SMTRY3   7  0.000000  0.000000 -1.000000        0.00000            
+REMARK 290   SMTRY1   8  0.000000 -1.000000  0.000000        0.00000            
+REMARK 290   SMTRY2   8 -1.000000  0.000000  0.000000        0.00000            
+REMARK 290   SMTRY3   8  0.000000  0.000000 -1.000000       53.40000            
+REMARK 290                                                                      
+REMARK 290 REMARK: NULL                                                         
+REMARK 300                                                                      
+REMARK 300 BIOMOLECULE: 1                                                       
+REMARK 300 SEE REMARK 350 FOR THE AUTHOR PROVIDED AND/OR PROGRAM                
+REMARK 300 GENERATED ASSEMBLY INFORMATION FOR THE STRUCTURE IN                  
+REMARK 300 THIS ENTRY. THE REMARK MAY ALSO PROVIDE INFORMATION ON               
+REMARK 300 BURIED SURFACE AREA.                                                 
+REMARK 300 REMARK: THE HIV-1 PROTEASE IS A DIMER.  IN THE CRYSTAL THE TWO       
+REMARK 300 MONOMERS ARE RELATED BY A CRYSTALLOGRAPHIC TWO-FOLD AXIS.            
+REMARK 300 TO GENERATE THE SYMMETRY RELATED MONOMER, THE FOLLOWING              
+REMARK 300 TRANSFORMATION MUST BE APPLIED TO THE COORDINATES                    
+REMARK 300 PRESENTED IN THIS ENTRY                                              
+REMARK 300                                                                      
+REMARK 300       0.0      -1.0       0.0          50.29                         
+REMARK 300      -1.0       0.0       0.0          50.29                         
+REMARK 300       0.0       0.0      -1.0          53.40                         
+REMARK 350                                                                      
+REMARK 350 COORDINATES FOR A COMPLETE MULTIMER REPRESENTING THE KNOWN           
+REMARK 350 BIOLOGICALLY SIGNIFICANT OLIGOMERIZATION STATE OF THE                
+REMARK 350 MOLECULE CAN BE GENERATED BY APPLYING BIOMT TRANSFORMATIONS          
+REMARK 350 GIVEN BELOW.  BOTH NON-CRYSTALLOGRAPHIC AND                          
+REMARK 350 CRYSTALLOGRAPHIC OPERATIONS ARE GIVEN.                               
+REMARK 350                                                                      
+REMARK 350 BIOMOLECULE: 1                                                       
+REMARK 350 AUTHOR DETERMINED BIOLOGICAL UNIT: DIMERIC                           
+REMARK 350 APPLY THE FOLLOWING TO CHAINS: A                                     
+REMARK 350   BIOMT1   1  1.000000  0.000000  0.000000        0.00000            
+REMARK 350   BIOMT2   1  0.000000  1.000000  0.000000        0.00000            
+REMARK 350   BIOMT3   1  0.000000  0.000000  1.000000        0.00000            
+REMARK 350   BIOMT1   2  0.000000 -1.000000  0.000000       50.29000            
+REMARK 350   BIOMT2   2 -1.000000  0.000000  0.000000       50.29000            
+REMARK 350   BIOMT3   2  0.000000  0.000000 -1.000000       53.40000            
+REMARK 465                                                                      
+REMARK 465 MISSING RESIDUES                                                     
+REMARK 465 THE FOLLOWING RESIDUES WERE NOT LOCATED IN THE                       
+REMARK 465 EXPERIMENT. (M=MODEL NUMBER; RES=RESIDUE NAME; C=CHAIN               
+REMARK 465 IDENTIFIER; SSSEQ=SEQUENCE NUMBER; I=INSERTION CODE.)                
+REMARK 465                                                                      
+REMARK 465   M RES C SSSEQI                                                     
+REMARK 465     PRO A     1                                                      
+REMARK 465     GLN A     2                                                      
+REMARK 465     ILE A     3                                                      
+REMARK 465     THR A     4                                                      
+REMARK 465     LEU A     5                                                      
+DBREF  2HVP A    1    99  UNP    P12497   POL_HV1N5       24    122             
+SEQRES   1 A   99  PRO GLN ILE THR LEU TRP GLN ARG PRO LEU VAL THR ILE          
+SEQRES   2 A   99  LYS ILE GLY GLY GLN LEU LYS GLU ALA LEU LEU ASP THR          
+SEQRES   3 A   99  GLY ALA ASP ASP THR VAL LEU GLU GLU MET ASN LEU PRO          
+SEQRES   4 A   99  GLY ARG TRP LYS PRO LYS MET ILE GLY GLY ILE GLY GLY          
+SEQRES   5 A   99  PHE ILE LYS VAL ARG GLN TYR ASP GLN ILE LEU ILE GLU          
+SEQRES   6 A   99  ILE CYS GLY HIS LYS ALA ILE GLY THR VAL LEU VAL GLY          
+SEQRES   7 A   99  PRO THR PRO VAL ASN ILE ILE GLY ARG ASN LEU LEU THR          
+SEQRES   8 A   99  GLN ILE GLY CYS THR LEU ASN PHE                              
+CRYST1   50.290   50.290  106.800  90.00  90.00  90.00 P 41 21 2     8          
+ORIGX1      0.019885  0.000000  0.000000        0.00000                         
+ORIGX2      0.000000  0.019885  0.000000        0.00000                         
+ORIGX3      0.000000  0.000000  0.009363        0.00000                         
+SCALE1      0.019885  0.000000  0.000000        0.00000                         
+SCALE2      0.000000  0.019885  0.000000        0.00000                         
+SCALE3      0.000000  0.000000  0.009363        0.00000                         
+ATOM      1  CA  TRP A   6      33.087  27.595  22.101  1.00  0.00           C  
+ATOM      2  CA  GLN A   7      35.937  27.648  24.539  1.00  0.00           C  
+ATOM      3  CA  ARG A   8      35.159  29.875  27.530  1.00  0.00           C  
+ATOM      4  CA  PRO A   9      32.447  27.965  29.386  1.00  0.00           C  
+ATOM      5  CA  LEU A  10      34.455  28.796  32.502  1.00  0.00           C  
+ATOM      6  CA  VAL A  11      32.437  29.620  35.608  1.00  0.00           C  
+ATOM      7  CA  THR A  12      33.168  29.803  39.333  1.00  0.00           C  
+ATOM      8  CA  ILE A  13      31.527  27.343  41.720  1.00  0.00           C  
+ATOM      9  CA  LYS A  14      31.722  26.916  45.491  1.00  0.00           C  
+ATOM     10  CA  ILE A  15      30.946  23.961  47.744  1.00  0.00           C  
+ATOM     11  CA  GLY A  16      33.151  22.935  50.672  1.00  0.00           C  
+ATOM     12  CA  GLY A  17      33.190  26.662  51.434  1.00  0.00           C  
+ATOM     13  CA  GLN A  18      36.276  26.547  49.221  1.00  0.00           C  
+ATOM     14  CA  LEU A  19      35.265  28.233  45.975  1.00  0.00           C  
+ATOM     15  CA  LYS A  20      36.929  26.559  42.996  1.00  0.00           C  
+ATOM     16  CA  GLU A  21      36.801  27.218  39.254  1.00  0.00           C  
+ATOM     17  CA  ALA A  22      34.801  24.793  37.107  1.00  0.00           C  
+ATOM     18  CA  LEU A  23      34.334  24.658  33.337  1.00  0.00           C  
+ATOM     19  CA  LEU A  24      30.557  24.602  32.894  1.00  0.00           C  
+ATOM     20  CA  ASP A  25      30.618  21.694  30.445  1.00  0.00           C  
+ATOM     21  CA  THR A  26      27.846  20.010  28.477  1.00  0.00           C  
+ATOM     22  CA  GLY A  27      30.084  17.071  27.594  1.00  0.00           C  
+ATOM     23  CA  ALA A  28      27.173  15.288  29.255  1.00  0.00           C  
+ATOM     24  CA  ASP A  29      27.225  12.431  31.764  1.00  0.00           C  
+ATOM     25  CA  ASP A  30      28.277  13.298  35.309  1.00  0.00           C  
+ATOM     26  CA  THR A  31      30.134  16.333  36.644  1.00  0.00           C  
+ATOM     27  CA  VAL A  32      33.537  15.766  38.235  1.00  0.00           C  
+ATOM     28  CA  LEU A  33      35.747  17.744  40.606  1.00  0.00           C  
+ATOM     29  CA  GLU A  34      39.388  17.660  41.699  1.00  0.00           C  
+ATOM     30  CA  GLU A  35      40.633  16.407  45.065  1.00  0.00           C  
+ATOM     31  CA  MET A  36      38.188  17.393  47.802  1.00  0.00           C  
+ATOM     32  CA  ASN A  37      37.250  16.281  51.306  1.00  0.00           C  
+ATOM     33  CA  LEU A  38      33.455  16.143  51.497  1.00  0.00           C  
+ATOM     34  CA  PRO A  39      32.677  13.773  54.372  1.00  0.00           C  
+ATOM     35  CA  GLY A  40      30.056  11.035  54.096  1.00  0.00           C  
+ATOM     36  CA  ARG A  41      30.242   7.608  52.468  1.00  0.00           C  
+ATOM     37  CA  TRP A  42      31.192   7.352  48.800  1.00  0.00           C  
+ATOM     38  CA  LYS A  43      31.163   4.451  46.345  1.00  0.00           C  
+ATOM     39  CA  PRO A  44      34.326   3.821  44.319  1.00  0.00           C  
+ATOM     40  CA  LYS A  45      33.800   4.337  40.593  1.00  0.00           C  
+ATOM     41  CA  MET A  46      35.716   4.383  37.300  1.00  0.00           C  
+ATOM     42  CA  ILE A  47      35.951   6.583  34.201  1.00  0.00           C  
+ATOM     43  CA  GLY A  48      38.150   6.693  31.093  1.00  0.00           C  
+ATOM     44  CA  GLY A  49      39.790   9.957  30.059  1.00  0.00           C  
+ATOM     45  CA  ILE A  50      42.717   8.605  28.038  1.00  0.00           C  
+ATOM     46  CA  GLY A  51      44.209   5.673  29.949  1.00  0.00           C  
+ATOM     47  CA  GLY A  52      43.324   2.092  30.869  1.00  0.00           C  
+ATOM     48  CA  PHE A  53      40.725   3.488  33.275  1.00  0.00           C  
+ATOM     49  CA  ILE A  54      40.689   5.981  36.141  1.00  0.00           C  
+ATOM     50  CA  LYS A  55      39.479   5.266  39.671  1.00  0.00           C  
+ATOM     51  CA  VAL A  56      37.341   7.795  41.531  1.00  0.00           C  
+ATOM     52  CA  ARG A  57      35.138   8.181  44.603  1.00  0.00           C  
+ATOM     53  CA  GLN A  58      31.852   9.793  43.570  1.00  0.00           C  
+ATOM     54  CA  TYR A  59      29.831   9.976  46.789  1.00  0.00           C  
+ATOM     55  CA  ASP A  60      26.187  10.964  46.338  1.00  0.00           C  
+ATOM     56  CA  GLN A  61      23.862  13.855  47.192  1.00  0.00           C  
+ATOM     57  CA  ILE A  62      26.038  16.892  47.943  1.00  0.00           C  
+ATOM     58  CA  LEU A  63      25.240  20.603  47.682  1.00  0.00           C  
+ATOM     59  CA  ILE A  64      27.284  22.973  45.530  1.00  0.00           C  
+ATOM     60  CA  GLU A  65      26.843  26.627  44.543  1.00  0.00           C  
+ATOM     61  CA  ILE A  66      27.333  27.973  41.023  1.00  0.00           C  
+ATOM     62  CA  CYS A  67      27.762  31.642  40.091  1.00  0.00           C  
+ATOM     63  CA  GLY A  68      24.953  32.107  42.629  1.00  0.00           C  
+ATOM     64  CA  HIS A  69      22.708  29.039  42.859  1.00  0.00           C  
+ATOM     65  CA  LYS A  70      22.268  25.862  44.892  1.00  0.00           C  
+ATOM     66  CA  ALA A  71      21.696  22.348  43.579  1.00  0.00           C  
+ATOM     67  CA  ILE A  72      22.958  18.981  44.837  1.00  0.00           C  
+ATOM     68  CA  GLY A  73      24.186  16.135  42.647  1.00  0.00           C  
+ATOM     69  CA  THR A  74      26.075  12.849  42.897  1.00  0.00           C  
+ATOM     70  CA  VAL A  75      29.150  14.535  41.398  1.00  0.00           C  
+ATOM     71  CA  LEU A  76      32.466  12.984  42.403  1.00  0.00           C  
+ATOM     72  CA  VAL A  77      36.136  13.876  42.787  1.00  0.00           C  
+ATOM     73  CA  GLY A  78      39.251  12.073  41.565  1.00  0.00           C  
+ATOM     74  CA  PRO A  79      42.371  12.989  39.610  1.00  0.00           C  
+ATOM     75  CA  THR A  80      40.194  14.939  37.171  1.00  0.00           C  
+ATOM     76  CA  PRO A  81      42.123  17.797  35.583  1.00  0.00           C  
+ATOM     77  CA  VAL A  82      38.601  18.952  34.708  1.00  0.00           C  
+ATOM     78  CA  ASN A  83      35.862  20.306  36.967  1.00  0.00           C  
+ATOM     79  CA  ILE A  84      33.168  19.461  34.434  1.00  0.00           C  
+ATOM     80  CA  ILE A  85      29.778  20.522  35.780  1.00  0.00           C  
+ATOM     81  CA  GLY A  86      26.461  21.503  34.203  1.00  0.00           C  
+ATOM     82  CA  ARG A  87      23.160  20.404  35.730  1.00  0.00           C  
+ATOM     83  CA  ASN A  88      19.387  20.830  35.414  1.00  0.00           C  
+ATOM     84  CA  LEU A  89      18.613  24.550  35.253  1.00  0.00           C  
+ATOM     85  CA  LEU A  90      20.580  25.557  32.151  1.00  0.00           C  
+ATOM     86  CA  THR A  91      18.797  26.425  28.910  1.00  0.00           C  
+ATOM     87  CA  GLN A  92      20.537  26.407  25.521  1.00  0.00           C  
+ATOM     88  CA  ILE A  93      21.231  28.365  22.319  1.00  0.00           C  
+ATOM     89  CA  GLY A  94      18.203  30.278  21.091  1.00  0.00           C  
+ATOM     90  CA  CYS A  95      16.223  27.047  20.804  1.00  0.00           C  
+ATOM     91  CA  THR A  96      16.407  25.949  24.440  1.00  0.00           C  
+ATOM     92  CA  LEU A  97      16.337  22.234  25.268  1.00  0.00           C  
+ATOM     93  CA  ASN A  98      17.919  20.296  28.123  1.00  0.00           C  
+ATOM     94  CA  PHE A  99      17.164  17.712  30.806  1.00  0.00           C  
+TER      95      PHE A  99                                                      
+MASTER      246    0    0    0    0    0    0    6   94    1    0    8          
+END                                                                             
