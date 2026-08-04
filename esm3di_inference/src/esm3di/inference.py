@@ -37,6 +37,7 @@ logger = logging.getLogger("esm3di")
 PACKAGE_ROOT = Path(__file__).resolve().parent
 DEFAULT_HF_REPO = PACKAGE_ROOT.parents[1] / "checkpoints" / "hf_compatible"
 DEFAULT_BATCH_SIZE = 4
+DEFAULT_REVISION = "46c5f7d"
 VOCAB_3DI = list("ACDEFGHIKLMNPQRSTVWY")
 
 
@@ -46,7 +47,7 @@ class ESM3DiPredictor:
     def __init__(
         self,
         model_checkpoint_path: Union[str, Path] = DEFAULT_HF_REPO,
-        revision: Optional[str] = None,
+        revision: Optional[str] = DEFAULT_REVISION,
         device: Optional[str] = None
     ):
         """Initializes the predictor, loads model components, and registers runtime device."""
@@ -110,7 +111,7 @@ class ESM3DiPredictor:
     def from_pretrained(
         cls,
         model_checkpoint_path: Union[str, Path] = DEFAULT_HF_REPO,
-        revision: Optional[str] = None,
+        revision: Optional[str] = DEFAULT_REVISION,
         device: Optional[str] = None
     ) -> "ESM3DiPredictor":
         """Factory method to construct an ESM3DiPredictor instance from local or HF weights."""

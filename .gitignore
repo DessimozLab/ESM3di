@@ -81,3 +81,6 @@ venv.bak/
 *.tar.gz
 /esm3di_inference/outputs
 /mnt
+/esm3di_inference/data
+/esm3di_inference/data
+/esm3di_inference/data

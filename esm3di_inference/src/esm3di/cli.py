@@ -16,11 +16,9 @@ from .io import (
     resolve_output_path,
     resolve_checkpoint_path
 )
-from .inference import ESM3DiPredictor, DEFAULT_HF_REPO, DEFAULT_BATCH_SIZE
+from .inference import ESM3DiPredictor, DEFAULT_HF_REPO, DEFAULT_BATCH_SIZE, DEFAULT_REVISION
 
 logger = logging.getLogger("esm3di")
-
-DEFAULT_REVISION = "46c5f7d"
 
 
 def setup_logging():
