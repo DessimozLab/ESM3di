@@ -1,0 +1,207 @@
+AC   MF_00002;
+DC   Protein;
+TR   HAMAP; MF_00002; -; 1; level=0
+XX
+Names: Polyprotein_Pestivirus
+XX
+XX
+FT   From: POLG_BVDVN (P19711)
+FT   SITE            168..169
+FT                   /note="Cleavage"
+FT   Tag: Cleavage1; Optional; Condition: C-S
+case <FTTag:Cleavage1>
+FT   CHAIN           Nter..168
+FT                   /note="N-terminal protease"
+end case
+case not <FTTag:Cleavage1>
+FT   SITE            168..169
+FT                   /note="Possible cleavage"
+FT   CHAIN           Nter..168
+FT                   /note="Possible N-terminal protease"
+end case
+XX
+FT   SITE            270..271
+FT                   /note="Cleavage"
+FT   Tag: Cleavage2; Optional; Condition: [GA]-[DE]
+case not <FTTag:Cleavage2>
+FT   SITE            270..271
+FT                   /note="Possible cleavage"
+end case
+case <FTTag:Cleavage1> and <FTTag:Cleavage2>
+FT   CHAIN           169..270
+FT                   /note="Capsid protein C"
+end case
+case not <FTTag:Cleavage1> or not <FTTag:Cleavage2>
+FT   CHAIN           169..270
+FT                   /note="Possible Capsid protein C"
+end case
+XX
+FT   SITE            497..498
+FT                   /note="Cleavage"
+FT   Tag: Cleavage3; Optional; Condition: A-[AIL]
+case not <FTTag:Cleavage3>
+FT   SITE            497..498
+FT                   /note="Possible cleavage"
+end case
+case <FTTag:Cleavage2> and <FTTag:Cleavage3>
+FT   CHAIN           271..497
+FT                   /note="E(rns) glycoprotein"
+end case
+case not <FTTag:Cleavage2> or not <FTTag:Cleavage3>
+FT   CHAIN           271..497
+FT                   /note="Possible E(rns) glycoprotein"
+end case
+XX
+FT   SITE            692..693
+FT                   /note="Cleavage"
+FT   Tag: Cleavage4; Optional; Condition: G-[HRY]
+case not <FTTag:Cleavage4>
+FT   SITE            692..693
+FT                   /note="Possible cleavage"
+end case
+case <FTTag:Cleavage3> and <FTTag:Cleavage4>
+FT   CHAIN           498..692
+FT                   /note="Envelope glycoprotein E1"
+end case
+case not <FTTag:Cleavage3> or not <FTTag:Cleavage4>
+FT   CHAIN           498..692
+FT                   /note="Possible Envelope glycoprotein E1"
+end case
+XX
+FT   SITE            1066..1067
+FT                   /note="Cleavage"
+FT   Tag: Cleavage5; Optional; Condition: G-[AL]
+case not <FTTag:Cleavage5>
+FT   SITE            1066..1067
+FT                   /note="Possible cleavage"
+end case
+case <FTTag:Cleavage4> and <FTTag:Cleavage5>
+FT   CHAIN           693..1066
+FT                   /note="Envelope glycoprotein E2"
+end case
+case not <FTTag:Cleavage4> or not <FTTag:Cleavage5>
+FT   CHAIN           693..1066
+FT                   /note="Possible Envelope glycoprotein E2"
+end case
+XX
+FT   SITE            1136..1137
+FT                   /note="Cleavage"
+FT   Tag: Cleavage6; Optional; Condition: [AG]-[DEG]
+case not <FTTag:Cleavage6>
+FT   SITE            1136..1137
+FT                   /note="Possible cleavage"
+end case
+case <FTTag:Cleavage5> and <FTTag:Cleavage6>
+FT   CHAIN           1067..1136
+FT                   /note="Viroporin p7"
+end case
+case not <FTTag:Cleavage5> or not <FTTag:Cleavage6>
+FT   CHAIN           1067..1136
+FT                   /note="Possible Viroporin p7"
+end case
+XX
+FT   SITE            1679..1680
+FT                   /note="Cleavage"
+FT   Tag: Cleavage7; Optional; Condition: R-G
+case not <FTTag:Cleavage7>
+FT   SITE            1679..1680
+FT                   /note="Possible cleavage"
+end case
+case <FTTag:Cleavage6> and <FTTag:Cleavage7>
+FT   CHAIN           1137..1679
+FT                   /note="Cysteine protease NS2"
+end case
+case not <FTTag:Cleavage6> or not <FTTag:Cleavage7>
+FT   CHAIN           1137..1679
+FT                   /note="Possible Cysteine protease NS2"
+end case
+XX
+FT   SITE            2362..2363
+FT                   /note="Cleavage"
+FT   Tag: Cleavage8; Optional; Condition: L-S
+case not <FTTag:Cleavage8>
+FT   SITE            2362..2363
+FT                   /note="Possible cleavage"
+end case
+case <FTTag:Cleavage7> and <FTTag:Cleavage8>
+FT   CHAIN           1680..2362
+FT                   /note="Serine protease NS3"
+end case
+case not <FTTag:Cleavage7> or not <FTTag:Cleavage8>
+FT   CHAIN           1680..2362
+FT                   /note="Possible Serine protease NS3"
+end case
+XX
+FT   SITE            2426..2427
+FT                   /note="Cleavage"
+FT   Tag: Cleavage9; Optional; Condition: L-[AS]
+case not <FTTag:Cleavage9>
+FT   SITE            2426..2427
+FT                   /note="Possible cleavage"
+end case
+case <FTTag:Cleavage8> and <FTTag:Cleavage9>
+FT   CHAIN           2363..2426
+FT                   /note="Non-structural protein 4A"
+end case
+case not <FTTag:Cleavage8> or not <FTTag:Cleavage9>
+FT   CHAIN           2363..2426
+FT                   /note="Possible Non-structural protein 4A"
+end case
+XX
+FT   SITE            2773..2774
+FT                   /note="Cleavage"
+FT   Tag: Cleavage10; Optional; Condition: L-S
+case not <FTTag:Cleavage10>
+FT   SITE            2773..2774
+FT                   /note="Possible cleavage"
+end case
+case <FTTag:Cleavage9> and <FTTag:Cleavage10>
+FT   CHAIN           2427..2773
+FT                   /note="Non-structural protein 4B"
+end case
+case not <FTTag:Cleavage9> or not <FTTag:Cleavage10>
+FT   CHAIN           2427..2773
+FT                   /note="Possible Non-structural protein 4B"
+end case
+XX
+FT   SITE            3269..3270
+FT                   /note="Cleavage"
+FT   Tag: Cleavage11; Optional; Condition: L-S
+case <FTTag:Cleavage10> and <FTTag:Cleavage11>
+FT   CHAIN           2774..3269
+FT                   /note="Non-structural protein 5A"
+end case
+case not <FTTag:Cleavage10> or not <FTTag:Cleavage11>
+FT   CHAIN           2774..3269
+FT                   /note="Possible Non-structural protein 5A"
+end case
+case <FTTag:Cleavage11>
+FT   CHAIN           3270..Cter
+FT                   /note="RNA-directed RNA polymerase"
+end case
+case not <FTTag:Cleavage11>
+FT   SITE            3269..3270
+FT                   /note="Possible cleavage"
+FT   CHAIN           3270..Cter
+FT                   /note="Possible RNA-directed RNA polymerase"
+end case
+XX
+Size: 1000-5000;
+Related: None;
+Template: P19711;
+Scope:
+ Viruses; Pestivirus
+Fusion:
+ Nter: None
+ Cter: None
+Duplicate: None
+Plasmid: None
+Comments: None
+XX
+# $Version$
+# $MDate$
+# $MBy$
+# $CDate$
+//
+
+

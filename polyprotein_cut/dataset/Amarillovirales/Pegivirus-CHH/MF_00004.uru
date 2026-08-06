@@ -1,0 +1,73 @@
+AC   MF_00004;
+DC   Protein;
+TR   HAMAP; MF_00004; -; 1; level=0
+XX
+Names: Polyprotein_Pegivirus
+XX
+XX
+FT   From: POLG_HPGV1 (Q69431)
+FT   CHAIN           Nter..19
+FT                   /note="Protein Y"
+FT   CHAIN           20..204
+FT                   /note="Envelope glycoprotein E1"
+FT   CHAIN           205..590
+FT                   /note="Envelope glycoprotein E2"
+FT   CHAIN           591..667
+FT                   /note="Viroporin p7-like"
+FT   CHAIN           668..894
+FT                   /note="Cysteine protease NS2"
+FT   CHAIN           895..1522
+FT                   /note="Serine protease NS3"
+FT   CHAIN           1523..1576
+FT                   /note="Non-structural protein 4A"
+FT   CHAIN           1577..1867
+FT                   /note="Non-structural protein 4B"
+FT   CHAIN           1868..2279
+FT                   /note="Non-structural protein 5A"
+FT   CHAIN           2280..Cter
+FT                   /note="RNA-directed RNA polymerase"
+FT   SITE            19..20
+FT                   /note="Cleavage"
+FT   Tag: Cleavage1; Optional; Condition: A-T
+FT   SITE            204..205
+FT                   /note="Cleavage"
+FT   Tag: Cleavage2; Optional; Condition: G-A
+FT   SITE            590..591
+FT                   /note="Cleavage"
+FT   Tag: Cleavage3; Optional; Condition: [LV]-A
+FT   SITE            667..668
+FT                   /note="Cleavage"
+FT   Tag: Cleavage4; Optional; Condition: F-[DE]
+FT   SITE            894..895
+FT                   /note="Cleavage"
+FT   Tag: Cleavage5; Optional; Condition: [ST]-A
+FT   SITE            1522..1523
+FT                   /note="Cleavage"
+FT   Tag: Cleavage6; Optional; Condition: A-G
+FT   SITE            1576..1577
+FT                   /note="Cleavage"
+FT   Tag: Cleavage7; Optional; Condition: P-P
+FT   SITE            1867..1868
+FT                   /note="Cleavage"
+FT   Tag: Cleavage8; Optional; Condition: G-Y
+FT   SITE            2279..2280
+FT                   /note="Cleavage"
+FT   Tag: Cleavage9; Optional; Condition: A-S
+XX
+Size: 1000-4000;
+Related: None;
+Template: xxxxxx;
+Scope:
+ Viruses; Pegivirus
+Fusion:
+ Nter: None
+ Cter: None
+Duplicate: None
+Plasmid: None
+Comments: None
+XX
+# $Version$
+# $MDate$
+# $MBy$
+# $CDate$
+//

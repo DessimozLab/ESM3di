@@ -273,6 +273,28 @@ for header, aa_seq, pred_3di in results:
     print(f"3Di: {pred_3di}")
 ```
 
+### Polyprotein Cleavage Prediction CLI
+
+Run cleavage-site prediction from amino acid FASTA using ESM3Di embeddings and saved small classifiers:
+
+```bash
+esm3di-cut \
+    --input-fasta data/polyproteins.fasta \
+    --esm3di-checkpoint checkpoints/esm3di_from_mlm/epoch_5.pt \
+    --ffn-checkpoint polyprotein_cut/models/cutsite_ffn_all_data.pt \
+    --transformer-checkpoint polyprotein_cut/models/cutsite_transformer_all_data.pt \
+    --classifier ensemble \
+    --cutoff 0.6 \
+    --output-prefix outputs/polyprotein_cut
+```
+
+Outputs:
+- `{output_prefix}_residue_predictions.csv`: per-residue probabilities and binary cleavage calls.
+- `{output_prefix}_sequence_summary.csv`: per-sequence cleavage positions and number of products.
+- `{output_prefix}_cleaved_products.fasta`: cleaved products with headers in the form `original_id_cut[start:end]`.
+
+You can choose `--classifier ffn`, `--classifier transformer`, or `--classifier ensemble`.
+
 ### Creating FoldSeek Database
 
 Generate a FoldSeek-compatible database from amino acid sequences:
