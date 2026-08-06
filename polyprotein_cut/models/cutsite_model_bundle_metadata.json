@@ -1,0 +1,10 @@
+{
+  "ffn_checkpoint": "polyprotein_cut/models/cutsite_ffn_all_data.pt",
+  "transformer_checkpoint": "polyprotein_cut/models/cutsite_transformer_all_data.pt",
+  "esm3di_checkpoint": "/home/dmoi/projects/ESM3di/checkpoints/esm3di_from_mlm/epoch_5.pt",
+  "cutoff_default": 0.5,
+  "suggested_cli": {
+    "module": "python -m esm3di.cutting_cli",
+    "script": "esm3di-cut"
+  }
+}
