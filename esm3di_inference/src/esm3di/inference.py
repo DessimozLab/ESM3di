@@ -27,7 +27,7 @@ from peft import PeftModel, PeftConfig
 hf_logging.set_verbosity_error()
 logging.getLogger("torch.nn.attention").setLevel(logging.ERROR)
 
-from .io import read_fasta, write_fasta
+from ....io import read_fasta, write_fasta
 from .model import CNNClassificationHead, ESMWithCNNHead
 
 # Module logger
@@ -148,7 +148,6 @@ class ESM3DiPredictor:
                     return_tensors="pt",
                     padding=True,
                     truncation=True,
-                    max_length=1024,
                     add_special_tokens=True,
                     return_special_tokens_mask=True
                 )
@@ -242,7 +241,6 @@ class ESM3DiPredictor:
                         return_tensors="pt",
                         padding=True,
                         truncation=True,
-                        max_length=1024,
                         add_special_tokens=True,
                         return_special_tokens_mask=True
                     )
