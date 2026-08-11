@@ -25,7 +25,6 @@ dependencies = [
     "numpy>=1.24.0,<2.0.0",
     "peft>=0.10.0",
     "accelerate>=0.20.0",
-    "biopython>=1.80",
     "tqdm>=4.65.0",
     "huggingface_hub>=0.20.0",
     "safetensors>=0.4.0",
