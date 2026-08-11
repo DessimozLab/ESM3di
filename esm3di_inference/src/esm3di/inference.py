@@ -27,7 +27,7 @@ from peft import PeftModel, PeftConfig
 hf_logging.set_verbosity_error()
 logging.getLogger("torch.nn.attention").setLevel(logging.ERROR)
 
-from ....io import read_fasta, write_fasta
+from .io import read_fasta, write_fasta
 from .model import CNNClassificationHead, ESMWithCNNHead
 
 # Module logger
