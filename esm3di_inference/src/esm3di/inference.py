@@ -22,6 +22,7 @@ import torch.nn.functional as F
 from transformers import AutoModel, AutoTokenizer
 from transformers import logging as hf_logging
 from peft import PeftModel, PeftConfig
+from huggingface_hub import snapshot_download, hf_hub_download
 
 # Silence Hugging Face and PyTorch backend chatter
 hf_logging.set_verbosity_error()
@@ -65,14 +66,33 @@ class ESM3DiPredictor:
         )
         logger.info(f"Using device: {self.device} ({device_name})")
 
+
     def _initialize_model_backbone(self) -> None:
         """Internal worker to construct model hierarchy and load trained weights."""
+        
+        # 1. Resolve path: If it's a remote HF repo, download/cache it automatically
         if not Path(self.model_checkpoint_path).exists():
-            raise FileNotFoundError(f"Configuration directory not found: {self.model_checkpoint_path}")
+            logger.info(f"'{self.model_checkpoint_path}' not found locally. Downloading from Hugging Face Hub...")
+            try:
+                # This downloads the entire adapter folder (including config, adapter_model.bin, cnn_head.bin)
+                local_dir = snapshot_download(
+                    repo_id=self.model_checkpoint_path,
+                    revision=self.revision,
+                    # Avoid downloading the heavy base model if it accidentally exists in the same repo
+                    ignore_patterns=["*.ckpt", "*.pt"] 
+                )
+                resolved_path = Path(local_dir)
+            except Exception as e:
+                raise FileNotFoundError(
+                    f"Could not find local path or HF repo for '{self.model_checkpoint_path}'. Error: {e}"
+                )
+        else:
+            resolved_path = Path(self.model_checkpoint_path)
 
         # Redirect standard output to suppress implicit model instantiation prints
         with open(os.devnull, 'w') as fnull, contextlib.redirect_stdout(fnull):
-            peft_config = PeftConfig.from_pretrained(self.model_checkpoint_path)
+            # Use resolved_path instead of self.model_checkpoint_path
+            peft_config = PeftConfig.from_pretrained(resolved_path)
             base_model_name = peft_config.base_model_name_or_path
 
             base_model = AutoModel.from_pretrained(
@@ -91,13 +111,14 @@ class ESM3DiPredictor:
                     revision=self.revision,
                 )
 
-            peft_model = PeftModel.from_pretrained(base_model, self.model_checkpoint_path)
+            peft_model = PeftModel.from_pretrained(base_model, resolved_path)
             hidden_size = base_model.config.hidden_size
             cnn_head = CNNClassificationHead(hidden_size=hidden_size)
 
             self.model = ESMWithCNNHead(peft_model=peft_model, cnn_head=cnn_head)
 
-            cnn_weights_path = Path(self.model_checkpoint_path) / "cnn_head.bin"
+            # Look for cnn_head.bin in the resolved cache directory
+            cnn_weights_path = resolved_path / "cnn_head.bin"
             if cnn_weights_path.exists():
                 self.model.cnn_head.load_state_dict(
                     torch.load(cnn_weights_path, map_location=self.device)
