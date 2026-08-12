@@ -1,0 +1,30 @@
+import os
+import glob
+import snakemake.utils
+
+snakemake.utils.min_version("7.8.0")
+
+# 1. Load Configurations
+configfile: "config/config.yaml"
+
+# 2. Global Workflow Variables
+mattypes = ['foldtree']
+
+# Identify target folders containing sequence datasets
+if "folder" not in config or not config["folder"]:
+    # Automatically scan for folders in results/ containing sequences.fasta
+    discovered = glob_wildcards("results/{folder}/sequences.fasta").folder
+    config["folder"] = discovered
+
+# 3. Target Rule (Defines the final outputs needed)
+rule all:
+    input:
+        expand(
+            "results/{folder}/{mattype}_struct_tree.PP.nwk.rooted.final",
+            folder=config["folder"],
+            mattype=mattypes
+        )
+
+# 4. Include Rule Modules
+include: "rules/database_ops.smk"
+include: "rules/tree_building.smk"

@@ -1,0 +1,24 @@
+viral-foldtree/
+├── .gitignore
+├── README.md
+├── LICENSE.md
+├── workflow/
+│   ├── Snakefile             # The core workflow engine orchestrating the rules
+│   ├── rules/
+│   │   ├── tree_building.smk # Rules for foldseek2distmat, quicktree, and madroot
+│   │   └── database_ops.smk  # Rules for esm3di prediction and foldseek db creation
+│   ├── envs/
+│   │   ├── esm3di.yaml       # Torch + transformers + your local pyproject package
+│   │   └── foldtree.yaml     # Foldseek, Quicktree, MAD, and standard bioinformatics tools
+│   └── scripts/
+│       ├── fasta2foldseek.py # Converts AA + 3Di fasta files to Foldseek db format
+│       ├── foldseekres2distmat_simple.py
+│       ├── postprocess.py
+│       └── process_madroot.py
+├── config/
+│   ├── config.yaml           # User configurations (cores, paths, batch sizes)
+│   └── samples.tsv           # List of viral sequence directory targets (optional)
+├── resources/
+│   └── madroot/              # Submodule or binary folder for MAD path dependency
+├── results/                  # Generated trees, distance matrices, and databases
+└── esm3di/                   # Optional: Added as a Git Submodule for local development

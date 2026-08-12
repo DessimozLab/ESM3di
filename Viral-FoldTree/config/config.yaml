@@ -1,0 +1,17 @@
+# config/config.yaml
+
+# Paths to dependencies
+foldseek_path: "foldseek"   
+
+# ESM3di Inference Configurations
+# config/config.yaml
+esm3di_model_ckpt: "checkpoints/hf_compatible"    # local path to the ESM3di model checkpoint, once up on HF can be removed
+esm3di_batch_size: 4          # Drop to 1 or 2 if testing on small GPUs/CPUs
+esm3di_threads: 4
+esm3di_gpus: 1                # Set to 0 if forcing CPU-only execution
+
+# Foldseek Execution Configurations
+foldseek_threads: 8
+
+# MAD Rooting Configurations
+mad_path: "madroot/mad"  # Path to the MAD executable !!compiled for Mac os!!

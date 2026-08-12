@@ -85,3 +85,4 @@ venv.bak/
 /esm3di_inference/data
 /esm3di_inference/data
 test_script.py
+/Viral-FoldTree/.snakemake
