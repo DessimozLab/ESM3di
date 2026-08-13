@@ -13,13 +13,13 @@ rule foldseek2distmat:
     conda:
         "../envs/foldtree.yaml"
     input:
-        "results/{folder}/allvall_1.csv"
+        "results/{dataset}/allvall_1.csv"
     output:
-        "results/{folder}/foldtree_fastmemat.txt"
+        "results/{dataset}/foldtree_fastmemat.txt"
     params:
         fmt = None,
     log:
-        "results/{folder}/logs/foldseek2distmat.log"
+        "results/{dataset}/logs/foldseek2distmat.log"
     script:
         "../scripts/foldseekres2distmat_simple.py"
 
@@ -30,11 +30,11 @@ rule quicktree:
     conda:
         "../envs/foldtree.yaml"
     input:
-        "results/{folder}/{mattype}_fastmemat.txt"
+        "results/{dataset}/{mattype}_fastmemat.txt"
     output:
-        "results/{folder}/{mattype}_struct_tree.nwk"
+        "results/{dataset}/{mattype}_struct_tree.nwk"
     log:
-        "results/{folder}/logs/{mattype}_quicktree.log"
+        "results/{dataset}/logs/{mattype}_quicktree.log"
     shell:
         """
         quicktree -i m {input} > {output} 2> {log}
@@ -47,11 +47,11 @@ rule postprocess_tree:
     conda:
         "../envs/foldtree.yaml"
     input:
-        "results/{folder}/{mattype}_struct_tree.nwk"
+        "results/{dataset}/{mattype}_struct_tree.nwk"
     output:
-        "results/{folder}/{mattype}_struct_tree.PP.nwk"
+        "results/{dataset}/{mattype}_struct_tree.PP.nwk"
     log:
-        "results/{folder}/logs/{mattype}_struct_postprocess.log"
+        "results/{dataset}/logs/{mattype}_struct_postprocess.log"
     script:
         "../scripts/postprocess.py"
 
@@ -62,11 +62,11 @@ rule mad_root_struct:
     conda:
         "../envs/foldtree.yaml"
     input:
-        "results/{folder}/{mattype}_struct_tree.PP.nwk"
+        "results/{dataset}/{mattype}_struct_tree.PP.nwk"
     output:
-        "results/{folder}/{mattype}_struct_tree.PP.nwk.rooted"
+        "results/{dataset}/{mattype}_struct_tree.PP.nwk.rooted"
     log:
-        "results/{folder}/logs/{mattype}_struct_madroot.log"
+        "results/{dataset}/logs/{mattype}_struct_madroot.log"
     params:
         mad=config.get("mad_path", "madroot/mad")
     shell:
@@ -81,11 +81,11 @@ rule mad_root_post:
     conda:
         "../envs/foldtree.yaml"
     input:
-        "results/{folder}/{mattype}_struct_tree.PP.nwk.rooted"
+        "results/{dataset}/{mattype}_struct_tree.PP.nwk.rooted"
     output:
-        "results/{folder}/{mattype}_struct_tree.PP.nwk.rooted.final"
+        "results/{dataset}/{mattype}_struct_tree.PP.nwk.rooted.final"
     log:
-        "results/{folder}/logs/{mattype}_struct_madroot_post.log"
+        "results/{dataset}/logs/{mattype}_struct_madroot_post.log"
     script:
         "../scripts/process_madroot.py"
 

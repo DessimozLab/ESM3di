@@ -10,18 +10,44 @@ configfile: "config/config.yaml"
 # 2. Global Workflow Variables
 mattypes = ['foldtree']
 
-# Identify target folders containing sequence datasets
-if "folder" not in config or not config["folder"]:
-    # Automatically scan for folders in results/ containing sequences.fasta
-    discovered = glob_wildcards("results/{folder}/sequences.fasta").folder
-    config["folder"] = discovered
+import os
+from glob import glob
 
+# 1. Fallback default if the user forgot to set it in config.yaml
+if "dataset" not in config or not config["dataset"]:
+    config["dataset"] = "test_virus_dataset"
+
+# 2. Dynamically look inside data/{dataset}/ for any .fasta, .fa, or .aa files
+
+if config["sequences"] == "":
+    dataset_dir = f"data/{config['dataset']}"
+    found_sequences = []
+
+    if os.path.exists(dataset_dir):
+        # Scan the directory for common FASTA extensions
+        found_sequences = [
+            f for f in os.listdir(dataset_dir) 
+            if f.endswith((".fasta", ".fa", ".fas", ".fna", ".ffn", ".frn", ".aa", ".faa"))
+        ]
+
+    # 3. Assign the target file name or handle errors gracefully
+    if len(found_sequences) == 1:
+        config["sequences"] = found_sequences[0]
+    elif len(found_sequences) > 1:
+        # If there are multiple fasta files, pick the first one but print a warning
+        config["sequences"] = found_sequences[0]
+        print(f"⚠️ WARNING: Multiple FASTA files found in {dataset_dir}. Using {config['sequences']}.")
+    else:
+        # Fallback name if the directory is empty or doesn't exist yet (prevents immediate crash during dry-runs)
+        config["sequences"] = "sequences.fasta"
+
+print(f"Using sequence file: {config['sequences']} for dataset: {config['dataset']}")
 # 3. Target Rule (Defines the final outputs needed)
 rule all:
     input:
         expand(
-            "results/{folder}/{mattype}_struct_tree.PP.nwk.rooted.final",
-            folder=config["folder"],
+            "results/{dataset}/{mattype}_struct_tree.PP.nwk.rooted.final",
+            dataset=config["dataset"],
             mattype=mattypes
         )
 

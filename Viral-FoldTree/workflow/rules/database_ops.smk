@@ -8,12 +8,12 @@ rule build_esm3di_foldseek_db:
     conda:
         "../envs/esm3di.yaml"
     input:
-        fasta="results/{folder}/sequences_20.fasta"
+        fasta="data/{dataset}/" + config['sequences'] # Later move input definition to config file
     output:
         # Foldseek DB outputs a series of database files with this prefix
-        db=multiext("results/{folder}/db", "", "_h", "_ss")
+        db=multiext("results/{dataset}/db", "", "_h", "_ss")
     params:
-        db_prefix="results/{folder}/db",
+        db_prefix="results/{dataset}/db",
         batch_size=config.get("esm3di_batch_size", 4),
         model_ckpt=config.get("esm3di_model_ckpt", ""),
         extra_flags=(
@@ -21,7 +21,7 @@ rule build_esm3di_foldseek_db:
             if config.get("esm3di_model_ckpt", "") else ""
         )
     log:
-        "results/{folder}/logs/build_esm3di_foldseek_db.log"
+        "results/{dataset}/logs/build_esm3di_foldseek_db.log"
 
     # threads: config.get("esm3di_threads", 4)
     # resources: gpu=config.get("esm3di_gpus", 1)
@@ -42,15 +42,15 @@ rule foldseek_allvall:
     conda:
         "../envs/foldtree.yaml"
     input:
-        db=multiext("results/{folder}/db", "", "_h", "_ss")
+        db=multiext("results/{dataset}/db", "", "_h", "_ss")
     output:
-        aln="results/{folder}/allvall_1.csv"
+        aln="results/{dataset}/allvall_1.csv"
     params:
-        db_prefix="results/{folder}/db",
-        tmp_dir="results/{folder}/tmp",
+        db_prefix="results/{dataset}/db",
+        tmp_dir="results/{dataset}/tmp",
         foldseek=config.get("foldseek_path", "foldseek")
     log:
-        "results/{folder}/logs/foldseek_allvall.log"
+        "results/{dataset}/logs/foldseek_allvall.log"
     #threads: config.get("foldseek_threads", 8)
     shell:
         """
