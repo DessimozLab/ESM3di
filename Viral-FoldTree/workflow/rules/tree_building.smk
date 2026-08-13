@@ -71,7 +71,7 @@ rule mad_root_struct:
         mad=config.get("mad_path", "madroot/mad")
     shell:
         """
-        {params.mad} {input} > {output} 2> {log}
+        {params.mad} {input} -n >> {log} 2>&1
         """
 
 rule mad_root_post:
