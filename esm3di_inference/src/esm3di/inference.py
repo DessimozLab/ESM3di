@@ -36,7 +36,7 @@ logger = logging.getLogger("esm3di")
 
 # Path resolution defaults
 PACKAGE_ROOT = Path(__file__).resolve().parent
-DEFAULT_HF_REPO = PACKAGE_ROOT.parents[1] / "checkpoints" / "hf_compatible"
+DEFAULT_HF_REPO = "cactuskid13/ESM3di_Small_MLM_3di"
 DEFAULT_BATCH_SIZE = 4
 DEFAULT_REVISION = "46c5f7d"
 VOCAB_3DI = list("ACDEFGHIKLMNPQRSTVWY")
@@ -72,16 +72,14 @@ class ESM3DiPredictor:
         
         # 1. Resolve path: If it's a remote HF repo, download/cache it automatically
         if not Path(self.model_checkpoint_path).exists():
-            logger.info(f"'{self.model_checkpoint_path}' not found locally. Downloading from Hugging Face Hub...")
+            logger.info(f"'Downloading model {self.model_checkpoint_path}' from Hugging Face Hub...")
             try:
                 # This downloads the entire adapter folder (including config, adapter_model.bin, cnn_head.bin)
-                local_dir = snapshot_download(
-                    repo_id=self.model_checkpoint_path,
-                    revision=self.revision,
-                    # Avoid downloading the heavy base model if it accidentally exists in the same repo
-                    ignore_patterns=["*.ckpt", "*.pt"] 
+                local_repo_root = snapshot_download(
+                repo_id=self.model_checkpoint_path,
+                allow_patterns=["hf_compatible", "hf_compatible/**"]
                 )
-                resolved_path = Path(local_dir)
+                resolved_path = Path(local_repo_root) / "hf_compatible"
             except Exception as e:
                 raise FileNotFoundError(
                     f"Could not find local path or HF repo for '{self.model_checkpoint_path}'. Error: {e}"
