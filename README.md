@@ -1,20 +1,6 @@
 # ESM3Di
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/DessimozLab/ESM3di/blob/main/ESM3Di_Colab.ipynb)
-
 ESM + PEFT LoRA for 3Di per-residue prediction. Train ESM-2 or ESM++ models with LoRA adapters to predict 3Di structural sequences from amino acid sequences.
-
-## Try It Online
-
-**No installation required!** Run ESM3Di directly in Google Colab with GPU support:
-
-[**→ Open ESM3Di in Colab**](https://colab.research.google.com/github/DessimozLab/ESM3di/blob/main/ESM3Di_Colab.ipynb)
-
-The Colab notebook allows you to:
-- Predict 3Di sequences from amino acid FASTAs
-- Choose between ESM2 and ESM++ models
-- Download results as FASTA files
-- Create FoldSeek databases
 
 ## Features
 
