@@ -88,3 +88,6 @@ test_script.py
 /Viral-FoldTree/.snakemake
 /Viral-FoldTree/results
 /Viral-FoldTree/results
+/refolded_fullglyco_E1_aa
+/refolded_fullglyco_E2_aa
+/refolded_fullglyco_E_aa

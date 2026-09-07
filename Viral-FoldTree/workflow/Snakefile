@@ -52,5 +52,7 @@ rule all:
         )
 
 # 4. Include Rule Modules
-include: "rules/database_ops.smk"
+#include: "rules/database_ops.smk"
+#include: "rules/3di_to_db.smk"
+include: "rules/prostt5_db.smk"
 include: "rules/tree_building.smk"
