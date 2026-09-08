@@ -1,0 +1,30 @@
+name: foldtree
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - python=3.10
+  - pip
+
+  # Structural & Phylogenetic tools
+  - foldseek
+  - quicktree
+  - toytree=2.0.1
+
+  # Core Data Science & Math stack (covers pandas, numpy, scipy, statsmodels)
+  - pandas
+  - numpy
+  - scipy
+  - statsmodels
+  - biopython
+
+  # Code Formatting & Utilities
+  - snakedeploy
+  - snakefmt
+
+  - pip:
+      - toyplot
+      - tqdm
+      - wget
+      - requests

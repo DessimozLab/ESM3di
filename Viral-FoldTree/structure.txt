@@ -1,0 +1,11 @@
+├── Viral-FoldTree/                  # Snakemake Pipeline Directory
+│   ├── workflow/                    # The engine (Keep)
+│   │   ├── Snakefile
+│   │   ├── rules/
+│   │   ├── envs/                    # Conda YAMLs
+│   │   └── scripts/                 # Helper scripts
+│   ├── config/                      # Pipeline configuration (Keep)
+│   │   └── config.yaml              # Default user settings
+│   ├── tests/ (or test_data/)       # Minimal test dataset (Keep)
+│   │   └── test_virus_dataset/      # Small FASTA/DB to verify `snakemake --dry-run`
+│   └── README.md                    # Pipeline-specific usage instructions

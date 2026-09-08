@@ -1,0 +1,30 @@
+name: esm3di
+channels:
+  - conda-forge
+  #- nvidia
+dependencies:
+  # Python constraint matching your pyproject.toml (>=3.9)
+  - python=3.10
+  - pip
+  
+  # PyTorch core dependencies matching your >=2.0.0 requirement
+  #- pytorch::pytorch>=2.0.0
+  #- pytorch::pytorch-cuda=11.8  # Set to 12.1 if your GPU cluster uses CUDA 12
+  
+  # Python packages from pyproject.toml installed via pip + Git package link
+  - pip:
+      - torch>=2.0.0
+      # Dependencies explicitly declared in your pyproject.toml
+      - "transformers>=4.40.0,<5.0.0"
+      - "numpy>=1.24.0,<2.0.0"
+      - "peft>=0.10.0"
+      - "accelerate>=0.20.0"
+      - "tqdm>=4.65.0"
+      - "huggingface_hub>=0.20.0"
+      - "safetensors>=0.4.0"
+      - "einops>=0.7.0"
+      
+      # Direct installation of esm3di package from release branch & subdirectory
+      # Target Branch: inference-release
+      # Subdirectory: esm3di_inference (contains pyproject.toml)
+      - "git+https://github.com/DessimozLab/ESM3di.git@inference-release#subdirectory=esm3di_inference"
