@@ -1,0 +1,36 @@
+ESM3di/                              # Repository Root
+├── src/                             # Python source directory
+│   └── esm3di/                      # The actual importable package
+│       ├── __init__.py              # exposes ESM3DiPredictor
+│       ├── cli.py                   # Package CLI (predict, phylo)
+│       ├── model.py
+│       ├── inference.py
+│       ├── io.py
+│       └── preprocessing.py
+│
+├── tests/                           # Top-level package tests
+├── workflows/
+│
+├── workflows/                       # Embedded Snakemake Pipeline
+│   ├── Snakefile                    # End-to-end (3Di -> FoldTree -> Tree)
+│   ├── envs/                        # Conda environments for rule execution
+│   ├── rules/                       # Modular Snakemake rules
+│   └── scripts/                     # Helper scripts used inside rules
+│
+├── checkpoints/                     # Model Weights (leave them on repo)
+│   └── hf_compatible/               # Tracked via Git LFS
+│
+├── research_archive/                # Dump of Legacy Research & Experimental Code 
+						    Basically all the content current Master branch
+│   ├── training/                    # Legacy model training & fine-tuning
+│   ├── experiments/                 # Failed/experimental approaches
+│   ├── notebooks/                   # Original results & paper figures
+│   └── legacy_readme.md             # Brief guide for your colleague
+│
+├── paper_results/                	  # Cleaned Benchmark Reproducibility
+│   ├── data/                        # Small sample input files
+│   └── run_paper_figures.sh         # Simple entry point to recreate figures
+│
+├── .gitignore                       # Standard rules + ignore outputs/
+├── README.md                        # Master project guide
+└── pyproject.toml                   # Root-level configuration / dev setup
