@@ -86,8 +86,8 @@ def main():
     )
     predict_parser.add_argument(
         "--input-fasta",
-        default="example_input.fasta",
-        help="Path to input amino acid FASTA file (default: example_input.fasta)"
+        default="test_data/example_input.fasta",
+        help="Path to input amino acid FASTA file (default: test_data/example_input.fasta)"
     )
     predict_parser.add_argument(
         "--output-fasta",
@@ -103,8 +103,8 @@ def main():
     )
     foldseek_parser.add_argument(
         "--input-fasta",
-        default="example_input.fasta",
-        help="Path to input amino acid FASTA file (default: example_input.fasta)"
+        default="test_data/example_input.fasta",
+        help="Path to input amino acid FASTA file (default: test_data/example_input.fasta)"
     )
     foldseek_parser.add_argument(
         "--output-db",
@@ -120,8 +120,8 @@ def main():
     )
     perplexity_parser.add_argument(
         "--input-fasta",
-        default="example_input.fasta",
-        help="Path to input amino acid FASTA file (default: example_input.fasta)"
+        default="test_data/example_input.fasta",
+        help="Path to input amino acid FASTA file (default: test_data/example_input.fasta)"
     )
     perplexity_parser.add_argument(
         "--output-tsv",
@@ -137,7 +137,7 @@ def main():
     )
     foldtree_parser.add_argument(
         "-i", "--input-fasta",
-        default="data/test_virus_dataset/sequences.fasta",
+        default="test_data/test_virus.fasta",
         help="Path to input amino acid FASTA file or directory containing FASTA files."
     )
     foldtree_parser.add_argument(
@@ -160,6 +160,11 @@ def main():
         "-n", "--dry-run",
         action="store_true",
         help="Do not execute anything; print the execution plan and rules that would be run."
+    )
+    foldtree_parser.add_argument(
+        "--use-prostt5",
+        action="store_true",
+        help="Use ProsTt5 instead of ESM3di for 3Di prediction (default: False)"
     )
     add_common_args(foldtree_parser)
 
@@ -189,6 +194,13 @@ def main():
             with as_file(pkg_wf_resource) as src_path:
                 shutil.copytree(src_path, staged_wf_dir)
 
+            # Ensure bundled binaries retain executable permissions
+            madroot_dir = staged_wf_dir / "madroot"
+            if madroot_dir.exists():
+                for bin_path in madroot_dir.iterdir():
+                    if bin_path.is_file():
+                        bin_path.chmod(bin_path.stat().st_mode | 0o111)
+
             # 2. Store conda environments outside staged workflow so they persist
             conda_prefix = output_dir / ".snakemake_conda"
 
@@ -197,7 +209,8 @@ def main():
                 f"output_dir={output_dir.resolve()}",
                 f"esm3di_model_ckpt={args.model_ckpt}",
                 f"esm3di_batch_size={args.batch_size}",
-                f"esm3di_revision={args.revision}"
+                f"esm3di_revision={args.revision}",
+                f"use_prostt5={args.use_prostt5}"
             ]
             if args.num_gpus is not None:
                 snakemake_config.append(f"esm3di_gpus={args.num_gpus}")
@@ -206,6 +219,7 @@ def main():
                 "snakemake",
                 "--snakefile", "Snakefile",
                 "--cores", str(args.cores),
+                "--scheduler", "greedy",
                 "--config", *snakemake_config,
                 "--use-conda",
                 "--conda-frontend", "conda",

@@ -8,3 +8,7 @@ esm3di_gpus: null
 
 # MAD Rooting Configurations
 mad_path: "madroot/mad"
+
+# ProsTt5 Configurations
+use_prostt5: false
+prostt5_model_path: "prostt5/prostt5_model.pt"

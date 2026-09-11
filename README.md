@@ -4,16 +4,17 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyTorch](https://img.shields.io/badge/PyTorch-%22.0%2B-ee4c2c.svg)](https://pytorch.org/)
 
-**ESM3Di** predicts 3D interaction (3Di) structural alphabets directly from primary amino acid sequences using fine-tuned ESM models (specifically optimized for viral protein structures). By bypassing explicit 3D atomic coordinate prediction, `esm3di` enables ultra-fast structural alignment and database construction for [Foldseek](https://github.com/steineggerlab/foldseek) at scale.
+**ESM3Di** predicts 3D interaction (3Di) structural alphabets directly from primary amino acid sequences using fine-tuned ESM models (specifically optimized for viral protein structures). By bypassing explicit 3D atomic coordinate prediction, `esm3di` enables ultra-fast structural alignment, database construction for [Foldseek](https://github.com/steineggerlab/foldseek), and automated phylogenetic tree generation at scale.
 
 ---
 
 ## ✨ Features
 
 - **Direct Sequence-to-3Di Prediction:** Translates protein amino acid FASTA inputs to Foldseek 3Di strings in seconds.
-- **Native Foldseek Integration:** Direct compilation of structural databases (`.db` files) without needing PDB/mmCIF generation.
-- **Per-Residue Model Confidence:** Computes per-token perplexity scores to flag uncertain regions or low-confidence predictions.
-- **Scalable Execution:** Supports single-CPU testing as well as multi-GPU parallel batched processing across available hardware accelerators.
+- **Native Foldseek Integration:** Compiles structural databases (`.db` files) directly without requiring PDB/mmCIF generation.
+- **Per-Residue Model Confidence:** Computes token-level perplexity scores to flag uncertain regions or low-confidence predictions.
+- **End-to-End Structural Phylogenetics (`foldtree`):** Automated Snakemake workflow for 3Di prediction, structural alignment, and phylogenetic tree reconstruction (supports both ESM3Di and ProsTT5 backends).
+- **Scalable Hardware Execution:** Multi-GPU parallel batched processing with automatic CPU fallback.
 
 ---
 
@@ -36,156 +37,183 @@ cd ESM3di
 conda create -n esm3di python=3.10 -y
 conda activate esm3di
 
-# Install ESM3Di
+# Install ESM3Di in editable mode
 pip install -e .
-
 ```
 
-> **Note on GPU Acceleration:** Standard `pip install -e .` will pull the default PyTorch wheel. If your GPU cluster requires a specific CUDA toolkit version (e.g., CUDA 12.1), pre-install PyTorch via the [official PyTorch guide](https://pytorch.org/get-started/locally/) prior to running `pip install -e .`.
+> **Note on GPU Acceleration:** Standard `pip install -e .` pulls the default PyTorch wheel. If your GPU cluster requires a specific CUDA toolkit version (e.g., CUDA 12.1), pre-install PyTorch via the [official PyTorch guide](https://pytorch.org/get-started/locally/) before running `pip install -e .`.
 
 ---
 
 ## 🚀 Quick Start
 
-Run 3Di predictions on an example FASTA file:
+Run 3Di predictions, build databases, or reconstruct phylogenetic trees:
 
 ```bash
-# Predict 3Di sequences
-esm3di predict --input-fasta example_input.fasta --output-fasta outputs/output_3di.fasta
+# 1. Predict 3Di sequences
+esm3di predict --input-fasta test_data/test_virus.fasta --output-fasta outputs/output_3di.fasta
 
-# Build a Foldseek database directly
-esm3di build-foldseek-db --input-fasta example_input.fasta --output-db outputs/foldseek_db
+# 2. Build a Foldseek database directly
+esm3di foldseek-db --input-fasta test_data/test_virus.fasta --output-db outputs/foldseek_db
 
+# 3. Run full phylogenetic tree inference (FoldTree pipeline)
+esm3di foldtree -i test_data/test_virus.fasta -o results --cores 8
 ```
 
 ---
 
 ## 💻 Command Line Interface (CLI)
 
-`esm3di` provides three core subcommands: `predict`, `build-foldseek-db` (aliases: `foldseek-db`, `foldseek`), and `perplexity`.
+`esm3di` provides four subcommands: `predict`, `foldseek-db`, `perplexity`, and `foldtree`.
 
 ```text
-usage: esm3di [-h] {predict,build-foldseek-db,perplexity} ...
+usage: esm3di [-h] {predict,foldseek-db,perplexity,foldtree} ...
 
 positional arguments:
-  {predict,build-foldseek-db,perplexity}
-    predict             Predict 3Di structural sequences from an amino acid FASTA file and save as FASTA.
-    build-foldseek-db   Predict 3Di sequences and compile directly into a Foldseek-compatible database (aliases: foldseek-db, foldseek).
+  {predict,foldseek-db,perplexity,foldtree}
+    predict             Predict 3Di sequences from an amino acid FASTA file and save to FASTA.
+    foldseek-db         Predict 3Di sequences and compile directly into a Foldseek-compatible database.
     perplexity          Calculate model confidence (perplexity) for each residue position and export to TSV.
-
+    foldtree            Run end-to-end 3Di prediction and phylogenetic tree inference via Snakemake.
 ```
+
+---
+
+### Common Options
+
+The following flags are available across all subcommands:
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--model-ckpt` | `str` | [`cactuskid13/ESM3di_Small_MLM_3di`](https://huggingface.co/cactuskid13/ESM3di_Small_MLM_3di/tree/main/hf_compatible) | Hugging Face repository ID or local checkpoint path or  |
+| `--num-gpus` | `int` | `None` | Number of GPUs to use (default: use all available). |
+| `--revision` | `str` | `46c5f7d` | Hugging Face model revision or commit SHA. |
+| `--batch-size` | `int` | `4` | Inference batch size per device. |
 
 ---
 
 ### 1. `predict` — Generate 3Di FASTA
 
-Translates amino acid sequences into matching 3Di structural sequences.
+Translates amino acid sequences into matching 3Di structural sequences saved in FASTA format.
 
 ```bash
 esm3di predict \
-  --input-fasta example_input.fasta \
+  --input-fasta test_data/test_virus.fasta \
   --output-fasta outputs/output_3di.fasta \
-  --batch-size 4
-
+  --batch-size 8
 ```
 
-**Options:**
+**Subcommand Flags:**
 
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
-| `--input-fasta` | `str` | `example_input.fasta` | Input protein amino acid FASTA file. |
+| `--input-fasta` | `str` | `test_data/example_input.fasta` | Input protein amino acid FASTA file. |
 | `--output-fasta` | `str` | `outputs/output_3di.fasta` | Destination path for output 3Di FASTA file. |
-| `--model-ckpt` | `str` | *[Default Weights]* | Optional path to local checkpoint or Hugging Face repo ID. |
-| `--revision` | `str` | `46c5f7d` | Base model Hugging Face revision/commit SHA for base model loading. |
-| `--batch-size` | `int` | `4` | Inference batch size per device. |
-| `--num-gpus` | `int` | `None` | Number of GPUs to use (default: use all available). |
 
 ---
 
-### 2. `build-foldseek-db` — Build Foldseek Database
+### 2. `foldseek-db` — Build Foldseek Database
 
-Runs sequence prediction and automatically formats output into a binary Foldseek structure database ready for immediate alignment searches. *(Aliases: `foldseek-db`, `foldseek`)*
+Runs sequence prediction and automatically formats output into a binary Foldseek structure database ready for alignment searches.
 
 ```bash
-esm3di build-foldseek-db \
-  --input-fasta example_input.fasta \
+esm3di foldseek-db \
+  --input-fasta test_data/test_virus.fasta \
   --output-db outputs/foldseek_db
-
 ```
 
-**Options:**
+**Subcommand Flags:**
 
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
-| `--input-fasta` | `str` | `example_input.fasta` | Input protein amino acid FASTA file. |
+| `--input-fasta` | `str` | `test_data/example_input.fasta` | Input protein amino acid FASTA file. |
 | `--output-db` | `str` | `outputs/foldseek_db` | Prefix path for output Foldseek database files. |
-| `--model-ckpt` | `str` | *[Default Weights]* | Optional path to local checkpoint or Hugging Face repo ID. |
-| `--revision` | `str` | `46c5f7d` | Base model Hugging Face revision/commit SHA for base model loading. |
-| `--batch-size` | `int` | `4` | Inference batch size per device. |
-| `--num-gpus` | `int` | `None` | Number of GPUs to use (default: use all available). |
 
 ---
 
 ### 3. `perplexity` — Per-Residue Confidence Metrics
 
-Calculates token confidence/perplexity scores for each amino acid position across sequences.
+Calculates token confidence/perplexity scores for each amino acid position across sequences and exports to TSV.
 
 ```bash
 esm3di perplexity \
-  --input-fasta example_input.fasta \
+  --input-fasta test_data/test_virus.fasta \
   --output-tsv outputs/output_confidence.tsv
-
 ```
 
-**Options:**
+**Subcommand Flags:**
 
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
-| `--input-fasta` | `str` | `example_input.fasta` | Input protein amino acid FASTA file. |
+| `--input-fasta` | `str` | `test_data/example_input.fasta` | Input protein amino acid FASTA file. |
 | `--output-tsv` | `str` | `outputs/output_confidence.tsv` | Target path to export TSV metrics file. |
-| `--model-ckpt` | `str` | *[Default Weights]* | Optional path to local checkpoint or Hugging Face repo ID. |
-| `--revision` | `str` | `46c5f7d` | Base model Hugging Face revision/commit SHA for base model loading. |
-| `--batch-size` | `int` | `4` | Inference batch size per device. |
 
 ---
 
-### Python API Usage
+### 4. `foldtree` — End-to-End Phylogenetic Tree Inference
+
+Executes an embedded Snakemake workflow to predict 3Di states, align structural sequences, and build rooted phylogenetic trees.
+
+```bash
+# Run standard ESM3Di FoldTree workflow
+esm3di foldtree -i test_data/test_virus.fasta -o results --cores 8
+
+# Run dry-run to preview execution steps
+esm3di foldtree -i test_data/test_virus.fasta -o results -n
+
+# Use ProsTT5 backend instead of ESM3Di
+esm3di foldtree -i test_data/test_virus.fasta -o results --use-prostt5
+```
+
+**Subcommand Flags:**
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `-i`, `--input-fasta` | `str` | `test_data/test_virus.fasta` | Input FASTA file or directory containing FASTA files. |
+| `-o`, `--output-dir` | `str` | `results` | Directory to save phylogenetic trees and intermediate files. |
+| `-d`, `--dataset` | `str` | `None` | Dataset identifier prefix (defaults to input file stem). |
+| `-c`, `--cores` | `int` | `4` | Number of CPU cores for Snakemake execution. |
+| `-n`, `--dry-run` | `flag` | `False` | Print execution plan and rules without executing. |
+| `--use-prostt5` | `flag` | `False` | Use ProstT5 instead of ESM3Di for 3Di prediction. |
+
+---
+
+## 🐍 Python API Usage
 
 ```python
 import logging
 from esm3di.inference import ESM3DiPredictor
 from esm3di.io import fasta2foldseek
 
-# Enable logging output for standard Python scripts
+# Configure logger
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     datefmt="%H:%M:%S"
 )
 
-# Initialize predictor (optionally pass revision="46c5f7d")
-predictor = ESM3DiPredictor.from_pretrained(revision="46c5f7d")
+# Initialize predictor
+predictor = ESM3DiPredictor.from_pretrained("DessimozLab/esm3di", revision="46c5f7d")
 
 # 1. In-Memory Sequence Prediction
 sequence = "MKTVRQERLKSIVRILERSKEPVSGAQLAEELSVSRQVIVQDIAYLRSLGYNIVATPRGYVLAGG"
 p_3di = predictor.predict(sequence)
 print(f"3Di Output: {p_3di}\n")
 
-# 2. FASTA to 3Di FASTA & Foldseek Database
-predictor.predict_fasta("example_input.fasta", "outputs/output_3di.fasta", batch_size=4)
+# 2. FASTA Translation & Foldseek Database Compilation
+predictor.predict_fasta("test_data/test_virus.fasta", "outputs/output_3di.fasta", batch_size=4)
 fasta2foldseek(
-    aa_input="example_input.fasta",
+    aa_input="test_data/test_virus.fasta",
     tdi_input="outputs/output_3di.fasta",
     output_basename="outputs/foldseek_db"
 )
 
-# 3. Per-Residue Perplexity Assessment
+# 3. Per-Residue Perplexity Calculation
 predictor.output_per_position_perplexity(
-    input_fasta_path="example_input.fasta",
+    input_fasta_path="test_data/test_virus.fasta",
     output_tsv_path="outputs/output_confidence.tsv",
     batch_size=16
 )
-
 ```
 
 ---
@@ -193,28 +221,52 @@ predictor.output_per_position_perplexity(
 ## 📁 Repository Structure
 
 ```text
-esm3di_inference/
-├── checkpoints/
-│   └── hf_compatible/       # Pre-trained ESM3Di weights (Git LFS)
-├── src/
-│   └── esm3di/
-│       ├── __init__.py      # Package entry point
-│       ├── cli.py           # Command-line interface router
-│       ├── inference.py     # Core inference engine & API predictor
-│       ├── io.py            # File I/O and Foldseek DB formatting
-│       ├── model.py         # Neural network architecture definitions
-│       └── preprocessing.py # Sequence sharding utilities for multi-GPU
-├── example_input.fasta      # Example amino acid FASTA file
-├── pyproject.toml           # Package configuration & dependencies
-└── README.md                # Project documentation
-
+ESM3di/                                # Repository Root
+├── src/                               # Python source directory
+│   └── esm3di/                        # Main package
+│       ├── __init__.py                # Package entry point
+│       ├── cli.py                     # CLI router (predict, foldseek-db, perplexity, foldtree)
+│       ├── model.py                   # Model architecture definitions
+│       ├── inference.py               # Core inference engine & predictor API
+│       ├── io.py                      # File I/O and Foldseek DB formatting
+│       ├── preprocessing.py           # Multi-GPU sequence sharding utilities
+│       │
+│       └── workflows/                 # Embedded Viral-FoldTree Workflow
+│           ├── __init__.py
+│           ├── Snakefile              # Snakemake workflow entry point
+│           ├── config.yaml            # Default runtime parameters
+│           ├── rules/                 # Modular Snakemake rules (.smk)
+│           ├── envs/                  # Conda environment definitions
+│           └── scripts/               # Helper scripts executed by rules
+│
+├── tests/                             # Unit & integration tests
+│   ├── test_model.py
+│   └── test_workflow.py               # Validates Snakemake dry-run pipeline
+│
+├── test_data/                         # Test inputs tracked in Git
+│   └── test_virus.fasta               # Verification sequence file
+│
+├── checkpoints/                       # Heavy Model Weights
+│   └── hf_compatible/                 # Tracked via Git LFS
+│
+├── short_notice_results/              # Paper figures & benchmarks
+│   ├── data/
+│   └── run_paper_figures.sh           # Script to recreate manuscript figures
+│
+├── research_archive/                  # Historical experimental files
+│   └── legacy_readme.md               # Guide to old research experiments
+│
+├── MANIFEST.in                        # Package distribution directives
+├── .gitignore                         # Output exclusion patterns
+├── README.md                          # Primary user documentation
+└── pyproject.toml                     # Python build & dependency configuration
 ```
 
 ---
 
 ## 📜 Citation & Credits
 
-If you use **ESM3Di** in your research, please cite:
+If you use **ESM3Di** or the **FoldTree** pipeline in your research, please cite:
 
 ```bibtex
 @article{esm3di2026,
@@ -224,7 +276,6 @@ If you use **ESM3Di** in your research, please cite:
   year={2026},
   publisher={Dessimoz Lab}
 }
-
 ```
 
 This software builds upon structural 3Di representations established by [Foldseek](https://github.com/steineggerlab/foldseek).
@@ -234,7 +285,3 @@ This software builds upon structural 3Di representations established by [Foldsee
 ## 📄 License
 
 This project is licensed under the **MIT License**. See the `LICENSE` file for details.
-
-```
-
-```

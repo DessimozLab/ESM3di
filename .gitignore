@@ -96,3 +96,4 @@ data/
 /results/.snakemake_conda
 /results/.workflow
 /results/sequences
+/outputs

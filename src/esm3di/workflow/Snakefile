@@ -6,7 +6,7 @@ configfile: "config.yaml"
 # -----------------------------------------------------------------------------
 # Input Sequence Resolution
 # -----------------------------------------------------------------------------
-raw_input = Path(config.get("input_path", "data/test_virus_dataset/sequences.fasta"))
+raw_input = Path(config.get("input_path", "test_data/test_virus.fasta"))
 
 if raw_input.is_dir():
     fasta_extensions = {".fasta", ".fa", ".fas", ".fna", ".ffn", ".frn", ".aa", ".faa"}
@@ -28,19 +28,22 @@ if not raw_input.is_file():
 
 # Resolve absolute path and set dataset identifier
 config["resolved_sequences"] = str(raw_input.resolve())
-out_dir = Path(config.get("output_dir", "results"))
-dataset = config.get("dataset") or raw_input.stem
+OUT_DIR = Path(config.get("output_dir", "results"))
+DATASET = config.get("dataset") or raw_input.stem
 
-# -----------------------------------------------------------------------------
-# Target Rule
-# -----------------------------------------------------------------------------
+# Set default model dynamically based on use_prostt5 flag
+if config.get("use_prostt5", False):
+    config["model"] = "prostt5"
+    include: "rules/prostt5_db.smk"
+else:
+    config["model"] = "esm3di"
+    include: "rules/database_ops.smk"
+
+include: "rules/tree_building.smk"
+
+MODEL = config["model"]
+
 rule all:
     input:
-        f"{out_dir}/{dataset}/foldtree_struct_tree.PP.nwk.rooted.final"
-
-# -----------------------------------------------------------------------------
-# Include Sub-Rules
-# -----------------------------------------------------------------------------
-include: "rules/database_ops.smk"
-include: "rules/tree_building.smk"
+        f"{OUT_DIR}/{DATASET}/{MODEL}_struct_tree.PP.nwk.rooted"
 
