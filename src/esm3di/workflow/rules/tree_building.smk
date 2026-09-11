@@ -1,11 +1,5 @@
 # Rules for distance matrix calculation, tree inference, and tree rooting
 
-
-# TO DO: 
-# - go through the scripts... exactly understand what they do 
-# - add MAD
-
-
 rule foldseek2distmat:
     """
     Converts Foldseek CSV alignment results into a distance matrix format for QuickTree.
@@ -13,13 +7,13 @@ rule foldseek2distmat:
     conda:
         "../envs/foldtree.yaml"
     input:
-        "results/{dataset}/allvall_1.csv"
+        "{out_dir}/{dataset}/allvall_1.csv"
     output:
-        "results/{dataset}/foldtree_fastmemat.txt"
+        "{out_dir}/{dataset}/foldtree_fastmemat.txt"
     params:
-        fmt = None,
+        fmt=None
     log:
-        "results/{dataset}/logs/foldseek2distmat.log"
+        "{out_dir}/{dataset}/logs/foldseek2distmat.log"
     script:
         "../scripts/foldseekres2distmat_simple.py"
 
@@ -30,15 +24,16 @@ rule quicktree:
     conda:
         "../envs/foldtree.yaml"
     input:
-        "results/{dataset}/{mattype}_fastmemat.txt"
+        "{out_dir}/{dataset}/{mattype}_fastmemat.txt"
     output:
-        "results/{dataset}/{mattype}_struct_tree.nwk"
+        "{out_dir}/{dataset}/{mattype}_struct_tree.nwk"
     log:
-        "results/{dataset}/logs/{mattype}_quicktree.log"
+        "{out_dir}/{dataset}/logs/{mattype}_quicktree.log"
     shell:
         """
-        quicktree -i m {input} > {output} 2> {log}
+        quicktree -i m "{input}" > "{output}" 2> "{log}"
         """
+
 
 rule postprocess_tree:
     """
@@ -47,13 +42,14 @@ rule postprocess_tree:
     conda:
         "../envs/foldtree.yaml"
     input:
-        "results/{dataset}/{mattype}_struct_tree.nwk"
+        "{out_dir}/{dataset}/{mattype}_struct_tree.nwk"
     output:
-        "results/{dataset}/{mattype}_struct_tree.PP.nwk"
+        "{out_dir}/{dataset}/{mattype}_struct_tree.PP.nwk"
     log:
-        "results/{dataset}/logs/{mattype}_struct_postprocess.log"
+        "{out_dir}/{dataset}/logs/{mattype}_struct_postprocess.log"
     script:
         "../scripts/postprocess.py"
+
 
 rule mad_root_struct:
     """
@@ -62,17 +58,18 @@ rule mad_root_struct:
     conda:
         "../envs/foldtree.yaml"
     input:
-        "results/{dataset}/{mattype}_struct_tree.PP.nwk"
+        "{out_dir}/{dataset}/{mattype}_struct_tree.PP.nwk"
     output:
-        "results/{dataset}/{mattype}_struct_tree.PP.nwk.rooted"
+        "{out_dir}/{dataset}/{mattype}_struct_tree.PP.nwk.rooted"
     log:
-        "results/{dataset}/logs/{mattype}_struct_madroot.log"
+        "{out_dir}/{dataset}/logs/{mattype}_struct_madroot.log"
     params:
         mad=config.get("mad_path", "madroot/mad")
     shell:
         """
-        {params.mad} {input} -n >> {log} 2>&1
+        "{params.mad}" "{input}" -n >> "{log}" 2>&1
         """
+
 
 rule mad_root_post:
     """
@@ -81,13 +78,10 @@ rule mad_root_post:
     conda:
         "../envs/foldtree.yaml"
     input:
-        "results/{dataset}/{mattype}_struct_tree.PP.nwk.rooted"
+        "{out_dir}/{dataset}/{mattype}_struct_tree.PP.nwk.rooted"
     output:
-        "results/{dataset}/{mattype}_struct_tree.PP.nwk.rooted.final"
+        "{out_dir}/{dataset}/{mattype}_struct_tree.PP.nwk.rooted.final"
     log:
-        "results/{dataset}/logs/{mattype}_struct_madroot_post.log"
+        "{out_dir}/{dataset}/logs/{mattype}_struct_madroot_post.log"
     script:
         "../scripts/process_madroot.py"
-
-
-# maybe add smth like scores using ultrametricity and taxonomic congruence metrics (like in foldtree)

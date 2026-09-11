@@ -22,7 +22,11 @@ import torch.nn.functional as F
 from transformers import AutoModel, AutoTokenizer
 from transformers import logging as hf_logging
 from peft import PeftModel, PeftConfig
-from huggingface_hub import snapshot_download, hf_hub_download
+
+# Disable Hugging Face progress bar
+os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+
+from huggingface_hub import snapshot_download
 
 # Silence Hugging Face and PyTorch backend chatter
 hf_logging.set_verbosity_error()
@@ -77,7 +81,8 @@ class ESM3DiPredictor:
                 # This downloads the entire adapter folder (including config, adapter_model.bin, cnn_head.bin)
                 local_repo_root = snapshot_download(
                 repo_id=self.model_checkpoint_path,
-                allow_patterns=["hf_compatible", "hf_compatible/**"]
+                allow_patterns=["hf_compatible", "hf_compatible/**"],
+
                 )
                 resolved_path = Path(local_repo_root) / "hf_compatible"
             except Exception as e:
@@ -85,6 +90,7 @@ class ESM3DiPredictor:
                     f"Could not find local path or HF repo for '{self.model_checkpoint_path}'. Error: {e}"
                 )
         else:
+            logger.info(f"'Loading local model from: {self.model_checkpoint_path}'")
             resolved_path = Path(self.model_checkpoint_path)
 
         # Redirect standard output to suppress implicit model instantiation prints
@@ -134,7 +140,6 @@ class ESM3DiPredictor:
         device: Optional[str] = None
     ) -> "ESM3DiPredictor":
         """Factory method to construct an ESM3DiPredictor instance from local or HF weights."""
-        logger.info(f"Loading model from: {model_checkpoint_path}")
         return cls(model_checkpoint_path=model_checkpoint_path, revision=revision, device=device)
 
     # =========================================================================
@@ -196,11 +201,11 @@ class ESM3DiPredictor:
         batch_size: int = DEFAULT_BATCH_SIZE,
         num_gpus: Optional[int] = None
     ) -> None:
-        """Processes an input amino acid FASTA file and writes predicted 3Di outputs to FASTA."""
         input_fasta_path = Path(input_fasta_path)
         output_fasta_path = Path(output_fasta_path)
 
-        resolved_gpus = torch.cuda.device_count() if num_gpus is None else num_gpus
+        available_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 0
+        resolved_gpus = available_gpus if num_gpus is None else min(num_gpus, available_gpus)
 
         if resolved_gpus > 1:
             success = _run_multi_gpu_inference(
@@ -211,6 +216,7 @@ class ESM3DiPredictor:
                 logger.info(f"Saved predicted 3Di sequences to: {output_fasta_path}")
                 return
 
+        # Standard single-device execution path (1 GPU or CPU)
         logger.info(f"Reading sequence inputs from: {input_fasta_path}")
         aa_records = read_fasta(str(input_fasta_path))
 
@@ -293,8 +299,8 @@ class ESM3DiPredictor:
 def _gpu_worker(gpu_id: int, shard_fasta: str, output_fasta: str, checkpoint_path: str, batch_size: int,
                 progress_queue: Any, error_event: Any):
     try:
-        os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
-        predictor = ESM3DiPredictor(checkpoint_path, device="cuda")
+        # Target the explicit CUDA device ordinal directly
+        predictor = ESM3DiPredictor(checkpoint_path, device=f"cuda:{gpu_id}")
         predictor.predict_fasta(shard_fasta, output_fasta, batch_size=batch_size, num_gpus=1)
         progress_queue.put(("done", gpu_id))
     except Exception as e:
@@ -306,16 +312,18 @@ def _run_multi_gpu_inference(input_fasta: str, output_3di_fasta: str, checkpoint
                              batch_size: int = DEFAULT_BATCH_SIZE) -> bool:
     import multiprocessing as mp
     from .preprocessing import _shard_fasta, _merge_fasta_outputs, _count_sequences
-    from Bio import SeqIO
 
-    if _count_sequences(input_fasta) <= 1 or num_gpus <= 1:
+    total_seqs = _count_sequences(input_fasta)
+    effective_gpus = min(num_gpus, total_seqs)
+
+    if total_seqs <= 1 or effective_gpus <= 1:
         return False
 
     ctx = mp.get_context('spawn')
     temp_dir = tempfile.mkdtemp(prefix="esm3di_shards_")
 
     try:
-        shards = _shard_fasta(input_fasta, num_gpus, temp_dir)
+        shards = _shard_fasta(input_fasta, effective_gpus, temp_dir)
         progress_queue, error_event = ctx.Queue(), ctx.Event()
         shard_outputs, processes = [], []
 
@@ -330,7 +338,8 @@ def _run_multi_gpu_inference(input_fasta: str, output_3di_fasta: str, checkpoint
             p.start()
 
         completed = 0
-        while completed < num_gpus:
+        # Wait for actual spawned process count
+        while completed < len(shards):
             try:
                 event = progress_queue.get(timeout=0.5)
                 if event[0] == "done":

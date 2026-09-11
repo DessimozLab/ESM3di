@@ -31,9 +31,9 @@ ESM3di/                               # Repository Root
 │   └── run_paper_figures.sh          # Recreates manuscript figures
 │
 ├── research_archive/                 # Dave's Original Work
-					LEAVING IN ITS ORIGINAL (current master branch) 
+					LEAVING IN ITS ORIGINAL FORM (current master branch) 
 
-│   └── legacy_readme.md              # Colleague's guide to navigating old experiments
+│   └── legacy_readme.md              # guide to navigating old experiments
 │
 ├── MANIFEST.in                       # Guarantees what gets packed into sdist/wheel
 ├── .gitignore                        # Prevents committing run outputs

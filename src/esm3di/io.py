@@ -32,12 +32,10 @@ def resolve_output_path(path_str: str, default_dir: str = "outputs") -> Path:
     If the user inputs just a plain filename without directories, it defaults
     it inside `outputs/`. Custom explicit paths are kept intact.
     """
-    path = Path(path_str)
-
     # If it is a bare file without parents (e.g., "output_3di.fasta")
-    if len(path.parts) == 1:
+    if "." in path_str and "/" not in path_str:
         resolved_dir = resolve_user_path(default_dir)
-        return resolved_dir / path
+        return resolved_dir / Path(path_str)
 
     return resolve_user_path(path_str)
 

@@ -4,7 +4,11 @@ import argparse
 import logging
 import sys
 import os
+import subprocess
 import warnings
+from importlib.resources import files
+from pathlib import Path
+
 
 # Suppress harmless runtime and third-party warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -43,6 +47,12 @@ def add_common_args(subparser: argparse.ArgumentParser):
         help=f"Path to local checkpoint or Hugging Face repo ID (default: {DEFAULT_HF_REPO})"
     )
     subparser.add_argument(
+        "--num-gpus",
+        type=int,
+        default=None,
+        help="Number of GPUs to use (default: use all available)"
+    )
+    subparser.add_argument(
         "--revision",
         default=DEFAULT_REVISION,
         help=f"Base model Hugging Face revision/commit SHA (default: {DEFAULT_REVISION})"
@@ -60,7 +70,7 @@ def main():
     setup_logging()
 
     parser = argparse.ArgumentParser(
-        description="ESM3Di Toolkit: Predict 3Di structural sequences and build Foldseek databases."
+        description="ESM3Di Toolkit: Predict 3Di structural sequences, build Foldseek databases, and infer phylogenies."
     )
 
     subparsers = parser.add_subparsers(
@@ -84,15 +94,9 @@ def main():
         default="outputs/output_3di.fasta",
         help="Path to save output 3Di FASTA file (default: outputs/output_3di.fasta)"
     )
-    predict_parser.add_argument(
-        "--num-gpus",
-        type=int,
-        default=None,
-        help="Number of GPUs to use (default: use all available)"
-    )
     add_common_args(predict_parser)
 
-    # Subcommand: build-foldseek-db
+    # Subcommand: foldseek-db
     foldseek_parser = subparsers.add_parser(
         "foldseek-db",
         help="Predict 3Di sequences and compile directly into a Foldseek-compatible database."
@@ -106,12 +110,6 @@ def main():
         "--output-db",
         default="outputs/foldseek_db",
         help="Prefix path for output Foldseek database files (default: outputs/foldseek_db)"
-    )
-    foldseek_parser.add_argument(
-        "--num-gpus",
-        type=int,
-        default=None,
-        help="Number of GPUs to use (default: use all available)"
     )
     add_common_args(foldseek_parser)
 
@@ -132,17 +130,107 @@ def main():
     )
     add_common_args(perplexity_parser)
 
+    # Subcommand: foldtree
+    foldtree_parser = subparsers.add_parser(
+        "foldtree",
+        help="Run end-to-end 3Di prediction and phylogenetic tree inference via Snakemake."
+    )
+    foldtree_parser.add_argument(
+        "-i", "--input-fasta",
+        default="data/test_virus_dataset/sequences.fasta",
+        help="Path to input amino acid FASTA file or directory containing FASTA files."
+    )
+    foldtree_parser.add_argument(
+        "-o", "--output-dir",
+        default="results",
+        help="Directory to save output phylogenetic trees and intermediate files (default: results)"
+    )
+    foldtree_parser.add_argument(
+        "-d", "--dataset",
+        default=None,
+        help="Name prefix/dataset identifier for outputs (defaults to input file name)"
+    )
+    foldtree_parser.add_argument(
+        "-c", "--cores",
+        type=int,
+        default=4,
+        help="Number of CPU cores for Snakemake execution (default: 4)"
+    )
+    foldtree_parser.add_argument(
+        "-n", "--dry-run",
+        action="store_true",
+        help="Do not execute anything; print the execution plan and rules that would be run."
+    )
+    add_common_args(foldtree_parser)
+
     args = parser.parse_args()
 
     input_path = resolve_user_path(args.input_fasta)
     model_path_or_id = resolve_checkpoint_path(args.model_ckpt)
 
-    if not input_path.is_file():
-        logger.error(f"Input file not found: '{input_path}'")
-        sys.exit(1)
+    # Route `foldtree` early because it manages its own Snakemake workflow
+    if args.command == "foldtree":
+        input_path = resolve_user_path(args.input_fasta)
+        output_dir = resolve_output_path(args.output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        print(output_dir)
+        try:
+            import shutil
+            from importlib.resources import as_file, files
+
+            # 1. Stage workflow directory locally to prevent source-cache issues
+            staged_wf_dir = output_dir / ".workflow"
+            pkg_wf_resource = files("esm3di").joinpath("workflow")
+
+            if staged_wf_dir.exists():
+                shutil.rmtree(staged_wf_dir)
+
+            with as_file(pkg_wf_resource) as src_path:
+                shutil.copytree(src_path, staged_wf_dir)
+
+            # 2. Store conda environments outside staged workflow so they persist
+            conda_prefix = output_dir / ".snakemake_conda"
+
+            snakemake_config = [
+                f"input_path={input_path.resolve()}",
+                f"output_dir={output_dir.resolve()}",
+                f"esm3di_model_ckpt={args.model_ckpt}",
+                f"esm3di_batch_size={args.batch_size}",
+                f"esm3di_revision={args.revision}"
+            ]
+            if args.num_gpus is not None:
+                snakemake_config.append(f"esm3di_gpus={args.num_gpus}")
+
+            cmd = [
+                "snakemake",
+                "--snakefile", "Snakefile",
+                "--cores", str(args.cores),
+                "--config", *snakemake_config,
+                "--use-conda",
+                "--conda-frontend", "conda",
+                "--conda-prefix", str(conda_prefix.resolve())
+            ]
+
+            if args.dry_run:
+                cmd.append("--dry-run")
+
+            logger.info("Launching FoldTree Snakemake pipeline...")
+
+            result = subprocess.run(cmd, cwd=staged_wf_dir, env=os.environ.copy())
+
+            # Optional: Clean up .workflow directory after successful execution
+            if result.returncode == 0 and not args.dry_run:
+                shutil.rmtree(staged_wf_dir, ignore_errors=True)
+                logger.info(f"FoldTree pipeline completed successfully. Results saved in: {output_dir}")
+            
+            sys.exit(result.returncode)
+
+        except Exception as e:
+            logger.error(f"Failed to execute FoldTree workflow: {str(e)}")
+            sys.exit(1)
 
     try:
-        # Pass the revision down to ESM3DiPredictor
         predictor = ESM3DiPredictor.from_pretrained(
             model_path_or_id,
             revision=args.revision

@@ -93,3 +93,6 @@ data/
 
 # PyTorch
 *.tar.gz
+/results/.snakemake_conda
+/results/.workflow
+/results/sequences

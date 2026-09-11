@@ -1,58 +1,46 @@
-import os
-import glob
+from pathlib import Path
 import snakemake.utils
 
-snakemake.utils.min_version("7.8.0")
+configfile: "config.yaml"
 
-# 1. Load Configurations
-configfile: "config/config.yaml"
+# -----------------------------------------------------------------------------
+# Input Sequence Resolution
+# -----------------------------------------------------------------------------
+raw_input = Path(config.get("input_path", "data/test_virus_dataset/sequences.fasta"))
 
-# 2. Global Workflow Variables
-mattypes = ['foldtree']
-
-import os
-from glob import glob
-
-# 1. Fallback default if the user forgot to set it in config.yaml
-if "dataset" not in config or not config["dataset"]:
-    config["dataset"] = "test_virus_dataset"
-
-# 2. Dynamically look inside data/{dataset}/ for any .fasta, .fa, or .aa files
-
-if config["sequences"] == "":
-    dataset_dir = f"data/{config['dataset']}"
-    found_sequences = []
-
-    if os.path.exists(dataset_dir):
-        # Scan the directory for common FASTA extensions
-        found_sequences = [
-            f for f in os.listdir(dataset_dir) 
-            if f.endswith((".fasta", ".fa", ".fas", ".fna", ".ffn", ".frn", ".aa", ".faa"))
-        ]
-
-    # 3. Assign the target file name or handle errors gracefully
-    if len(found_sequences) == 1:
-        config["sequences"] = found_sequences[0]
-    elif len(found_sequences) > 1:
-        # If there are multiple fasta files, pick the first one but print a warning
-        config["sequences"] = found_sequences[0]
-        print(f"⚠️ WARNING: Multiple FASTA files found in {dataset_dir}. Using {config['sequences']}.")
+if raw_input.is_dir():
+    fasta_extensions = {".fasta", ".fa", ".fas", ".fna", ".ffn", ".frn", ".aa", ".faa"}
+    found_files = [f for f in raw_input.iterdir() if f.suffix.lower() in fasta_extensions]
+    
+    if len(found_files) == 1:
+        raw_input = found_files[0]
+        print(f"Directory provided. Using found FASTA file: {raw_input}")
+    elif len(found_files) > 1:
+        raise ValueError(
+            f"Directory '{raw_input}' contains multiple FASTA files: {[f.name for f in found_files]}. "
+            "Please specify the exact file path using -i/--input-fasta."
+        )
     else:
-        # Fallback name if the directory is empty or doesn't exist yet (prevents immediate crash during dry-runs)
-        config["sequences"] = "sequences.fasta"
+        raise FileNotFoundError(f"No FASTA files found inside directory: {raw_input}")
 
-print(f"Using sequence file: {config['sequences']} for dataset: {config['dataset']}")
-# 3. Target Rule (Defines the final outputs needed)
+if not raw_input.is_file():
+    raise FileNotFoundError(f"Input sequence file not found: {raw_input}")
+
+# Resolve absolute path and set dataset identifier
+config["resolved_sequences"] = str(raw_input.resolve())
+out_dir = Path(config.get("output_dir", "results"))
+dataset = config.get("dataset") or raw_input.stem
+
+# -----------------------------------------------------------------------------
+# Target Rule
+# -----------------------------------------------------------------------------
 rule all:
     input:
-        expand(
-            "results/{dataset}/{mattype}_struct_tree.PP.nwk.rooted.final",
-            dataset=config["dataset"],
-            mattype=mattypes
-        )
+        f"{out_dir}/{dataset}/foldtree_struct_tree.PP.nwk.rooted.final"
 
-# 4. Include Rule Modules
-#include: "rules/database_ops.smk"
-#include: "rules/3di_to_db.smk"
-include: "rules/prostt5_db.smk"
+# -----------------------------------------------------------------------------
+# Include Sub-Rules
+# -----------------------------------------------------------------------------
+include: "rules/database_ops.smk"
 include: "rules/tree_building.smk"
+
