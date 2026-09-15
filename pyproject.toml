@@ -47,6 +47,7 @@ benchmark = [
     "pandas>=2.0.0",
     "jupyter",
     "curl-cffi>=0.7.0",
+    "biopython>=1.80",
 ]
 
 [project.scripts]

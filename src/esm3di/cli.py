@@ -215,6 +215,9 @@ def main():
             if args.num_gpus is not None:
                 snakemake_config.append(f"esm3di_gpus={args.num_gpus}")
 
+            if args.dataset is not None:
+                snakemake_config.append(f"dataset={args.dataset}")
+
             cmd = [
                 "snakemake",
                 "--snakefile", "Snakefile",

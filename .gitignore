@@ -85,15 +85,17 @@ ckp/
 # Data files (uncomment if you don't want to track data)
 *.fasta
 *.fa
-data/
+/data/
+/brief_communication/flavi_glyco/data/af2_structures/
 *.json
 
 # Logs
 *.log
 
-# PyTorch
+# Results and outputs
 *.tar.gz
 /results/.snakemake_conda
 /results/.workflow
 /results/sequences
 /outputs
+/brief_communication/flavi_glyco/results/.snakemake_conda

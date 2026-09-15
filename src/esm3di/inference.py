@@ -24,9 +24,10 @@ from transformers import logging as hf_logging
 from peft import PeftModel, PeftConfig
 
 # Disable Hugging Face progress bar
-os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
-
 from huggingface_hub import snapshot_download
+from huggingface_hub.utils import disable_progress_bars
+
+disable_progress_bars()
 
 # Silence Hugging Face and PyTorch backend chatter
 hf_logging.set_verbosity_error()
