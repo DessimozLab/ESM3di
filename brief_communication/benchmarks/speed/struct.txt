@@ -1,0 +1,16 @@
+speed/
+├── data/
+│   ├── subset_10.fasta            # Generated nested FASTA files
+│   ├── subset_100.fasta
+│   ├── subset_1000.fasta
+│   └── subset_10000.fasta
+├── models/
+│   ├── base.py                    # Abstract base class for timing and metrics
+│   ├── ems3di_runner.py          # PyTorch inference code
+│   ├── prostt5_runner.py          # PyTorch inference code
+│   └── colabfold_runner.py        # JAX/ColabFold inference wrapper
+├── prepare_data.py
+├── run_benchmark.py               # Main CLI script to orchestrate execution
+├── results/
+│   └── timing_results.csv         # Standardized output CSV (dataset_size, model, time_sec)
+└── plot_results.ipynb            # Lightweight notebook that reads CSV and generates the log-log plot

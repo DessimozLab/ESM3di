@@ -99,3 +99,4 @@ ckp/
 /results/sequences
 /outputs
 /brief_communication/flavi_glyco/results/.snakemake_conda
+weights/prostt5_model/prostt5-f16.gguf

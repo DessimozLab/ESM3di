@@ -41,6 +41,11 @@ conda activate esm3di
 pip install -e .
 ```
 
+For benchmark tooling, install the Python dependencies with `pip install -e ".[benchmark]"`.
+The ColabFold benchmark invokes the external `colabfold_batch` executable and Foldseek;
+install LocalColabFold separately in an environment compatible with its NumPy and Pandas
+requirements, then ensure both executables are on `PATH`.
+
 > **Note on GPU Acceleration:** Standard `pip install -e .` pulls the default PyTorch wheel. If your GPU cluster requires a specific CUDA toolkit version (e.g., CUDA 12.1), pre-install PyTorch via the [official PyTorch guide](https://pytorch.org/get-started/locally/) before running `pip install -e .`.
 
 ---
