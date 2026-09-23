@@ -42,7 +42,7 @@ logger = logging.getLogger("esm3di")
 # Path resolution defaults
 PACKAGE_ROOT = Path(__file__).resolve().parent
 DEFAULT_HF_REPO = "cactuskid13/ESM3di_Small_MLM_3di"
-DEFAULT_BATCH_SIZE = 4
+DEFAULT_BATCH_SIZE = 8
 DEFAULT_REVISION = "46c5f7d"
 VOCAB_3DI = list("ACDEFGHIKLMNPQRSTVWY")
 

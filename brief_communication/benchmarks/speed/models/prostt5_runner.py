@@ -28,7 +28,6 @@ class ProstT5Runner(BaseRunner):
     ):
         super().__init__(model_name=model_name, device=device)
         self.weights_dir = weights_dir
-        self.threads = threads
 
     def load_model(self) -> None:
         """
@@ -82,7 +81,6 @@ class ProstT5Runner(BaseRunner):
                 str(fasta_path),
                 str(tmp_db),
                 "--prostt5-model", str(self.weights_dir),
-                "--threads", str(self.threads),
                 "-v", "0",  # Suppress verbose log output
             ]
 

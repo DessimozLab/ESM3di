@@ -30,7 +30,7 @@ class ESM3DiRunner(BaseRunner):
         self,
         model_name: str = "esm3di",
         device: str = "cuda",
-        batch_size: int = 16,
+        batch_size: int = 8,
     ):
         super().__init__(model_name=model_name, device=device)
         self.batch_size = batch_size

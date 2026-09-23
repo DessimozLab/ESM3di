@@ -52,12 +52,6 @@ class BaseRunner(ABC):
         """
         Abstract method containing model-specific execution loop.
         Should process the FASTA file and return predicted 3Di token sequences.
-
-        Args:
-            fasta_path (Path): Path to the FASTA file.
-
-        Returns:
-            List[str]: List of predicted 3Di string sequences.
         """
         pass
 
@@ -73,9 +67,14 @@ class BaseRunner(ABC):
             torch.cuda.reset_peak_memory_stats()
             torch.cuda.empty_cache()
 
-        # 3. Measure inference time
+        # 3. Measure inference time with CUDA synchronization
         start_time = time.perf_counter()
         self._run_inference(fasta_path)
+        
+        # Ensure all asynchronous PyTorch GPU operations complete before stopping clock
+        if torch.cuda.is_available() and "cuda" in self.device:
+            torch.cuda.synchronize()
+            
         wall_time = time.perf_counter() - start_time
 
         # 4. Measure peak VRAM
@@ -118,21 +117,19 @@ class BaseRunner(ABC):
 
     def warm_up(self, dummy_length: int = 300) -> None:
         """
-        Helper warm-up method to execute 1-2 dummy passes on the GPU
+        Helper warm-up method to execute 1 dummy pass on the GPU
         to trigger CUDA context initialization before timing starts.
         """
         print(f"[+] Running CUDA warm-up for {self.model_name}...")
         dummy_seq = "A" * dummy_length
         
-        # Create temporary dummy FASTA
         tmp_path = Path("/tmp/warmup_dummy.fasta")
         with open(tmp_path, "w") as f:
             f.write(f">warmup\n{dummy_seq}\n")
 
-        # Execute un-timed forward pass
         try:
             self._run_inference(tmp_path)
-            if self.device == "cuda":
+            if torch.cuda.is_available() and "cuda" in self.device:
                 torch.cuda.synchronize()
         finally:
             if tmp_path.exists():
