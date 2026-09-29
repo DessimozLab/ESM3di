@@ -204,15 +204,15 @@ def main():
     parser.add_argument(
         "--data-dir",
         type=Path,
-        default=Path("brief_communication/benchmarks/speed/data"),
+        default=Path("data"),
         help="Directory to store raw fasta and output subsets.",
     )
     parser.add_argument(
         "--subsets",
         type=int,
         nargs="+",
-        default=[1, 5, 10, 100, 500, 1000, 5000, 10000],
-        help="Subset sizes to generate (default: [1, 5, 10, 100, 500, 1000, 5000, 10000]).",
+        default=[10, 30, 100, 300, 1000, 3000, 10000],
+        help="Subset sizes to generate (default: [10, 30, 100, 300, 1000, 3000, 10000]).",
     )
     parser.add_argument(
         "--min-len",
@@ -264,8 +264,8 @@ def main():
             raw_fasta=raw_fasta_path,
             output_dir=args.data_dir / "length_bins",
             #target_lengths=sorted(args.subsets),
-            seqs_per_bin=32,
-            tolerance=2
+            seqs_per_bin=1, #32
+            tolerance=0
         )
     else:
         # Generate nested subsets

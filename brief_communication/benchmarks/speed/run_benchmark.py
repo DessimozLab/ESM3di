@@ -5,10 +5,8 @@ Main CLI script to orchestrate speed and memory benchmarks across 3Di prediction
 Usage examples:
 # Standard dataset size benchmark:
 python run_benchmark.py --models colabfold --subsets 10 25 50 100 --no-warmup
-python run_benchmark.py --models esm3di prostt5 --subsets 10 50 100 500 1000
 
 # Length-bins benchmark (runtime vs sequence length using binned FASTAs):
-python run_benchmark.py --models esm3di prostt5 colabfold --length-bins --no-warmup
 """
 
 import argparse
@@ -83,19 +81,45 @@ def find_length_bin_fastas(data_dir: Path) -> List[Path]:
     return sorted(bin_files, key=extract_target_length)
 
 
-def append_result_to_csv(csv_path: Path, result: BenchmarkResult) -> None:
-    """Appends a single BenchmarkResult instance to the target CSV file."""
+def append_result_to_csv(
+    csv_path: Path,
+    result: BenchmarkResult,
+    repetition: int,
+) -> None:
+    """Append one benchmark repetition, extending an existing CSV schema if needed."""
     csv_path.parent.mkdir(parents=True, exist_ok=True)
-    file_exists = csv_path.exists()
 
     result_dict = result.to_dict()
-    fieldnames = list(result_dict.keys())
+    result_dict["repetition"] = repetition
 
-    with open(csv_path, mode="a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        if not file_exists:
+    if not csv_path.exists() or csv_path.stat().st_size == 0:
+        with open(csv_path, mode="w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=list(result_dict.keys()))
             writer.writeheader()
-        writer.writerow(result_dict)
+            writer.writerow(result_dict)
+        return
+
+    with open(csv_path, mode="r", newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        existing_fieldnames = reader.fieldnames or []
+        existing_rows = list(reader)
+
+    fieldnames = list(existing_fieldnames)
+    for key in result_dict:
+        if key not in fieldnames:
+            fieldnames.append(key)
+
+    # Rewrite when the schema changed; this preserves existing results.
+    if fieldnames != existing_fieldnames:
+        existing_rows.append(result_dict)
+        with open(csv_path, mode="w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(existing_rows)
+    else:
+        with open(csv_path, mode="a", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writerow(result_dict)
 
 
 def main():
@@ -105,13 +129,13 @@ def main():
     parser.add_argument(
         "--data-dir",
         type=Path,
-        default=Path("brief_communication/benchmarks/speed/data"),
+        default=Path("data"),
         help="Directory containing benchmark subset FASTA files and length_bins subdirectory.",
     )
     parser.add_argument(
         "--results-file",
         type=Path,
-        default=Path("brief_communication/benchmarks/speed/results/timing_results.csv"),
+        default=Path("results/timing_results.csv"),
         help="Target CSV file for saving metrics.",
     )
     parser.add_argument(
@@ -137,22 +161,27 @@ def main():
         help="Target execution device (default: cuda).",
     )
     parser.add_argument(
-        "--no-warmup",
-        action="store_true",
-        help="Skip CUDA warm-up run prior to timed benchmark execution.",
-    )
-    parser.add_argument(
         "--length-bins",
         action="store_true",
         help="Run length-bins benchmark using multi-sequence FASTA files in data_dir/length_bins/.",
     )
+    parser.add_argument(
+        "--repeats",
+        type=int,
+        default=1,
+        help="Number of timed inference repetitions per FASTA file.",
+    )
 
     args = parser.parse_args()
+
+    if args.repeats < 1:
+        parser.error("--repeats must be a positive integer.")
 
     # Determine input dataset mode
     try:
         if args.length_bins:
-            target_files = find_length_bin_fastas(args.data_dir)
+            #target_files = find_length_bin_fastas(args.data_dir)
+            target_files = [Path("data/length_bins/bin_L700.fasta")]
             print(f"[+] Found {len(target_files)} length-bin FASTA file(s) in '{args.data_dir / 'length_bins'}':")
         else:
             target_files = find_fasta_subsets(args.data_dir, args.subsets)
@@ -183,33 +212,42 @@ def main():
             print(f"[!] Failed to load model '{model_key}': {e}", file=sys.stderr)
             continue
 
-        if not args.no_warmup and runner.device == "cuda":
-            runner.warm_up(dummy_length=300)
-
-        # Iterate over target FASTA files
+        # Iterate over target FASTA files and repeat each benchmark.
         for fasta_file in target_files:
-            print(f"\n[+] Executing: {model_key} | File: {fasta_file.name}")
-
-            try:
-                result = runner.run_benchmark(fasta_file)
-                append_result_to_csv(args.results_file, result)
-
-                avg_sec_per_seq = (
-                    result.wall_time_seconds / result.num_sequences
-                    if result.num_sequences > 0
-                    else 0.0
-                )
-
+            for repetition in range(1, args.repeats + 1):
                 print(
-                    f"    Done ({result.num_sequences} seqs, {result.total_residues} res) -> "
-                    f"Wall Time: {result.wall_time_seconds:.2f}s | "
-                    f"Avg/Seq: {avg_sec_per_seq:.3f}s | "
-                    f"Res/s: {result.residues_per_second:.1f} | "
-                    f"Peak VRAM: {result.peak_vram_gb:.2f} GB"
+                    f"\n[+] Executing: {model_key} | File: {fasta_file.name} "
+                    f"| Repetition: {repetition}/{args.repeats}"
                 )
 
-            except Exception as e:
-                print(f"[!] Benchmark failed for {model_key} on {fasta_file.name}: {e}", file=sys.stderr)
+                try:
+                    result = runner.run_benchmark(fasta_file)
+                    append_result_to_csv(
+                        args.results_file,
+                        result,
+                        repetition=repetition,
+                    )
+
+                    avg_sec_per_seq = (
+                        result.wall_time_seconds / result.num_sequences
+                        if result.num_sequences > 0
+                        else 0.0
+                    )
+
+                    print(
+                        f"    Done ({result.num_sequences} seqs, {result.total_residues} res) -> "
+                        f"Wall Time: {result.wall_time_seconds:.2f}s | "
+                        f"Avg/Seq: {avg_sec_per_seq:.3f}s | "
+                        f"Res/s: {result.residues_per_second:.1f} | "
+                        f"Peak VRAM: {result.peak_vram_gb:.2f} GB"
+                    )
+
+                except Exception as e:
+                    print(
+                        f"[!] Benchmark failed for {model_key} on "
+                        f"{fasta_file.name}, repetition {repetition}: {e}",
+                        file=sys.stderr,
+                    )
 
         del runner
         if torch.cuda.is_available():

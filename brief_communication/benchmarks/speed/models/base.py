@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
 from pathlib import Path
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import torch
 
@@ -114,24 +114,3 @@ class BaseRunner(ABC):
                     total_residues += len(line)
 
         return num_sequences, total_residues
-
-    def warm_up(self, dummy_length: int = 300) -> None:
-        """
-        Helper warm-up method to execute 1 dummy pass on the GPU
-        to trigger CUDA context initialization before timing starts.
-        """
-        print(f"[+] Running CUDA warm-up for {self.model_name}...")
-        dummy_seq = "A" * dummy_length
-        
-        tmp_path = Path("/tmp/warmup_dummy.fasta")
-        with open(tmp_path, "w") as f:
-            f.write(f">warmup\n{dummy_seq}\n")
-
-        try:
-            self._run_inference(tmp_path)
-            if torch.cuda.is_available() and "cuda" in self.device:
-                torch.cuda.synchronize()
-        finally:
-            if tmp_path.exists():
-                tmp_path.unlink()
-        print(f"[+] Warm-up completed for {self.model_name}.")

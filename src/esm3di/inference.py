@@ -77,19 +77,31 @@ class ESM3DiPredictor:
         
         # 1. Resolve path: If it's a remote HF repo, download/cache it automatically
         if not Path(self.model_checkpoint_path).exists():
-            logger.info(f"'Downloading model {self.model_checkpoint_path}' from Hugging Face Hub...")
             try:
-                # This downloads the entire adapter folder (including config, adapter_model.bin, cnn_head.bin)
+                # Step 1: Attempt to resolve strictly from local cache (offline check)
                 local_repo_root = snapshot_download(
-                repo_id=self.model_checkpoint_path,
-                allow_patterns=["hf_compatible", "hf_compatible/**"],
+                    repo_id=self.model_checkpoint_path,
+                    allow_patterns=["hf_compatible", "hf_compatible/**"],
+                    local_files_only=True,
+                )
+                logger.info(f"Using cached model '{self.model_checkpoint_path}' from local Hugging Face cache.")
+                
+            except Exception:
+                # Step 2: Not in local cache — proceed with downloading from HF Hub
+                logger.info(f"Downloading model '{self.model_checkpoint_path}' from Hugging Face Hub...")
+                try:
+                    local_repo_root = snapshot_download(
+                        repo_id=self.model_checkpoint_path,
+                        allow_patterns=["hf_compatible", "hf_compatible/**"],
+                        local_files_only=False,
+                    )
+                except Exception as e:
+                    raise FileNotFoundError(
+                        f"Could not find local path or fetch HF repo for '{self.model_checkpoint_path}'. Error: {e}"
+                    )
 
-                )
-                resolved_path = Path(local_repo_root) / "hf_compatible"
-            except Exception as e:
-                raise FileNotFoundError(
-                    f"Could not find local path or HF repo for '{self.model_checkpoint_path}'. Error: {e}"
-                )
+            resolved_path = Path(local_repo_root) / "hf_compatible"
+            
         else:
             logger.info(f"'Loading local model from: {self.model_checkpoint_path}'")
             resolved_path = Path(self.model_checkpoint_path)
@@ -200,7 +212,8 @@ class ESM3DiPredictor:
         input_fasta_path: Union[str, Path],
         output_fasta_path: Union[str, Path],
         batch_size: int = DEFAULT_BATCH_SIZE,
-        num_gpus: Optional[int] = None
+        num_gpus: Optional[int] = None,
+        sort_by_length: bool = True
     ) -> None:
         input_fasta_path = Path(input_fasta_path)
         output_fasta_path = Path(output_fasta_path)
@@ -211,7 +224,8 @@ class ESM3DiPredictor:
         if resolved_gpus > 1:
             success = _run_multi_gpu_inference(
                 str(input_fasta_path), str(output_fasta_path),
-                self.model_checkpoint_path, resolved_gpus, batch_size=batch_size
+                self.model_checkpoint_path, resolved_gpus, batch_size=batch_size,
+                sort_by_length=sort_by_length
             )
             if success:
                 logger.info(f"Saved predicted 3Di sequences to: {output_fasta_path}")
@@ -227,8 +241,17 @@ class ESM3DiPredictor:
             logger.info(f"Saved predicted 3Di sequences to: {output_fasta_path}")
             return
 
-        headers, raw_seqs = zip(*aa_records)
-        predicted_3dis = self.predict_batch(list(raw_seqs), batch_size=batch_size)
+        indexed_records = list(enumerate(aa_records))
+        if sort_by_length:
+            indexed_records.sort(key=lambda item: len(item[1][1]))
+
+        raw_seqs = [sequence for _, (_, sequence) in indexed_records]
+        predicted_sorted = self.predict_batch(raw_seqs, batch_size=batch_size)
+        predicted_3dis = [None] * len(aa_records)
+        for (original_index, (header, _)), prediction in zip(indexed_records, predicted_sorted):
+            predicted_3dis[original_index] = prediction
+
+        headers = [header for header, _ in aa_records]
 
         write_fasta(list(zip(headers, predicted_3dis)), str(output_fasta_path))
         logger.info(f"Saved predicted 3Di sequences to: {output_fasta_path}")
@@ -310,7 +333,7 @@ def _gpu_worker(gpu_id: int, shard_fasta: str, output_fasta: str, checkpoint_pat
 
 
 def _run_multi_gpu_inference(input_fasta: str, output_3di_fasta: str, checkpoint_path: str, num_gpus: int,
-                             batch_size: int = DEFAULT_BATCH_SIZE) -> bool:
+                             batch_size: int = DEFAULT_BATCH_SIZE, sort_by_length: bool = True) -> bool:
     import multiprocessing as mp
     from .preprocessing import _shard_fasta, _merge_fasta_outputs, _count_sequences
 
@@ -324,7 +347,7 @@ def _run_multi_gpu_inference(input_fasta: str, output_3di_fasta: str, checkpoint
     temp_dir = tempfile.mkdtemp(prefix="esm3di_shards_")
 
     try:
-        shards = _shard_fasta(input_fasta, effective_gpus, temp_dir)
+        shards = _shard_fasta(input_fasta, effective_gpus, temp_dir, sort_by_length=sort_by_length)
         progress_queue, error_event = ctx.Queue(), ctx.Event()
         shard_outputs, processes = [], []
 
@@ -355,7 +378,8 @@ def _run_multi_gpu_inference(input_fasta: str, output_3di_fasta: str, checkpoint
         for p in processes:
             p.join()
 
-        _merge_fasta_outputs(shard_outputs, output_3di_fasta, [rec.id for rec in SeqIO.parse(input_fasta, "fasta")])
+        original_order = [header for header, _ in read_fasta(input_fasta)]
+        _merge_fasta_outputs(shard_outputs, output_3di_fasta, original_order)
         return True
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)

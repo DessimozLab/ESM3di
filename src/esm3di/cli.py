@@ -63,6 +63,12 @@ def add_common_args(subparser: argparse.ArgumentParser):
         default=DEFAULT_BATCH_SIZE,
         help=f"Inference batch size per device (default: {DEFAULT_BATCH_SIZE})"
     )
+    subparser.add_argument(
+        "--no-sort-by-length",
+        dest="sort_by_length",
+        action="store_false",
+        help="Disable length sorting before inference"
+    )
 
 
 def main():
@@ -259,7 +265,8 @@ def main():
                 input_fasta_path=input_path,
                 output_fasta_path=output_fasta_path,
                 batch_size=args.batch_size,
-                num_gpus=args.num_gpus
+                num_gpus=args.num_gpus,
+                sort_by_length=args.sort_by_length
             )
 
         elif args.command == "foldseek-db":
@@ -273,7 +280,8 @@ def main():
                     input_fasta_path=input_path,
                     output_fasta_path=temp_3di_fasta,
                     batch_size=args.batch_size,
-                    num_gpus=args.num_gpus
+                    num_gpus=args.num_gpus,
+                    sort_by_length=args.sort_by_length
                 )
 
                 logger.info(f"Building Foldseek database at: {output_db_path}")

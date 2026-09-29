@@ -85,6 +85,7 @@ class ColabFoldRunner(BaseRunner):
                 "--num-models", str(self.num_models),
                 "--msa-mode", self.msa_mode,
                 "--sort-queries-by", "length",
+                "--recompile-padding", "20",
             ]
 
             if self.use_amber:

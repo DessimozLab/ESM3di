@@ -47,7 +47,7 @@ class ESM3DiRunner(BaseRunner):
         self.predictor = ESM3DiPredictor.from_pretrained()
         self.is_loaded = True
 
-    def _run_inference(self, fasta_path: Path) -> None:
+    def _run_inference_pred_only(self, fasta_path: Path) -> None:
             """
             Runs ESM3Di inference on the input FASTA file using native batching.
             Pure timing of model inference and output generation.
@@ -56,9 +56,28 @@ class ESM3DiRunner(BaseRunner):
                 fasta_path (Path): Path to the input FASTA file.
             """
             with tempfile.NamedTemporaryFile(suffix=".fasta") as tmp_out:
-                # Leverage ESM3Di's native predict_fasta pipeline
                 self.predictor.predict_fasta(
                     str(fasta_path),
                     tmp_out.name,
                     batch_size=self.batch_size,
                 )
+    
+    def _run_inference(self, fasta_path: Path) -> None:
+        """
+        Runs ESM3Di inference using the command-line interface (CLI).
+        Pure timing of model inference and output generation.
+
+        Args:
+            fasta_path (Path): Path to the input FASTA file.
+        """
+        import subprocess
+
+        with tempfile.NamedTemporaryFile(suffix=".fasta") as tmp_out:
+            cmd = [
+                "esm3di",
+                "predict",
+                "--input-fasta", str(fasta_path),
+                "--output-fasta", tmp_out.name,
+                "--batch-size", str(self.batch_size),
+            ]
+            subprocess.run(cmd, check=True)
