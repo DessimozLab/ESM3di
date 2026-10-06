@@ -9,6 +9,8 @@ import warnings
 from importlib.resources import files
 from pathlib import Path
 
+import torch
+
 
 # Suppress harmless runtime and third-party warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -16,6 +18,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 from .io import (
     fasta2foldseek,
+    read_fasta,
     resolve_user_path,
     resolve_output_path,
     resolve_checkpoint_path
@@ -25,22 +28,41 @@ from .inference import ESM3DiPredictor, DEFAULT_HF_REPO, DEFAULT_BATCH_SIZE, DEF
 logger = logging.getLogger("esm3di")
 
 
-def setup_logging():
-    """Sets up standard logger format for terminal output."""
-    handler = logging.StreamHandler(sys.stdout)
+def setup_logging(verbosity: int):
+    """Configure CLI logging according to the requested verbosity."""
+    levels = {
+        0: logging.CRITICAL + 1,
+        1: logging.ERROR,
+        2: logging.WARNING,
+        3: logging.INFO,
+    }
+    if verbosity not in levels:
+        raise ValueError("verbosity must be between 0 and 3")
+
+    handler = logging.StreamHandler(sys.stderr)
     formatter = logging.Formatter(
         fmt="%(asctime)s [%(levelname)s] %(message)s",
         datefmt="%H:%M:%S"
     )
     handler.setFormatter(formatter)
 
-    root_logger = logging.getLogger("esm3di")
-    root_logger.setLevel(logging.INFO)
-    root_logger.addHandler(handler)
+    logger.setLevel(levels[verbosity])
+    logger.propagate = False
+    logger.handlers.clear()
+    logger.addHandler(handler)
 
 
 def add_common_args(subparser: argparse.ArgumentParser):
     """Adds arguments shared across subcommands."""
+    subparser.add_argument(
+        "-v",
+        "--verbosity",
+        type=int,
+        choices=range(4),
+        default=argparse.SUPPRESS,
+        metavar="INT",
+        help="Verbosity level: 0: quiet, 1: +errors, 2: +warnings, 3: +info [3]"
+    )
     subparser.add_argument(
         "--model-ckpt",
         default=str(DEFAULT_HF_REPO),
@@ -73,10 +95,17 @@ def add_common_args(subparser: argparse.ArgumentParser):
 
 def main():
     """Parses command-line arguments and routes commands."""
-    setup_logging()
-
     parser = argparse.ArgumentParser(
         description="ESM3Di Toolkit: Predict 3Di structural sequences, build Foldseek databases, and infer phylogenies."
+    )
+    parser.add_argument(
+        "-v",
+        "--verbosity",
+        type=int,
+        choices=range(4),
+        default=3,
+        metavar="INT",
+        help="Verbosity level: 0: quiet, 1: +errors, 2: +warnings, 3: +info [3]"
     )
 
     subparsers = parser.add_subparsers(
@@ -175,6 +204,7 @@ def main():
     add_common_args(foldtree_parser)
 
     args = parser.parse_args()
+    setup_logging(args.verbosity)
 
     input_path = resolve_user_path(args.input_fasta)
     model_path_or_id = resolve_checkpoint_path(args.model_ckpt)
@@ -185,7 +215,6 @@ def main():
         output_dir = resolve_output_path(args.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        print(output_dir)
         try:
             import shutil
             from importlib.resources import as_file, files
@@ -273,27 +302,46 @@ def main():
             output_db_path = resolve_output_path(args.output_db)
             output_db_path.parent.mkdir(parents=True, exist_ok=True)
 
-            temp_3di_fasta = output_db_path.parent / f"{output_db_path.name}_temp_3di.fasta"
+            available_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 0
+            requested_gpus = available_gpus if args.num_gpus is None else min(args.num_gpus, available_gpus)
 
-            try:
-                predictor.predict_fasta(
-                    input_fasta_path=input_path,
-                    output_fasta_path=temp_3di_fasta,
+            if requested_gpus > 1:
+                temp_3di_fasta = output_db_path.parent / f"{output_db_path.name}_temp_3di.fasta"
+                try:
+                    predictor.predict_fasta(
+                        input_fasta_path=input_path,
+                        output_fasta_path=temp_3di_fasta,
+                        batch_size=args.batch_size,
+                        num_gpus=args.num_gpus,
+                        sort_by_length=args.sort_by_length
+                    )
+                    aa_input = input_path
+                    tdi_input = temp_3di_fasta
+                    logger.info("Using temporary FASTA output for multi-GPU Foldseek inference.")
+                    logger.info(f"Building Foldseek database at: {output_db_path}")
+                    fasta2foldseek(
+                        aa_input=aa_input,
+                        tdi_input=tdi_input,
+                        output_basename=str(output_db_path)
+                    )
+                finally:
+                    if temp_3di_fasta.exists():
+                        temp_3di_fasta.unlink()
+            else:
+                aa_records = read_fasta(str(input_path))
+                tdi_records = predictor.predict_records(
+                    aa_records,
                     batch_size=args.batch_size,
-                    num_gpus=args.num_gpus,
                     sort_by_length=args.sort_by_length
                 )
 
                 logger.info(f"Building Foldseek database at: {output_db_path}")
                 fasta2foldseek(
-                    aa_input=str(input_path),
-                    tdi_input=str(temp_3di_fasta),
+                    aa_input=aa_records,
+                    tdi_input=tdi_records,
                     output_basename=str(output_db_path)
                 )
-                logger.info("Foldseek database generated successfully.")
-            finally:
-                if temp_3di_fasta.exists():
-                    temp_3di_fasta.unlink()
+            logger.info("Foldseek database generated successfully.")
 
         elif args.command == "perplexity":
             output_tsv_path = resolve_output_path(args.output_tsv)

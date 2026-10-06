@@ -1,5 +1,6 @@
 import string
 from typing import List, Tuple, Union
+from os import PathLike
 import sys
 from pathlib import Path
 
@@ -166,8 +167,8 @@ def iter_fasta(filename, clean=None, full_name=False):
 
 
 def fasta2foldseek(
-        aa_input: Union[str, List[Tuple[str, str]]],
-        tdi_input: Union[str, List[Tuple[str, str]]],
+        aa_input: Union[str, PathLike, List[Tuple[str, str]]],
+        tdi_input: Union[str, PathLike, List[Tuple[str, str]]],
         output_basename: str
 ):
     """Compiles foldseek binary database files.
@@ -191,15 +192,15 @@ def fasta2foldseek(
             open(f"{output_basename}.lookup", "wb") as lookup_h:
 
         # Programmatic Router: Check if we are handling files or direct lists
-        if isinstance(aa_input, str):
+        if isinstance(aa_input, (str, PathLike)):
             from .io import iter_fasta
-            pep_iterator = iter_fasta(aa_input, full_name=True)
+            pep_iterator = iter_fasta(str(aa_input), full_name=True)
         else:
             pep_iterator = aa_input
 
-        if isinstance(tdi_input, str):
+        if isinstance(tdi_input, (str, PathLike)):
             from .io import iter_fasta
-            tdi_iterator = iter_fasta(tdi_input, full_name=True)
+            tdi_iterator = iter_fasta(str(tdi_input), full_name=True)
         else:
             tdi_iterator = tdi_input
 

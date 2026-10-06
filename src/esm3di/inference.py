@@ -10,7 +10,7 @@ import warnings
 import contextlib
 from tqdm import tqdm
 from pathlib import Path
-from typing import List, Union, Optional, Any
+from typing import List, Union, Optional, Any, Tuple
 
 # Mute third-party library noise early during import
 warnings.filterwarnings("ignore", category=UserWarning, module="bitsandbytes")
@@ -168,7 +168,7 @@ class ESM3DiPredictor:
     def predict_batch(self, sequences: List[str], batch_size: int = DEFAULT_BATCH_SIZE) -> List[str]:
         """Predicts 3Di structural tokens for a list of in-memory protein sequences."""
         predicted_strings: List[str] = []
-        disable_pbar = len(sequences) <= 1
+        disable_pbar = len(sequences) <= 1 or not logger.isEnabledFor(logging.INFO)
 
         with torch.no_grad():
             for i in tqdm(
@@ -207,6 +207,33 @@ class ESM3DiPredictor:
 
         return predicted_strings
 
+    def predict_records(
+        self,
+        records: List[Tuple[str, str]],
+        batch_size: int = DEFAULT_BATCH_SIZE,
+        sort_by_length: bool = True
+    ) -> List[Tuple[str, str]]:
+        """Predicts 3Di sequences for in-memory FASTA records.
+
+        Headers and record order are preserved, while optional length sorting is
+        used only to improve batching efficiency.
+        """
+        indexed_records = list(enumerate(records))
+        if sort_by_length:
+            indexed_records.sort(key=lambda item: len(item[1][1]))
+
+        raw_seqs = [sequence for _, (_, sequence) in indexed_records]
+        predicted_sorted = self.predict_batch(raw_seqs, batch_size=batch_size)
+        predicted_records: List[Optional[Tuple[str, str]]] = [None] * len(records)
+
+        for (original_index, (header, _)), prediction in zip(indexed_records, predicted_sorted):
+            predicted_records[original_index] = (header, prediction)
+
+        if any(record is None for record in predicted_records):
+            raise RuntimeError("Prediction count did not match the number of input records.")
+
+        return [record for record in predicted_records if record is not None]
+
     def predict_fasta(
         self,
         input_fasta_path: Union[str, Path],
@@ -241,19 +268,12 @@ class ESM3DiPredictor:
             logger.info(f"Saved predicted 3Di sequences to: {output_fasta_path}")
             return
 
-        indexed_records = list(enumerate(aa_records))
-        if sort_by_length:
-            indexed_records.sort(key=lambda item: len(item[1][1]))
-
-        raw_seqs = [sequence for _, (_, sequence) in indexed_records]
-        predicted_sorted = self.predict_batch(raw_seqs, batch_size=batch_size)
-        predicted_3dis = [None] * len(aa_records)
-        for (original_index, (header, _)), prediction in zip(indexed_records, predicted_sorted):
-            predicted_3dis[original_index] = prediction
-
-        headers = [header for header, _ in aa_records]
-
-        write_fasta(list(zip(headers, predicted_3dis)), str(output_fasta_path))
+        predicted_records = self.predict_records(
+            aa_records,
+            batch_size=batch_size,
+            sort_by_length=sort_by_length
+        )
+        write_fasta(predicted_records, str(output_fasta_path))
         logger.info(f"Saved predicted 3Di sequences to: {output_fasta_path}")
 
     def output_per_position_perplexity(
@@ -274,7 +294,7 @@ class ESM3DiPredictor:
         with open(output_tsv_path, 'w') as out_f:
             out_f.write("sequence_id\tposition\taa\tperplexity\n")
 
-            disable_pbar = len(aa_records) <= 1
+            disable_pbar = len(aa_records) <= 1 or not logger.isEnabledFor(logging.INFO)
             with torch.no_grad():
                 for i in tqdm(
                     range(0, len(aa_records), batch_size),

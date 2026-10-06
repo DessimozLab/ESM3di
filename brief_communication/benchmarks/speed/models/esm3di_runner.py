@@ -47,7 +47,7 @@ class ESM3DiRunner(BaseRunner):
         self.predictor = ESM3DiPredictor.from_pretrained()
         self.is_loaded = True
 
-    def _run_inference_pred_only(self, fasta_path: Path) -> None:
+    def _run_inference(self, fasta_path: Path) -> None:
             """
             Runs ESM3Di inference on the input FASTA file using native batching.
             Pure timing of model inference and output generation.
@@ -62,7 +62,7 @@ class ESM3DiRunner(BaseRunner):
                     batch_size=self.batch_size,
                 )
     
-    def _run_inference(self, fasta_path: Path) -> None:
+    def _run_inference_cli(self, fasta_path: Path) -> None:
         """
         Runs ESM3Di inference using the command-line interface (CLI).
         Pure timing of model inference and output generation.

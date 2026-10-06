@@ -46,6 +46,19 @@ The ColabFold benchmark invokes the external `colabfold_batch` executable and Fo
 install LocalColabFold separately in an environment compatible with its NumPy and Pandas
 requirements, then ensure both executables are on `PATH`.
 
+### Running tests
+
+Install the development dependencies and run the unit test suite:
+
+```bash
+pip install -e ".[dev]"
+pytest -q
+```
+
+The unit tests do not download a model checkpoint. They cover FASTA and Foldseek I/O,
+in-memory prediction orchestration, preprocessing/shard handling, CLI logging, and
+the model wrapper shapes.
+
 > **Note on GPU Acceleration:** Standard `pip install -e .` pulls the default PyTorch wheel. If your GPU cluster requires a specific CUDA toolkit version (e.g., CUDA 12.1), pre-install PyTorch via the [official PyTorch guide](https://pytorch.org/get-started/locally/) before running `pip install -e .`.
 
 ---
@@ -94,6 +107,14 @@ The following flags are available across all subcommands:
 | `--num-gpus` | `int` | `None` | Number of GPUs to use (default: use all available). |
 | `--revision` | `str` | `46c5f7d` | Hugging Face model revision or commit SHA. |
 | `--batch-size` | `int` | `4` | Inference batch size per device. |
+| `-v`, `--verbosity` | `int` | `3` | Logging verbosity: `0` quiet, `1` errors, `2` warnings, `3` info. |
+
+Verbosity can be specified before or after the subcommand:
+
+```bash
+esm3di -v 1 predict --input-fasta test_data/test_virus.fasta
+esm3di predict -v 0 --input-fasta test_data/test_virus.fasta
+```
 
 ---
 

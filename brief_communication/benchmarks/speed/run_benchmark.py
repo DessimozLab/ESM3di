@@ -180,8 +180,7 @@ def main():
     # Determine input dataset mode
     try:
         if args.length_bins:
-            #target_files = find_length_bin_fastas(args.data_dir)
-            target_files = [Path("data/length_bins/bin_L700.fasta")]
+            target_files = find_length_bin_fastas(args.data_dir)
             print(f"[+] Found {len(target_files)} length-bin FASTA file(s) in '{args.data_dir / 'length_bins'}':")
         else:
             target_files = find_fasta_subsets(args.data_dir, args.subsets)

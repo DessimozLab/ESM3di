@@ -29,12 +29,13 @@ rule build_esm3di_foldseek_db:
         gpu=int(config.get("esm3di_gpus") or 0)
     shell:
         """
+        set -o pipefail
         esm3di foldseek-db \
             --input-fasta "{input.fasta}" \
             --output-db "{params.db_prefix}" \
             --batch-size {params.batch_size} \
             --num-gpus {resources.gpu} \
-            {params.extra_flags} > "{log}" 2>&1
+            {params.extra_flags} 2>&1 | tee "{log}"
         """
 
 

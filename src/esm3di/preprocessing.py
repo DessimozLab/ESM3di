@@ -96,6 +96,7 @@ def _count_sequences(fasta_path: str) -> int:
 def _shard_fasta(input_fasta: str, num_shards: int, temp_dir: str,
                  sort_by_length: bool = False) -> List[Tuple[str, List[str]]]:
     """Distributes sequences using round-robin for multi-GPU inference."""
+    os.makedirs(temp_dir, exist_ok=True)
     shards = [[] for _ in range(num_shards)]
 
     records = read_fasta(input_fasta)
