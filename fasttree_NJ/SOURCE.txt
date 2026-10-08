@@ -1,0 +1,16 @@
+FastTree official upstream source
+Version: 2.2.0
+Commit: a5a2723ea1e64faf3da7ea514521cfa348891add
+URL: https://raw.githubusercontent.com/morgannprice/fasttree/a5a2723ea1e64faf3da7ea514521cfa348891add/FastTree.c
+Downloaded: 2026-10-02
+Source SHA256: 975202a6b74c9996af871404ff043bb2152edcbda539035662514bc12d1f3431
+Binary SHA256: a961fce8d22dc0285eef89569cfda2c965cb437718d917b0eb53f5a70dff6d3c
+Compiler: 11.4.0
+Build: gcc -DOPENMP -O3 -fopenmp -fopenmp-simd -funsafe-math-optimizations -march=native -o FastTreeMP src/FastTree.c -lm
+
+FoldMason official binary
+Release: 4-dd3c235
+URL: https://github.com/steineggerlab/foldmason/releases/download/4-dd3c235/foldmason-linux-avx2.tar.gz
+Downloaded: 2026-10-02
+Archive SHA256: 7e6f6bd264defda742882ec167eedaad1185c0a83a32646b1ec83fa6c5b86f05
+Binary SHA256: 6d4896fb8ea9da55695bc9ef0e564b1a8c1d2e7dcd700a3b012c6d7f2dd18fd6
