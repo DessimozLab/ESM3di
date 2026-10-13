@@ -24,7 +24,7 @@ The figure and tables are reproducible with [`mlm-and-residue-loss-curves.ipynb`
 | 3Di residue classification | 4 | 1.266426 | 1.295301 |
 | 3Di residue classification | 5 | 1.249222 | 1.296983 |
 
-MLM validation loss decreased by 0.031 across its three recorded epochs. The classifier reached its lowest validation loss at epoch 4 (1.295301); epoch 5 reduced training loss further but validation loss was effectively flat/slightly higher. Loss magnitudes are not comparable across tasks because their objectives and output spaces differ.
+MLM validation loss decreased by 0.031 across its three recorded epochs. The classifier reached its lowest validation loss at epoch 4 (1.295301); epoch 5 reduced training loss further but validation loss was effectively flat/slightly higher. The figure's third panel adds the classifier's recorded `Loss/train_running_avg` scalar over 4,939 logged batch updates, making the within-run training convergence visible. It is a smoothed training signal rather than a validation curve. Loss magnitudes are not comparable across tasks because their objectives and output spaces differ.
 
 ## Dataset
 
@@ -63,4 +63,4 @@ The run is specified in [`configs/config_mlm_resume_3di.json`](../configs/config
 
 ## Reproduction notes
 
-The notebook reads MLM epoch summaries from the text log and extracts the two epoch-level scalar series (`Loss/train_epoch` and `Loss/val_epoch`) from the classifier’s TensorBoard event stream. It saves the figure to `reports/assets/training_validation_loss_curves.png`.
+The notebook reads MLM epoch summaries from the text log and extracts the classifier’s epoch-level scalar series (`Loss/train_epoch` and `Loss/val_epoch`) plus `Loss/train_running_avg` from the TensorBoard event stream. It saves the figure to `reports/assets/training_validation_loss_curves.png`.
