@@ -10,7 +10,7 @@ Everything else is experimental.
 ## Read First (Link, Do Not Duplicate)
 - Usage, CLI, checkpoint compatibility: [README.md](../README.md)
 - FoldSeek DB wrapper: [fastas2foldseekdb_README.md](../fastas2foldseekdb_README.md)
-- Recipes: [configs/](../configs/)
+- Recipes: [configs/](../configs)
 
 ## Supported Modules
 - [esm3di/cli.py](../esm3di/cli.py): the `esm3di` command, with subcommands `prepare`, `mlm`, `train`, `predict`, `foldseekdb`, and `pipeline`.
@@ -25,7 +25,7 @@ Everything else is experimental.
 - [esm3di/ESM3di_model.py](../esm3di/ESM3di_model.py): `ESM3DiModel` (backbone, LoRA, heads) and dataset helpers.
 - [esm3di/predict.py](../esm3di/predict.py), [esm3di/foldseek_db.py](../esm3di/foldseek_db.py): inference (windowed, multi-GPU) and the FoldSeek DB writer.
 - [esm3di/esmretrain.py](../esm3di/esmretrain.py), [esm3di/esmretrain_mlm.py](../esm3di/esmretrain_mlm.py): legacy shims. They forward to the new trainers, or to `experimental/*_full.py` when experimental flags are used.
-- [esm3di/experimental/](../esm3di/experimental/): earlier approaches (ESM-2/T5, iterative heads, tracks, taxon balancing, …). Do not extend these for the main pipeline.
+- [esm3di/experimental/](../esm3di/experimental): earlier approaches (ESM-2/T5, iterative heads, tracks, taxon balancing, …). Do not extend these for the main pipeline.
 
 ## Hard Conventions
 - Paired FASTAs must match by header order and sequence length.

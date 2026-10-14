@@ -1,0 +1,7 @@
+name: prostt5_db
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - foldseek>=9.427df8a

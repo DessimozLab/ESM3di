@@ -56,6 +56,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+workflow = [
+    "snakemake>=7.8.0",
+    "pulp<2.8.0",
+]
 # GPU optimization (requires CUDA)
 gpu = [
     "bitsandbytes>=0.42.0",
@@ -83,6 +87,9 @@ Issues = "https://github.com/DessimozLab/ESM3di/issues"
 
 [project.scripts]
 esm3di = "esm3di.cli:main"
+esm3di-infer = "esm3di.inference.cli:main"
+esm3di-learn = "esm3di.training.cli:main"
+esm3di-cut = "esm3di.cutting_cli:main"
 esm3di-prepare = "esm3di.prepare_data:main"
 esm3di-train-mlm = "esm3di.esmretrain_mlm:main"
 esm3di-train = "esm3di.esmretrain:main"
@@ -93,6 +100,8 @@ esm3di-push-to-hub = "esm3di.hf_publish:main"
 esm3di-buildtrainingset = "esm3di.experimental.build_trainingset:main"
 esm3di-download-alphafold = "esm3di.experimental.testdataset:main"
 
-[tool.setuptools]
-packages = ["esm3di", "esm3di.experimental"]
-package-dir = {"" = "."}
+[tool.setuptools.packages.find]
+include = ["esm3di*"]
+
+[tool.setuptools.package-data]
+"esm3di.workflow" = ["Snakefile", "*.yaml", "rules/*.smk", "scripts/*.py", "envs/*.yaml", "madroot/*"]
