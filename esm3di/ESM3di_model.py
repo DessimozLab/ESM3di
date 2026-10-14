@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from transformers import AutoModelForTokenClassification, AutoModelForMaskedLM, AutoModel
-from .iterative_head import (
+from .experimental.iterative_head import (
     IterativeTransformerClassificationHead,
     IterativeTransformerOutput,
     ModelWithIterativeTransformerHead,
@@ -779,11 +779,20 @@ def load_esm3di_from_mlm_checkpoint(
     plddt_prediction_mode: str = "classification",
     aux_track_num_bins: Optional[dict] = None,
 ):
-    """Load a MaskedLM checkpoint and use its encoder weights for an ESM3DiModel."""
-    # Create ESM3DiModel wrapper with LoRA/heads as desired.
-    esm3di = ESM3DiModel(
+    """Build an ``ESM3DiModel`` whose backbone is initialised from an MLM checkpoint.
+
+    ``mlm_checkpoint_path`` is an HF directory written by ``esm3di mlm`` (or the
+    legacy ``esmretrain_mlm``). Backbone weights are copied into the base model
+    before LoRA is applied; heads are freshly initialised.
+
+    Note: versions of this function before the cleanup silently failed to copy
+    any weights (key-name mismatch), so 3Di models trained "from MLM" with the
+    old code actually started from the stock HF weights.
+    """
+    return ESM3DiModel(
         hf_model_name=hf_model_name,
-        model_revision=base_revision,
+        revision=base_revision,
+        backbone_init=mlm_checkpoint_path,
         num_labels=num_labels,
         lora_r=lora_r,
         lora_alpha=lora_alpha,
@@ -811,94 +820,6 @@ def load_esm3di_from_mlm_checkpoint(
         plddt_prediction_mode=plddt_prediction_mode,
         aux_track_num_bins=aux_track_num_bins,
     )
-
-    # Load MLM model and extract the encoder backbone.
-    # We always instantiate from hf_model_name and then copy state from mlm_checkpoint_path.
-    # This avoids config_class mismatch from loading mismatched checkpoint classes directly.
-    source_backbone_model = AutoModelForMaskedLM.from_pretrained(
-        hf_model_name,
-        trust_remote_code=True,
-        revision=base_revision
-    )
-
-    state_dict = None
-    if os.path.isfile(mlm_checkpoint_path) and mlm_checkpoint_path.endswith(".pt"):
-        checkpoint = torch.load(mlm_checkpoint_path, map_location="cpu")
-        state_dict = checkpoint.get("model_state_dict", checkpoint)
-    elif os.path.isdir(mlm_checkpoint_path):
-        # try loading from HF checkpoint folder
-        candidate = None
-        for fname in ["pytorch_model.bin", "model.bin"]:
-            fpath = os.path.join(mlm_checkpoint_path, fname)
-            if os.path.exists(fpath):
-                candidate = fpath
-                break
-        if candidate:
-            checkpoint = torch.load(candidate, map_location="cpu")
-            # this might be raw state dict or wrapped object
-            if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
-                state_dict = checkpoint["model_state_dict"]
-            else:
-                state_dict = checkpoint
-        else:
-            # fallback: load direct from path using AutoModelForMaskedLM to handle remote format
-            mlm_model = AutoModelForMaskedLM.from_pretrained(
-                mlm_checkpoint_path,
-                trust_remote_code=True,
-            )
-            source_backbone = getattr(mlm_model, "base_model", mlm_model)
-            state_dict = source_backbone.state_dict()
-
-    if state_dict is not None:
-        # Only load matching shapes and ignore classification heads from MLM checkpoint.
-        source_sd = source_backbone_model.state_dict()
-        filtered_source_sd = {}
-        for k, v in state_dict.items():
-            if k not in source_sd:
-                continue
-            if source_sd[k].shape != v.shape:
-                continue
-            if k.startswith("sequence_head") or k.startswith("lm_head") or k.startswith("classifier"):
-                continue
-            filtered_source_sd[k] = v
-        source_backbone_model.load_state_dict(filtered_source_sd, strict=False)
-
-    source_backbone = getattr(source_backbone_model, "base_model", source_backbone_model)
-
-    # Find the target model for weights assignment
-    target_backbone = esm3di.base_model
-    if hasattr(esm3di, "model") and hasattr(esm3di.model, "base_model"):
-        target_backbone = esm3di.model.base_model
-
-    # Copy only shared weights from source to target, leaving classification head intact.
-    source_dict = source_backbone.state_dict()
-    target_dict = target_backbone.state_dict()
-    filtered = {}
-    for k, v in source_dict.items():
-        # Skip heads (at least the classification head should stay in target model)
-        if k.startswith("sequence_head") or k.startswith("lm_head") or k.startswith("classifier"):
-            continue
-
-        # transform key names if necessary (e.g., from `base_model.` prefixes)
-        short_k = k
-        if short_k.startswith("base_model."):
-            short_k = short_k.split("base_model.", 1)[1]
-        if short_k.startswith("model."):
-            short_k = short_k.split("model.", 1)[1]
-
-        if short_k in target_dict and target_dict[short_k].shape == v.shape:
-            filtered[short_k] = v
-        # also allow direct key if exact matches already
-        elif k in target_dict and target_dict[k].shape == v.shape:
-            filtered[k] = v
-
-    load_result = target_backbone.load_state_dict(filtered, strict=False)
-    if load_result.missing_keys:
-        print(f"[load_esm3di_from_mlm_checkpoint] missing keys: {len(load_result.missing_keys)}")
-    if load_result.unexpected_keys:
-        print(f"[load_esm3di_from_mlm_checkpoint] unexpected keys: {len(load_result.unexpected_keys)}")
-
-    return esm3di
 
 
 class ESM3DiModel:
@@ -929,7 +850,8 @@ class ESM3DiModel:
                     plddt_num_bins: int = 10,
                     plddt_prediction_mode: str = "classification",
                     aux_track_num_bins: Optional[dict] = None,
-                    revision: Optional[str] = None, 
+                    revision: Optional[str] = None,
+                    backbone_init: Optional[str] = None,
 ):
         """
         Initialize ESM model with LoRA configuration.
@@ -958,6 +880,11 @@ class ESM3DiModel:
             use_positional_encoding: Add positional encoding mixing to iterative head (default: True)
             use_hidden_state_feedback: Feed hidden states back instead of logits during iteration (default: True)
             use_gru_gate: Use GRU-style gating for controlled hidden state updates (default: False)
+            revision: HF hub revision of the remote code/weights. ``None`` uses the
+                pinned known-good revision from ``esm3di.checkpoints.KNOWN_HF_REVISIONS``.
+            backbone_init: Optional MLM checkpoint directory (output of ``esm3di mlm``).
+                Its backbone weights are copied into the base model *before* LoRA is
+                applied, so the 3Di tagger starts from the MLM-adapted encoder.
         """
         head_count = sum([use_cnn_head, use_transformer_head, use_iterative_transformer_head])
         if head_count > 1:
@@ -969,7 +896,12 @@ class ESM3DiModel:
         if plddt_prediction_mode not in {"classification", "regression"}:
             raise ValueError("plddt_prediction_mode must be 'classification' or 'regression'")
 
-        self.revision = revision
+        from .checkpoints import resolve_hf_revision
+
+        self.revision = resolve_hf_revision(hf_model_name, revision)
+        self.backbone_init = backbone_init
+        self.backbone_transfer_report = None
+        self.tokenizer = None
         self.hf_model_name = hf_model_name
         self.num_labels = num_labels
         self.lora_r = lora_r
@@ -1003,11 +935,11 @@ class ESM3DiModel:
             import warnings
             warnings.warn(
                 f"T5-based model detected: {hf_model_name}. "
-                "Consider using T5ProteinModel from esm3di.T5Model instead for better support.",
+                "Consider using T5ProteinModel from esm3di.experimental.T5Model instead for better support.",
                 DeprecationWarning
             )
             print(f"\n⚠️  T5-based model detected: {hf_model_name}")
-            print("   For better support, use T5ProteinModel from esm3di.T5Model")
+            print("   For better support, use T5ProteinModel from esm3di.experimental.T5Model")
 
         # Load model using standard HuggingFace approach
         self._load_model()
@@ -1020,7 +952,9 @@ class ESM3DiModel:
         else:
             print("\nAuto-discovering LoRA target modules...")
             self.target_modules = discover_lora_target_modules(self.base_model)
-            print(f"Discovered target modules: {self.target_modules}")
+            tm = self.target_modules
+            preview = ", ".join(tm[:6]) + (f", ... (+{len(tm) - 6} more)" if len(tm) > 6 else "")
+            print(f"Discovered {len(tm)} LoRA target modules: {preview}")
 
         # Configure and apply LoRA
         self._setup_lora()
@@ -1125,7 +1059,18 @@ class ESM3DiModel:
                     revision=self.revision
                 )
                 print("✓ Base model loaded (AutoModel)")
-        
+
+            if self.tokenizer is None:
+                from .checkpoints import get_tokenizer
+                self.tokenizer = get_tokenizer(self.base_model, self.hf_model_name, self.revision)
+
+            if self.backbone_init:
+                from .checkpoints import load_mlm_state_dict, transfer_backbone_weights
+                print(f"  Initialising backbone from MLM checkpoint: {self.backbone_init}")
+                mlm_state = load_mlm_state_dict(self.backbone_init, revision=self.revision)
+                self.backbone_transfer_report = transfer_backbone_weights(self.base_model, mlm_state)
+                print(f"✓ MLM backbone weights loaded: {self.backbone_transfer_report.summary()}")
+
 
     def _setup_lora(self):
         """Setup LoRA configuration and wrap the base model."""

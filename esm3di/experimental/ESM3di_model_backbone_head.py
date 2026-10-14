@@ -103,7 +103,7 @@ class Lion(torch.optim.Optimizer):
 # -----------------------------
 # Loss Functions (imported from losses.py)
 # -----------------------------
-from .losses import (
+from ..losses import (
     FocalLoss,
     CyclicalFocalLoss,
     PLDDTWeightedFocalLoss,
@@ -987,11 +987,11 @@ class ESM3DiModel:
             import warnings
             warnings.warn(
                 f"T5-based model detected: {hf_model_name}. "
-                "Consider using T5ProteinModel from esm3di.T5Model instead for better support.",
+                "Consider using T5ProteinModel from esm3di.experimental.T5Model instead for better support.",
                 DeprecationWarning
             )
             print(f"\n⚠️  T5-based model detected: {hf_model_name}")
-            print("   For better support, use T5ProteinModel from esm3di.T5Model")
+            print("   For better support, use T5ProteinModel from esm3di.experimental.T5Model")
 
         # Load model using standard HuggingFace approach
         self._load_model()

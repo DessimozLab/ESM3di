@@ -1,0 +1,15 @@
+{
+  "_comment": "Stage 1: MLM fine-tuning of ESM++ large (recipe used for esmc_viral_ft_large, 10 epochs).",
+  "input_fasta": ["data/train_aa.fasta"],
+  "val_fasta": ["data/val_aa.fasta"],
+  "model_name": "Synthyra/ESMplusplus_large",
+  "output_dir": "runs/mlm_esmpp_large",
+  "epochs": 10,
+  "batch_size": 4,
+  "learning_rate": 2e-5,
+  "weight_decay": 0.01,
+  "max_length": 1024,
+  "mlm_probability": 0.15,
+  "precision": "bf16",
+  "use_lora": false
+}

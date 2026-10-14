@@ -6,13 +6,13 @@ Balances the dataset by sampling equal numbers of sequences from each taxon at a
 
 Example usage:
   # Balance by phylum, sampling up to 500 sequences per phylum
-  python -m esm3di.balance_by_taxon --level phylum --max-per-taxon 500 --output-prefix /mnt/data1/bfvd/balanced/phylum_balanced
+  python -m esm3di.experimental.balance_by_taxon --level phylum --max-per-taxon 500 --output-prefix /mnt/data1/bfvd/balanced/phylum_balanced
 
   # Balance by class with minimum 50 sequences per class
-  python -m esm3di.balance_by_taxon --level class --max-per-taxon 1000 --min-per-taxon 50 --output-prefix balanced_class
+  python -m esm3di.experimental.balance_by_taxon --level class --max-per-taxon 1000 --min-per-taxon 50 --output-prefix balanced_class
 
   # Use the minimum taxon count as the sample size (perfect balance)
-  python -m esm3di.balance_by_taxon --level phylum --use-min --output-prefix perfectly_balanced
+  python -m esm3di.experimental.balance_by_taxon --level phylum --use-min --output-prefix perfectly_balanced
 """
 
 import argparse
@@ -286,7 +286,7 @@ def main():
         print(f"\nCreating train/val/test splits...", file=sys.stderr)
         import subprocess
         split_cmd = [
-            sys.executable, '-m', 'esm3di.split_data',
+            sys.executable, '-m', 'esm3di.experimental.split_data',
             '--aa-fasta', aa_output,
             '--three-di-fasta', threedi_output,
             '--output-prefix', Path(args.output_prefix).name,

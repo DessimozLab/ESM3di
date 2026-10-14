@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "esm3di"
-version = "0.1.0"
-description = "ESM + PEFT LoRA for 3Di per-residue prediction"
+version = "0.2.0"
+description = "ESM++ masked-LM + LoRA fine-tuning for per-residue 3Di structural-token prediction"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
@@ -25,8 +25,8 @@ classifiers = [
 dependencies = [
     # Core ML dependencies
     "torch>=2.0.0",
-    "transformers>=4.40.0",           # Compatible with ESM++ and peft
-    "peft>=0.10.0",                   # LoRA adapters
+    "transformers>=4.45.0,<4.49.0",   # ESM++ remote code + peft 0.12/0.13 (see requirements.txt)
+    "peft>=0.12.0,<0.14.0",           # LoRA adapters
     "accelerate>=0.20.0",             # Required by peft and transformers
     "safetensors>=0.4.0",             # Fast model loading
     
@@ -82,14 +82,17 @@ Repository = "https://github.com/DessimozLab/ESM3di"
 Issues = "https://github.com/DessimozLab/ESM3di/issues"
 
 [project.scripts]
-esm3di-train = "esm3di.esmretrain:main"
+esm3di = "esm3di.cli:main"
+esm3di-prepare = "esm3di.prepare_data:main"
 esm3di-train-mlm = "esm3di.esmretrain_mlm:main"
+esm3di-train = "esm3di.esmretrain:main"
+esm3di-predict = "esm3di.predict:main"
 esm3di-makefoldseekdb = "esm3di.fastas2foldseekdb:main"
-esm3di-buildtrainingset = "esm3di.build_trainingset:main"
-esm3di-cut = "esm3di.cutting_cli:main"
-esm3di-download-alphafold = "esm3di.testdataset:main"
 esm3di-push-to-hub = "esm3di.hf_publish:main"
+# legacy / experimental tools
+esm3di-buildtrainingset = "esm3di.experimental.build_trainingset:main"
+esm3di-download-alphafold = "esm3di.experimental.testdataset:main"
 
 [tool.setuptools]
-packages = ["esm3di"]
+packages = ["esm3di", "esm3di.experimental"]
 package-dir = {"" = "."}

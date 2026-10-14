@@ -14,7 +14,7 @@ Requirements:
     - PDB files with pLDDT scores in B-factor column (e.g., AlphaFold predictions)
 
 Example usage:
-    python -m esm3di.build_trainingset --pdb-dir structures/ --output-prefix train_data --plddt-threshold 70
+    python -m esm3di.experimental.build_trainingset --pdb-dir structures/ --output-prefix train_data --plddt-threshold 70
 """
 
 import argparse

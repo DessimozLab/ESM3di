@@ -6,20 +6,20 @@ This script filters the BFVD metadata by taxon name (searching in scientific nam
 
 Example usage:
   # Extract all Coronaviridae
-  python -m esm3di.extract_taxon_subset --taxon "Coronaviridae" --output-prefix coronaviridae
+  python -m esm3di.experimental.extract_taxon_subset --taxon "Coronaviridae" --output-prefix coronaviridae
 
   # Extract by genus
-  python -m esm3di.extract_taxon_subset --taxon "Betacoronavirus" --output-prefix betacov
+  python -m esm3di.experimental.extract_taxon_subset --taxon "Betacoronavirus" --output-prefix betacov
 
   # Use custom paths
-  python -m esm3di.extract_taxon_subset --taxon "Flaviviridae" \
+  python -m esm3di.experimental.extract_taxon_subset --taxon "Flaviviridae" \
       --metadata /path/to/metadata.tsv \
       --aa-fasta /path/to/aa.fasta \
       --three-di-fasta /path/to/3di.fasta \
       --output-prefix flavi
 
   # Case-sensitive exact match
-  python -m esm3di.extract_taxon_subset --taxon "Orthocoronavirinae" --exact-match
+  python -m esm3di.experimental.extract_taxon_subset --taxon "Orthocoronavirinae" --exact-match
 """
 
 import argparse

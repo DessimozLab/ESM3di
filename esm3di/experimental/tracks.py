@@ -5,7 +5,7 @@ Extract auxiliary structural tracks (bend, torsion, contact, burial, etc.) from 
 This script processes a directory of PDB/CIF files and outputs FASTA files for each track.
 
 Example usage:
-    python -m esm3di.tracks --indir structures/ --outdir tracks/ --workers 8
+    python -m esm3di.experimental.tracks --indir structures/ --outdir tracks/ --workers 8
 """
 
 from __future__ import annotations

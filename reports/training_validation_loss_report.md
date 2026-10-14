@@ -2,14 +2,23 @@
 
 ![Training and validation loss curves](assets/training_validation_loss_curves.png)
 
+> **Caveat (found during the repository cleanup).** The legacy `esmretrain.py` did not
+> actually copy the MLM checkpoint's weights into the backbone: the 3Di run below
+> was trained on the stock `Synthyra/ESMplusplus_small` backbone (verified by
+> comparing `checkpoints/esm3di_from_mlm/*.pt` against both the base model and
+> the MLM checkpoint). The 3Di numbers therefore measure "base ESM++ + LoRA + CNN
+> head", not the MLM → 3Di recipe. The new `esm3di train --init-from <mlm dir>`
+> transfers the backbone and reports the number of tensors copied; rerun with it
+> to measure the effect of the MLM stage.
+
 ## Scope
 
 This report covers the small ESM++ model selected for use:
 
-1. MLM fine-tuning recorded in [`esmc_viral_ft/train.log`](../esmc_viral_ft/train.log), ending at `esmc_viral_ft/epoch_3/`.
+1. MLM fine-tuning recorded in `esmc_viral_ft/train.log` (training run directory, not tracked in git), ending at `esmc_viral_ft/epoch_3/`.
 2. Five-epoch 3Di per-residue classification recorded in `tensorboard_logs/esm3di_from_mlm/run_20260326_212108/`, initialized from that MLM epoch-3 checkpoint.
 
-The figure and tables are reproducible with [`mlm-and-residue-loss-curves.ipynb`](../output/jupyter-notebook/mlm-and-residue-loss-curves.ipynb).
+The figure and tables are reproducible with [`mlm-and-residue-loss-curves.ipynb`](../analyses/scratch/output/jupyter-notebook/mlm-and-residue-loss-curves.ipynb).
 
 ## Loss histories
 
@@ -50,7 +59,7 @@ The historical log does not preserve a full CLI/config snapshot for this MLM run
 
 ### 3Di residue classifier
 
-The run is specified in [`configs/config_mlm_resume_3di.json`](../configs/config_mlm_resume_3di.json) and saves to `checkpoints/esm3di_from_mlm`.
+The run is specified in `configs/config_mlm_resume_3di.json` (its settings are now in [`configs/3di_esmpp_small_from_mlm.json`](../configs/3di_esmpp_small_from_mlm.json)) and saves to `checkpoints/esm3di_from_mlm`.
 
 - Initialization: `./esmc_viral_ft/epoch_3/` MLM checkpoint.
 - Objective: per-residue 3Di token classification from amino-acid sequences.

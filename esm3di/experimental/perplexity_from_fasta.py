@@ -3,7 +3,7 @@
 Compute per-position perplexity from an ESM3Di checkpoint and AA FASTA input.
 
 Example:
-    python -m esm3di.perplexity_from_fasta \
+    python -m esm3di.experimental.perplexity_from_fasta \
         --model-ckpt checkpoints/epoch_3.pt \
         --input-fasta proteins_aa.fasta \
         --output-tsv proteins_perplexity.tsv
@@ -15,8 +15,8 @@ from typing import Any, Dict, Optional, Tuple
 
 import torch
 
-from .ESM3di_model import ESM3DiModel
-from .model_outputs import PLDDT_BIN_VOCAB
+from ..ESM3di_model import ESM3DiModel
+from ..model_outputs import PLDDT_BIN_VOCAB
 
 
 def _load_checkpoint(checkpoint_path: str) -> Dict[str, Any]:

@@ -1,482 +1,250 @@
 # ESM3Di
 
-ESM + PEFT LoRA for 3Di per-residue prediction. Train ESM-2 or ESM++ models with LoRA adapters to predict 3Di structural sequences from amino acid sequences.
+Predict per-residue **3Di structural tokens** (the FoldSeek structural alphabet) directly from amino-acid sequences, so you can build FoldSeek databases and run structure-aware searches for proteins without structures.
 
-## Features
+The supported recipe is a two-stage fine-tune of an [ESM++](https://huggingface.co/Synthyra) protein language model:
 
-- 🧬 Train ESM-2 and ESM++ models for 3Di structure prediction
-- 🎯 Memory-efficient training using LoRA (Low-Rank Adaptation)
-- 🔧 Support for masking low-confidence positions
-- ⚡ Multi-GPU training with DataParallel
-- 🔀 Multi-GPU inference with automatic sharding
-- 🌐 Google Colab notebook for online inference
+1. **MLM stage (unsupervised).** Continue masked-language-model training of ESM++ on sequences from your domain, for example viral proteins.
+2. **3Di stage (supervised).** Start from the MLM backbone, add LoRA adapters and a small CNN token-classification head, and train them to predict the 3Di token at each residue. The labels come from structures via FoldSeek, and the loss can be weighted by pLDDT.
+
+Everything else that was tried (ESM-2/T5 backbones, iterative heads, auxiliary tracks, taxon balancing, …) lives in [`esm3di/experimental/`](esm3di/experimental/) and is kept for reference only.
+
+```
+structures (PDB/mmCIF, AlphaFold, ...) ──► esm3di prepare ──► data/{train,val,test}_{aa,3di,plddt_bins}.fasta
+                                                                      │
+extra sequences (optional) ─────────────────────────┐                 │
+                                                    ▼                 ▼
+Synthyra/ESMplusplus_{small,large} ──► esm3di mlm ──► mlm/best ──► esm3di train ──► 3di/best.pt
+                                                                                        │
+proteins.fasta ─────────────────────────────────────────────────────► esm3di predict ──► 3Di FASTA / FoldSeek DB
+```
 
 ## Installation
 
-### Option 1: Using Conda (Recommended)
-
-1. Create and activate the conda environment:
 ```bash
-# Standard environment (CUDA 11.8, most GPUs):
-conda env create -f environment.yml
-conda activate esm3di
-
-# For Blackwell GPUs (RTX 5090, RTX PRO 4000, etc.):
-conda env create -f environment_blackwell.yml
-conda activate esm3di_blackwell
-```
-
-**Note:** For exact reproducibility, use `environment_frozen.yml` which has pinned versions.
-
-### Building a Conda package
-
-The repository ships with a conda recipe in `conda-recipe/meta.yaml`.
-
-```bash
-conda install -n base conda-build
-conda build conda-recipe
-```
-
-The resulting package can be inspected and installed from the local conda build cache.
-
-### Option 2: Using pip
-
-1. Create a virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
+# Conda (recommended)
+conda env create -f environment.yml             # most GPUs
+conda env create -f environment_blackwell.yml   # Blackwell GPUs (RTX 50xx, RTX PRO)
+conda activate esm3di                           # or esm3di_blackwell
 pip install -e .
+
+# or plain pip
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt && pip install -e .
 ```
 
-## Usage
+[FoldSeek](https://github.com/steineggerlab/foldseek) is required to extract 3Di labels from structures (`esm3di prepare`) and to build FoldSeek databases. Put it on `PATH`, or pass `--foldseek-bin /path/to/foldseek` (or set `FOLDSEEK_BIN`).
 
-### Downloading Test Structures from AlphaFold Database
+> Keep `transformers` (`>=4.45,<4.49`) and `peft` (`>=0.12,<0.14`) in the ranges given in [requirements.txt](requirements.txt). ESM++ is loaded with `trust_remote_code`, and ESM3Di pins the remote-code revision that works with these versions automatically. Override it with `--hf-revision` if you need to.
 
-Download random AlphaFold structures for testing or training:
+After installation the `esm3di` command is available. Without installing, use `python -m esm3di.cli` instead.
+
+## Quick start: one command
+
+Point the pipeline at a set of structures, and optionally at a set of extra sequences for the MLM stage:
 
 ```bash
-python -m esm3di.testdataset \
-    --count 10 \
-    --output-dir test_structures \
-    --seed 42
+esm3di pipeline \
+  --structures structures/ \
+  --sequences viral_proteins.fasta \
+  --init-from Synthyra/ESMplusplus_small \
+  --out-dir runs/my_model
 ```
 
-Or download specific proteins by UniProt accession:
+The pipeline:
+
+1. Runs `esm3di prepare` on the structures and writes `runs/my_model/data/`.
+2. Runs the MLM stage on `--sequences` (plus the structure sequences if `--mlm-on-structure-sequences` is given) and writes `runs/my_model/mlm/`.
+3. Trains the 3Di tagger from the MLM backbone and writes `runs/my_model/3di/best.pt`.
+
+| You have… | Command |
+|---|---|
+| structures + extra sequences (full recipe) | `--structures S --sequences F.fasta` |
+| only structures, but still want an MLM stage | `--structures S --mlm-on-structure-sequences` |
+| only structures, no MLM stage | `--structures S` |
+| already-prepared data | `--data-dir runs/old/data` instead of `--structures` |
+| an MLM checkpoint already | `--init-from runs/mlm/best` (skip `--sequences`) |
+| a trained 3Di checkpoint to fine-tune further | `--init-from model.pt` (no MLM stage allowed) |
+
+Other useful options:
+
+- Epochs, batch size, and learning rate per stage: `--mlm-epochs/--mlm-batch-size/--mlm-lr` and `--epochs/--batch-size/--lr`.
+- Full config files per stage: `--mlm-config configs/mlm_esmpp_small.json` and `--train-config configs/3di_esmpp_small_from_mlm.json`.
+- Splitting: `--cluster-split`, `--val-fraction`, and `--test-fraction`.
+- Interrupted runs: re-run the same command with `--resume`. Prepared data is reused, a finished MLM stage is skipped, and 3Di training resumes from its latest epoch.
+
+Every stage is also available as its own command, as described in the next section.
+
+## Step by step
+
+### 1. Prepare training data from structures
 
 ```bash
-python -m esm3di.testdataset \
-    --accessions P04637 P01112 P42574 \
-    --output-dir structures
+esm3di prepare --structures structures/ more/*.cif.gz --out-dir data [--cluster-split]
 ```
 
-#### Download Options
+`--structures` accepts directories, files (`.pdb`, `.cif`, `.ent`, optionally `.gz`), or text files listing paths. Every chain becomes one example. Single-chain files are named after the file stem; multi-chain files use `stem_A`, `stem_B`, and so on. Output:
 
-- `--count`: Number of random structures to download
-- `--accessions`: Specific UniProt accessions to download
-- `--output-dir`: Output directory (default: alphafold_structures)
-- `--delay`: Delay between downloads in seconds (default: 0.5)
-- `--seed`: Random seed for reproducible sampling
-- `--version`: AlphaFold model version (default: 4)
+```
+data/
+  {all,train,val,test}_aa.fasta          amino-acid sequences
+  {all,train,val,test}_3di.fasta         3Di labels (same headers/lengths)
+  {all,train,val,test}_plddt_bins.fasta  pLDDT bins 0-9 per residue (from CA B-factors)
+  manifest.json
+```
 
-**Note**: Downloaded structures are from the [AlphaFold Protein Structure Database](https://alphafold.ebi.ac.uk/)
+Use `--no-plddt` for experimental structures, where B-factors are not pLDDT. `--cluster-split` assigns whole FoldSeek clusters to a single split, so the validation and test sets are not near-duplicates of the training set.
 
-### Building Training Dataset from PDB Files
+You can also bring your own paired FASTAs. They must have identical headers in the same order and equal sequence lengths. 3Di labels use the 20 letters `A-T`, case-insensitive. An optional pLDDT-bin FASTA uses digits `0-9` per residue.
 
-Generate training data from PDB structures with pLDDT-based masking:
+### 2. MLM fine-tuning (unsupervised)
 
 ```bash
-python -m esm3di.build_trainingset \
-    --pdb-dir alphafold_structures/ \
-    --output-prefix training_data \
-    --plddt-threshold 70 \
-    --mask-char X
+esm3di mlm --input-fasta data/train_aa.fasta extra_sequences.fasta \
+           --val-fasta data/val_aa.fasta \
+           --model-name Synthyra/ESMplusplus_small \
+           --output-dir runs/mlm_small --epochs 3 --batch-size 4
+# or: esm3di mlm --config configs/mlm_esmpp_small.json
 ```
 
-This will:
-1. Parse PDB files to extract sequences and pLDDT scores (from B-factor column)
-2. Use FoldSeek to generate 3Di sequences
-3. Mask low-confidence positions (pLDDT < threshold) in 3Di sequences
-4. Output AA and masked 3Di FASTA files ready for training
+The MLM stage trains all weights by default; `--use-lora true` trains adapters instead. It runs in bf16 autocast by default, and `--precision fp32` switches to full fp32. Outputs are HF model directories `runs/mlm_small/{epoch_N,best,final}/`. `best` is chosen on validation loss and perplexity. Resume an interrupted run with `--resume auto`.
 
-#### Building Training Set Options
-
-- `--pdb-dir`: Directory containing PDB files (or use `--pdb-files` for specific files)
-- `--output-prefix`: Prefix for output files
-- `--plddt-threshold`: pLDDT threshold below which to mask (default: 70)
-- `--mask-char`: Character for masking low-confidence positions (default: X)
-- `--split-chains`: Split multi-chain structures into separate entries
-- `--chain`: Extract specific chain only
-
-**Output files:**
-- `{prefix}_aa.fasta`: Amino acid sequences
-- `{prefix}_3di_masked.fasta`: 3Di sequences with masked positions
-- `{prefix}_stats.txt`: Statistics about masking
-
-### Training
-
-Train a model using FASTA files with amino acid sequences and corresponding 3Di labels:
+### 3. 3Di training (supervised)
 
 ```bash
-python -m esm3di.esmretrain \
-    --aa-fasta data/sequences.fasta \
-    --three-di-fasta data/3di_labels.fasta \
-    --hf-model facebook/esm2_t33_650M_UR50D \
-    --mask-label-chars "X" \
-    --batch-size 4 \
-    --epochs 10 \
-    --lr 1e-4 \
-    --out-dir checkpoints/
+esm3di train --data-dir data --init-from runs/mlm_small/best --out-dir runs/3di_small
+# or: esm3di train --config configs/3di_esmpp_small_from_mlm.json
 ```
 
-#### Using ESM++ Models
+`--init-from` accepts:
 
-ESM++ models from Synthyra (via HuggingFace) are supported and offer improved performance:
+| Value | Meaning |
+|---|---|
+| `Synthyra/ESMplusplus_small` / `_large` (default: small) | start from the stock base model |
+| an MLM output dir (`runs/mlm_small/best`) | load the MLM-tuned backbone, then add fresh LoRA and head |
+| a 3Di checkpoint (`model.pt`) | continue fine-tuning a trained tagger on new data. The model architecture comes from the checkpoint; optimiser and epoch counter start fresh |
+
+`--resume runs/3di_small/last.pt` (or `--resume auto` with `--out-dir`) continues an interrupted run with its optimiser, scheduler, and epoch counter.
+
+Defaults follow the recipe that worked:
+
+- LoRA r=16 / α=32 on all attention and FFN projections (auto-discovered).
+- A 2-layer CNN head.
+- AdamW lr 1e-4 with warmup and cosine decay.
+- Mixed precision.
+- pLDDT-weighted cross-entropy whenever a pLDDT-bin FASTA is available (`--plddt-min-bin` and `--plddt-weight-exponent` tune it).
+
+Without a separate validation set, `--val-split` holds out a fraction of the training data. Multi-GPU training uses `--multi-gpu true` (DataParallel).
+
+Each run directory contains:
+
+```
+runs/3di_small/
+  epoch_N.pt  best.pt  last.pt     checkpoints (best = lowest validation loss)
+  metrics.jsonl                    per-epoch train/val loss and accuracy
+  train_config.json                fully resolved configuration
+```
+
+### 4. Predict 3Di and build a FoldSeek database
 
 ```bash
-# Train with ESM++ Small (333M params)
-python -m esm3di.esmretrain \
-    --aa-fasta data/sequences.fasta \
-    --three-di-fasta data/3di_labels.fasta \
-    --hf-model Synthyra/ESMplusplus_small \
-    --mask-label-chars "X" \
-    --batch-size 4 \
-    --epochs 10 \
-    --lr 2e-4 \
-    --out-dir checkpoints/
+esm3di predict --checkpoint runs/3di_small/best.pt -i proteins.fasta -o proteins_3di.fasta \
+               [--foldseek-db dbs/proteins] [--gpus 0,1] [--confidence-output conf.fasta]
 
-# Or use ESM++ Large for better quality
-python -m esm3di.esmretrain \
-    --hf-model Synthyra/ESMplusplus_large \
-    # ... other args
+# FoldSeek DB from existing AA + 3Di FASTAs
+esm3di foldseekdb --aa-fasta proteins.fasta --three-di-fasta proteins_3di.fasta -o dbs/proteins
+foldseek easy-search query_db dbs/proteins hits.m8 tmp --exhaustive-search 1   # example search
 ```
 
-**Available ESM++ Models:**
-- `Synthyra/ESMplusplus_small`: 333M parameters
-- `Synthyra/ESMplusplus_large`: 575M parameters
+Sequences longer than the model window are predicted in overlapping windows. `esm3di-makefoldseekdb` / `python -m esm3di.fastas2foldseekdb` (see [fastas2foldseekdb_README.md](fastas2foldseekdb_README.md)) does prediction and DB creation in one step.
 
-ESM++ models provide:
-- Better protein representations than ESM-2
-- Faster inference
-- Improved scaling and performance
-- Native HuggingFace integration (no additional dependencies)
+To sanity-check predictions, run `python -m esm3di.test_output_diversity proteins_3di.fasta`. It warns if the output collapses to a few tokens.
 
-#### Key Arguments
+## Configuration files
 
-- `--aa-fasta`: FASTA file with amino acid sequences
-- `--three-di-fasta`: FASTA file with matching 3Di sequences (same order and length)
-- `--hf-model`: Model identifier. ESM-2 options: `facebook/esm2_t12_35M_UR50D` (35M), `facebook/esm2_t30_150M_UR50D` (150M), `facebook/esm2_t33_650M_UR50D` (650M). ESM++ options: `Synthyra/ESMplusplus_small` (333M), `Synthyra/ESMplusplus_large` (575M)
-- `--mask-label-chars`: Characters to treat as masked (e.g., low pLDDT positions)
-- `--lora-r`: LoRA rank (default: 8)
-- `--lora-alpha`: LoRA scaling factor (default: 16.0)
-- `--batch-size`: Training batch size per GPU
-- `--epochs`: Number of training epochs
-- `--lr`: Learning rate
-- `--out-dir`: Directory to save checkpoints
-- `--multi-gpu`: Enable multi-GPU training (uses all available GPUs)
-- `--mixed-precision`: Enable FP16 mixed precision training
-- `--gradient-accumulation-steps`: Accumulate gradients over N batches
+Both trainers accept `--config file.json`. Keys are the long option names with underscores (`batch_size`, `init_from`, …), and keys starting with `_` are treated as comments. Settings are applied in this order, each overriding the previous: built-in defaults, then the config file, then `--data-dir` paths, then explicit command-line flags. Relative paths are resolved against the current working directory.
 
-### Multi-GPU Training
+| Config | Purpose |
+|---|---|
+| [configs/mlm_esmpp_small.json](configs/mlm_esmpp_small.json), [configs/mlm_esmpp_large.json](configs/mlm_esmpp_large.json) | MLM stage on `data/` |
+| [configs/3di_esmpp_small_from_mlm.json](configs/3di_esmpp_small_from_mlm.json), [configs/3di_esmpp_large_from_mlm.json](configs/3di_esmpp_large_from_mlm.json) | 3Di stage from the MLM output |
+| [configs/bfvd/](configs/bfvd/) | Same recipe on the BFVD viral structure splits (absolute paths for our cluster) |
 
-For training on multiple GPUs, use the `--multi-gpu` flag:
+Older experimental options (focal loss, iterative heads, T5, auxiliary tracks, …) are rejected with a pointer to `python -m esm3di.experimental.esmretrain_full`.
+
+## Checkpoints and compatibility
+
+**3Di checkpoint (`.pt`).** A `torch.save` dict with `model_state_dict` (complete model: backbone, LoRA, and head), `label_vocab`, `mask_label_chars`, `args`, `epoch`, `optimizer_state_dict`, and, for new runs, a `provenance` record of which MLM checkpoint the backbone came from. The architecture is rebuilt from `args`, so prediction only needs the `.pt` file.
+
+**MLM checkpoint (directory).** A standard HuggingFace model directory, plus `esm3di_mlm.json` with the training metadata. Directories containing only a PEFT adapter are merged into their base model on load.
+
+**Compatibility with older checkpoints:**
+
+- Checkpoints written by the old `esmretrain.py` / `esmretrain_mlm.py` (including `checkpoints/esm3di_from_mlm/*.pt`, the `esmc_viral_ft_large` MLM dirs, and the Hub models below) load in `esm3di predict` and `esm3di train --init-from`. The `DataParallel` `module.` prefix is handled.
+- Checkpoints from older PEFT versions that wrapped extra modules with LoRA are merged into dense weights on load, and their outputs are unchanged.
+- `python -m esm3di.esmretrain` and `python -m esm3di.esmretrain_mlm` still work. They forward to the new trainers, or to the experimental full versions if you pass experimental flags.
+
+> ⚠️ **Note on earlier "MLM → 3Di" runs.** In the previous trainer, the MLM checkpoint given to the 3Di stage was not actually loaded into the backbone, so those 3Di models were trained on the stock ESM++ weights. The new trainer copies the MLM backbone before adding LoRA and logs how many tensors were transferred. Retrain with the new pipeline to get the real benefit of the MLM stage.
+
+### Pre-trained models
+
+| HuggingFace repository | Backbone | Notes |
+|---|---|---|
+| [cactuskid13/ESMpp_small_3Di](https://huggingface.co/cactuskid13/ESMpp_small_3Di) | ESM++ small | trained on BFVD (`epoch_3.pt`) |
+| [cactuskid13/esm2small_3di](https://huggingface.co/cactuskid13/esm2small_3di) | ESM-2 35M | small and fast, legacy |
 
 ```bash
-python -m esm3di.esmretrain \
-    --aa-fasta data/sequences.fasta \
-    --three-di-fasta data/3di_labels.fasta \
-    --hf-model Synthyra/ESMplusplus_small \
-    --batch-size 8 \
-    --multi-gpu \
-    --mixed-precision \
-    --epochs 10 \
-    --out-dir checkpoints/
+huggingface-cli download cactuskid13/ESMpp_small_3Di epoch_3.pt --local-dir models/
+esm3di predict --checkpoint models/epoch_3.pt -i proteins.fasta -o proteins_3di.fasta
 ```
 
-This uses `torch.nn.DataParallel` to automatically distribute batches across all available GPUs. The effective batch size is `batch_size * num_gpus`.
+Upload your own model with `esm3di-push-to-hub --repo-id org/name --local-file runs/3di_small/best.pt`. MLM runs can push automatically with `esm3di mlm --push-to-hub true --hub-repo-id org/name`.
 
-**Multi-GPU Training Options:**
-- `--multi-gpu`: Enable DataParallel multi-GPU training
-- `--mixed-precision`: Enable FP16 for faster training and reduced memory
-- `--gradient-accumulation-steps`: Simulate larger batches when GPU memory is limited
-- `--device`: Specify primary GPU (e.g., `cuda:0`)
-
-**Example with gradient accumulation:**
-```bash
-# Effective batch size = 4 * 4 * 2 GPUs = 32
-python -m esm3di.esmretrain \
-    --batch-size 4 \
-    --gradient-accumulation-steps 4 \
-    --multi-gpu \
-    # ... other args
-```
-
-### Using Config Files
-
-For reproducible experiments, use JSON config files:
-
-```bash
-python -m esm3di.esmretrain --config config_esmpp_large.json
-```
-
-Example config file:
-```json
-{
-  "aa_fasta": "data/sequences.fasta",
-  "three_di_fasta": "data/3di_labels.fasta",
-  "hf_model": "Synthyra/ESMplusplus_small",
-  "mask_label_chars": "X",
-  "use_cnn_head": true,
-  "batch_size": 8,
-  "epochs": 3,
-  "lr": 0.0002,
-  "multi_gpu": true,
-  "mixed_precision": true,
-  "out_dir": "checkpoints_esmpp"
-}
-```
-
-### Inference
-
-Use the trained model to predict 3Di sequences:
+### Python API
 
 ```python
-from esm3di import predict_3di_for_fasta
+from esm3di.predict import predict_records
+records = [("prot1", "MKTAYIAKQRQISFVKSHFSRQ")]
+for header, three_di, confidence in predict_records(records, checkpoint="runs/3di_small/best.pt"):
+    print(header, three_di)
 
-results = predict_3di_for_fasta(
-    model_ckpt="checkpoints/epoch_10.pt",
-    aa_fasta="data/test_sequences.fasta",
-    device="cuda"  # or "cpu"
-)
-
-for header, aa_seq, pred_3di in results:
-    print(f">{header}")
-    print(f"AA:  {aa_seq}")
-    print(f"3Di: {pred_3di}")
+from esm3di.checkpoints import load_3di_checkpoint      # (ESM3DiModel, ckpt dict)
+from esm3di.fastas2foldseekdb import create_foldseek_db_from_fastas
 ```
 
-### Polyprotein Cleavage Prediction CLI
+`from esm3di import ESM3DiModel, read_fasta` and `ESM3DiModel.predict_from_fasta(...)`, which the Colab notebook uses, still work.
 
-Run cleavage-site prediction from amino acid FASTA using ESM3Di embeddings and saved small classifiers:
+## Repository layout
 
-```bash
-esm3di-cut \
-    --input-fasta data/polyproteins.fasta \
-    --esm3di-checkpoint checkpoints/esm3di_from_mlm/epoch_5.pt \
-    --ffn-checkpoint polyprotein_cut/models/cutsite_ffn_all_data.pt \
-    --transformer-checkpoint polyprotein_cut/models/cutsite_transformer_all_data.pt \
-    --classifier ensemble \
-    --cutoff 0.6 \
-    --output-prefix outputs/polyprotein_cut
-```
+| Path | Contents |
+|---|---|
+| [esm3di/cli.py](esm3di/cli.py) | `esm3di` command: `prepare`, `mlm`, `train`, `predict`, `foldseekdb`, `pipeline` |
+| [esm3di/prepare_data.py](esm3di/prepare_data.py) | structures → paired AA/3Di/pLDDT FASTAs via FoldSeek |
+| [esm3di/train_mlm.py](esm3di/train_mlm.py) | stage 1: ESM++ MLM fine-tuning |
+| [esm3di/train_3di.py](esm3di/train_3di.py) | stage 2: 3Di token classification |
+| [esm3di/checkpoints.py](esm3di/checkpoints.py) | checkpoint loading, MLM → 3Di backbone transfer, HF revision pinning |
+| [esm3di/ESM3di_model.py](esm3di/ESM3di_model.py) | `ESM3DiModel` (backbone + LoRA + heads), dataset utilities |
+| [esm3di/predict.py](esm3di/predict.py), [esm3di/foldseek_db.py](esm3di/foldseek_db.py) | inference and FoldSeek DB writer |
+| [esm3di/experimental/](esm3di/experimental/) | unsupported earlier approaches and data tools |
+| [configs/](configs/) | recipes for the supported pipeline |
+| [analyses/](analyses/) | benchmarks, case studies and scratch material (not part of the package) |
+| [notebooks/](notebooks/), [reports/](reports/) | notebooks (incl. Colab inference) and training reports |
 
-Outputs:
-- `{output_prefix}_residue_predictions.csv`: per-residue probabilities and binary cleavage calls.
-- `{output_prefix}_sequence_summary.csv`: per-sequence cleavage positions and number of products.
-- `{output_prefix}_cleaved_products.fasta`: cleaved products with headers in the form `original_id_cut[start:end]`.
+## Citation
 
-You can choose `--classifier ffn`, `--classifier transformer`, or `--classifier ensemble`.
+If you use this code, please cite:
 
-### Creating FoldSeek Database
-
-Generate a FoldSeek-compatible database from amino acid sequences:
-
-```bash
-python -m esm3di.fastas2foldseekdb \
-    --aa-fasta data/proteins.fasta \
-    --model-ckpt checkpoints/epoch_10.pt \
-    --output-db my_foldseek_db
-```
-
-This will:
-1. Run ESM inference to predict 3Di sequences
-2. Create intermediate AA and 3Di FASTA files
-3. Build a FoldSeek database with both sequence and structure information
-
-#### Multi-GPU Inference
-
-For large datasets, enable multi-GPU inference to parallelize predictions:
-
-```bash
-python -m esm3di.fastas2foldseekdb \
-    --aa-fasta data/large_dataset.fasta \
-    --model-ckpt checkpoints/epoch_10.pt \
-    --output-db my_foldseek_db \
-    --multi-gpu \
-    --num-gpus 4
-```
-
-**How Multi-GPU Inference Works:**
-1. Input sequences are sharded across GPUs using round-robin distribution
-2. Each GPU runs as an isolated subprocess with its own CUDA context
-3. Predictions are merged back into original sequence order
-4. FoldSeek database is built from the merged results
-
-**Multi-GPU Inference Options:**
-- `--multi-gpu`: Enable multi-GPU inference
-- `--num-gpus`: Number of GPUs to use (default: all available)
-
-#### Using Pre-computed 3Di Sequences
-
-If you already have 3Di predictions:
-
-```bash
-python -m esm3di.fastas2foldseekdb \
-    --aa-fasta data/proteins.fasta \
-    --three-di-fasta data/proteins_3di.fasta \
-    --output-db my_foldseek_db \
-    --skip-inference
-```
-
-#### FoldSeek Database Options
-
-- `--keep-fastas`: Keep intermediate FASTA files after database creation
-- `--output-aa-fasta`: Specify path for AA FASTA output
-- `--output-3di-fasta`: Specify path for 3Di FASTA output
-- `--foldseek-bin`: Custom path to foldseek binary
-
-**Note**: FoldSeek must be installed and available in your PATH. Download from [https://github.com/steineggerlab/foldseek](https://github.com/steineggerlab/foldseek)
-
-## Data Format
-
-### Input FASTA Files
-
-Both amino acid and 3Di FASTA files should have:
-- Matching number of sequences
-- Sequences in the same order
-- Equal length for corresponding AA and 3Di sequences
-
-Example `sequences.fasta`:
-```
->protein1
-MKTAYIAKQRQISFVKSHFSRQLEERLGLIEVQAPILSRVGDGTQDNLSGAEK
->protein2
-KALTARQQEVFDLIRDHISQTGMPPTRAEIAQRLGFRSPNAAEEHLKALARKGVIE
-```
-
-Example `3di_labels.fasta`:
-```
->protein1
-acbdACBDacbdACBDacbdACBDacbdACBDacbdACBDacbdACBDacbdA
->protein2
-XbdACBDacbdACBDacbdACBDacbdACBDacbdACBDacbdACBDacbdACB
-```
-
-Note: Characters specified in `--mask-label-chars` (e.g., 'X') will be ignored during training.
-
-## Model Checkpoints
-
-Checkpoints are saved after each epoch and contain:
-- Model state dict (including LoRA adapters)
-- Label vocabulary
-- Masked label characters
-- Training arguments
-
-### Downloading Pre-trained Checkpoints
-
-Pre-trained checkpoints are hosted on HuggingFace Hub for easy access:
-
-```python
-from huggingface_hub import hf_hub_download
-
-# Download ESM2 35M checkpoint (~131MB)
-checkpoint = hf_hub_download(
-    repo_id="cactuskid13/esm2small_3di",
-    filename="epoch_3.pt"
-)
-
-# Or download ESM++ BFVD checkpoint (~1.4GB)
-checkpoint = hf_hub_download(
-    repo_id="cactuskid13/ESMpp_small_3Di",
-    filename="epoch_3.pt"
-)
-```
-
-### Publishing your trained model to Hugging Face Hub
-
-ESM3Di now includes a dedicated publisher CLI and optional in-training upload hooks.
-
-#### 1) Upload an exported HF-compatible directory
-
-```bash
-export HF_TOKEN="<your-hf-token>"
-esm3di-push-to-hub \
-  --repo-id your-org/esm3di-custom \
-  --local-dir checkpoints/hf_compatible
-```
-
-#### 2) Upload a single checkpoint file
-
-```bash
-esm3di-push-to-hub \
-  --repo-id your-org/esm3di-custom \
-  --local-file checkpoints/epoch_10.pt \
-  --path-in-repo checkpoints/epoch_10.pt
-```
-
-#### 3) Auto-publish during training
-
-Both training entry points support Hub upload flags:
-
-- `python -m esm3di.esmretrain --push-to-hub --hub-repo-id <org/repo> ...`
-- `python -m esm3di.esmretrain_mlm --push-to-hub --hub-repo-id <org/repo> ...`
-
-When enabled, the scripts upload `hf_compatible/` exports, and `esmretrain.py` also uploads per-epoch `.pt` checkpoints under `checkpoints/` in the model repo.
-
-### Available Pre-trained Checkpoints
-
-| HuggingFace Repository | Model | Size | Description |
-|------------------------|-------|------|-------------|
-| [cactuskid13/esm2small_3di](https://huggingface.co/cactuskid13/esm2small_3di) | ESM2 35M | ~131MB | Fast, well-tested, recommended |
-| [cactuskid13/ESMpp_small_3Di](https://huggingface.co/cactuskid13/ESMpp_small_3Di) | ESM++ small | ~1.4GB | Trained on BFVD, better accuracy |
-
-**Recommended for most users:** `cactuskid13/esm2small_3di` (fast, small, reliable)
-
-### Verifying Predictions
-
-Use the test script to verify that model outputs have sufficient diversity:
-
-```bash
-python test_output_diversity.py output_3di.fasta
-```
-
-This will check that:
-- Output contains multiple unique 3Di characters
-- No single character dominates more than 50% of predictions
-- Output is not effectively uniform (>90% one character)
-
-## Requirements
-
-- Python ≥ 3.10
-- PyTorch ≥ 2.0.0
-- transformers ≥ 4.30.0
-- peft ≥ 0.5.0
-- CUDA-capable GPU (recommended)
-- biopython (for FoldSeek database creation)
-
-**For multi-GPU training/inference:**
-- Multiple CUDA-capable GPUs
-- Sufficient GPU memory (ESM++ small: ~4GB per GPU, ESM++ large: ~8GB per GPU)
+- ESM++: [Synthyra, 2024](https://huggingface.co/Synthyra)
+- ESM-2: Lin et al., 2022
+- LoRA: Hu et al., 2021
+- FoldSeek / 3Di: van Kempen et al., 2023
 
 ## License
 
 MIT License
 
-## Citation
-
-If you use this code, please cite the relevant papers:
-- ESM-2: [Lin et al., 2022]
-- ESM++: [Synthyra, 2024] - https://huggingface.co/Synthyra
-- LoRA: [Hu et al., 2021]
-- 3Di: [van Kempen et al., 2023]
-
-
 ## Funding
 
 Funded by NIH through the [Pathogen Data Network](https://www.pathogendatanetwork.org).
 
-*This resource is supported by the National Institute Of Allergy And Infectious Diseases of the National Institutes of Health under Award Number U24AI183840. The content is solely the responsibility of the authors and does not necessarily represent the official views of the National Institutes of Health.
+*This resource is supported by the National Institute Of Allergy And Infectious Diseases of the National Institutes of Health under Award Number U24AI183840. The content is solely the responsibility of the authors and does not necessarily represent the official views of the National Institutes of Health.*

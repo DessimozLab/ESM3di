@@ -1,74 +1,54 @@
 # fastas2foldseekdb
 
-Generate FoldSeek databases from amino acid FASTA files using ESM 3Di predictions.
+Build a FoldSeek database from amino-acid FASTA files by predicting 3Di tokens with a trained ESM3Di checkpoint. This is a one-step wrapper around `esm3di predict` + `esm3di foldseekdb`. See the [README](README.md) for training.
 
-## Setup
-
-### 1. Create the conda environment
-
-```bash
-conda env create -f fastas2foldseekdb.yml
-conda activate fastas2foldseekdb
-```
-
-On first activation, FastPLMs will be automatically cloned to the environment and PYTHONPATH will be configured.
+FoldSeek must be on `PATH`, or pass `--foldseek-bin` (or set `FOLDSEEK_BIN`).
 
 ## Usage
 
-### Basic usage with inference
-
 ```bash
-python fastas2foldseekdb.py \
-    --aa-fasta path/to/proteins.fasta \
-    --model-ckpt path/to/checkpoints/epoch_3.pt \
-    --output-db path/to/output_db \
-    --device cuda:0
-```
+# Predict 3Di and build the DB
+esm3di-makefoldseekdb \
+    --aa-fasta proteins.fasta \
+    --model-ckpt runs/3di_small/best.pt \
+    --output-db dbs/proteins \
+    --device cuda:0 [--num-gpus 2] [--keep-fastas]
 
-### Using pre-computed 3Di FASTA (skip inference)
-
-```bash
-python fastas2foldseekdb.py \
-    --aa-fasta path/to/proteins.fasta \
-    --three-di-fasta path/to/proteins_3di.fasta \
-    --output-db path/to/output_db \
+# Use a pre-computed 3Di FASTA (no model needed)
+esm3di-makefoldseekdb \
+    --aa-fasta proteins.fasta \
+    --three-di-fasta proteins_3di.fasta \
+    --output-db dbs/proteins \
     --skip-inference
 ```
 
-### Full options
+`python -m esm3di.fastas2foldseekdb` is equivalent. With the unified CLI, the same can be done as:
+
+```bash
+esm3di predict --checkpoint runs/3di_small/best.pt -i proteins.fasta -o proteins_3di.fasta --foldseek-db dbs/proteins
+esm3di foldseekdb --aa-fasta proteins.fasta --three-di-fasta proteins_3di.fasta -o dbs/proteins
+```
+
+Any ESM3Di 3Di checkpoint works, including old `esmretrain.py` checkpoints and the Hub models (`cactuskid13/ESMpp_small_3Di`, `cactuskid13/esm2small_3di`).
+
+## Options
 
 | Option | Description |
 |--------|-------------|
-| `--aa-fasta` | Input amino acid FASTA file (required) |
-| `--three-di-fasta` | Pre-computed 3Di FASTA file |
-| `--model-ckpt` | Path to trained ESM 3Di model checkpoint |
-| `--skip-inference` | Skip inference, use provided 3Di FASTA |
-| `--device` | Device for inference (cuda:0, cuda:1, cpu) |
-| `--output-db` | Output FoldSeek database path (required) |
-| `--keep-fastas` | Keep intermediate AA and 3Di FASTA files |
-| `--output-aa-fasta` | Path to save AA FASTA |
-| `--output-3di-fasta` | Path to save 3Di FASTA |
-| `--foldseek-bin` | Path to foldseek binary (default: foldseek) |
+| `--aa-fasta` | Input amino-acid FASTA (required) |
+| `--output-db` | Output FoldSeek database prefix (required) |
+| `--model-ckpt` | Trained 3Di checkpoint (`.pt`) |
+| `--three-di-fasta` + `--skip-inference` | Use existing 3Di predictions instead of running the model |
+| `--device` | `cuda`, `cuda:1`, `cpu` |
+| `--num-gpus` | Shard inference over GPUs `0..N-1` |
+| `--batch-size` | Sequences per batch |
+| `--revision` | Pin the HF remote-code revision of the backbone (normally automatic) |
+| `--keep-fastas` | Also write `<output-db>_aa.fasta` and `<output-db>_3di.fasta` |
+| `--output-aa-fasta`, `--output-3di-fasta`, `--output-confidence-fasta` | Explicit paths for the intermediate FASTAs / per-residue confidence |
+| `--foldseek-bin` | Path to the foldseek binary |
 
 ## Output
 
-The pipeline produces a FoldSeek database with the following files:
+FoldSeek sequence-DB files `{output_db}`, `{output_db}_ss` (3Di), `{output_db}_h` (headers) plus their `.index`/`.dbtype` files, ready for `foldseek search` / `easy-search`.
 
-- `{output_db}` - Main amino acid database
-- `{output_db}_ss` - 3Di structure database  
-- `{output_db}_h` - Header database
-- `{output_db}.fasta` - Amino acid FASTA
-- `{output_db}_3di.fasta` - Predicted 3Di FASTA (if `--keep-fastas`)
-- `{output_db}_aa.fasta` - Copy of input AA FASTA (if `--keep-fastas`)
-
-## Example
-
-```bash
-# Process alphacoronavirus sequences
-python fastas2foldseekdb.py \
-    --aa-fasta ./alphacorona/alphacoronaviridae.fasta \
-    --model-ckpt ./checkpoints_ESMplusplus_small/epoch_3.pt \
-    --output-db ./alphacorona/alphacoronaviridae \
-    --keep-fastas \
-    --device cuda:1
-```
+The earlier, more feature-rich script (taxonomy, custom models) is kept at `esm3di/experimental/fastas2foldseekdb_full.py`.

@@ -1,5 +1,5 @@
 {% set name = "esm3di" %}
-{% set version = "0.1.0" %}
+{% set version = "0.2.0" %}
 
 package:
   name: {{ name|lower }}
@@ -13,11 +13,14 @@ build:
   noarch: python
   script: {{ PYTHON }} -m pip install . -vv
   entry_points:
+    - esm3di = esm3di.cli:main
+    - esm3di-prepare = esm3di.prepare_data:main
+    - esm3di-predict = esm3di.predict:main
     - esm3di-train = esm3di.esmretrain:main
     - esm3di-train-mlm = esm3di.esmretrain_mlm:main
     - esm3di-makefoldseekdb = esm3di.fastas2foldseekdb:main
-    - esm3di-buildtrainingset = esm3di.build_trainingset:main
-    - esm3di-download-alphafold = esm3di.testdataset:main
+    - esm3di-buildtrainingset = esm3di.experimental.build_trainingset:main
+    - esm3di-download-alphafold = esm3di.experimental.testdataset:main
     - esm3di-push-to-hub = esm3di.hf_publish:main
 
 requirements:
@@ -29,8 +32,8 @@ requirements:
   run:
     - python >=3.10
     - pytorch >=2.0.0
-    - transformers >=4.40.0
-    - peft >=0.10.0
+    - transformers >=4.45.0,<4.49.0
+    - peft >=0.12.0,<0.14.0
     - accelerate >=0.20.0
     - huggingface_hub >=0.20.0
     - sentencepiece >=0.2.0

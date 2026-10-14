@@ -1,0 +1,22 @@
+{
+  "_comment": "Reproduces the BFVD viral MLM run (esmc_viral_ft_large); original runs used fp32.",
+  "input_fasta": [
+    "/mnt/data1/bfvd/training_set_nomasking/splits/bfvd_train_aa.fasta"
+  ],
+  "val_fasta": [
+    "/mnt/data1/bfvd/training_set_nomasking/splits/bfvd_val_aa.fasta"
+  ],
+  "model_name": "Synthyra/ESMplusplus_large",
+  "output_dir": "checkpoints/mlm_bfvd_esmpp_large",
+  "epochs": 10,
+  "batch_size": 4,
+  "learning_rate": 2e-05,
+  "weight_decay": 0.01,
+  "max_length": 1024,
+  "mlm_probability": 0.15,
+  "precision": "bf16",
+  "use_lora": false,
+  "test_fasta": [
+    "/mnt/data1/bfvd/training_set_nomasking/splits/bfvd_test_aa.fasta"
+  ]
+}
