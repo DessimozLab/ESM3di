@@ -2,6 +2,12 @@
 
 ESM + PEFT LoRA for 3Di per-residue prediction. Train ESM-2 or ESM++ models with LoRA adapters to predict 3Di structural sequences from amino acid sequences.
 
+## Scope
+
+ESM3Di is an experimental, dataset-focused effort. Its models and evaluations are intended for viral protein collections and other explicitly curated, specialized structure sets (for example, the BFVD-derived training splits used in this repository).
+
+It is **not** intended to be a general-purpose replacement for ProstT5, nor does this repository claim broad performance equivalence across arbitrary proteins, taxa, or structural datasets. For general 3Di prediction, use ProstT5 or another broadly validated method; use ESM3Di when working within a supported viral or specialized-structure setting and validate performance on the target dataset.
+
 ## Features
 
 - 🧬 Train ESM-2 and ESM++ models for 3Di structure prediction
