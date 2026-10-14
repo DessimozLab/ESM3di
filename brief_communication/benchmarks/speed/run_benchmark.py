@@ -13,6 +13,7 @@ import argparse
 import csv
 import re
 import sys
+import tempfile
 from pathlib import Path
 from typing import Dict, List, Type
 
@@ -79,6 +80,40 @@ def find_length_bin_fastas(data_dir: Path) -> List[Path]:
         return int(match.group(1)) if match else 0
 
     return sorted(bin_files, key=extract_target_length)
+
+
+def upsample_fasta(fasta_path: Path, target_count: int, output_dir: Path) -> Path:
+    """Repeat FASTA records until the file contains exactly target_count records."""
+    records = []
+    current_record = []
+
+    with open(fasta_path, "r", encoding="utf-8") as fasta_file:
+        for line in fasta_file:
+            if line.startswith(">"):
+                if current_record:
+                    records.append(current_record)
+                current_record = [line.rstrip("\n")]
+            elif current_record and line.strip():
+                current_record.append(line.rstrip("\n"))
+
+    if current_record:
+        records.append(current_record)
+
+    if len(records) >= target_count:
+        return fasta_path
+    if not records:
+        raise ValueError(f"Cannot upsample empty FASTA file '{fasta_path}'.")
+
+    output_path = output_dir / fasta_path.name
+    with open(output_path, "w", encoding="utf-8") as output_file:
+        for index in range(target_count):
+            record = records[index % len(records)]
+            header = record[0]
+            if index >= len(records):
+                header = f"{header}__upsample_{index // len(records)}"
+            output_file.write("\n".join([header, *record[1:]]) + "\n")
+
+    return output_path
 
 
 def append_result_to_csv(
@@ -171,11 +206,19 @@ def main():
         default=1,
         help="Number of timed inference repetitions per FASTA file.",
     )
+    parser.add_argument(
+        "--upsample-nseqs-to",
+        type=int,
+        default=None,
+        help="If set, upsample the number of sequences in each FASTA to this value for benchmarking. Useful for length-bins.",
+    )
 
     args = parser.parse_args()
 
     if args.repeats < 1:
         parser.error("--repeats must be a positive integer.")
+    if args.upsample_nseqs_to is not None and args.upsample_nseqs_to < 1:
+        parser.error("--upsample-nseqs-to must be a positive integer.")
 
     # Determine input dataset mode
     try:
@@ -193,64 +236,72 @@ def main():
         print(f"[!] Error: {e}", file=sys.stderr)
         sys.exit(1)
 
-    # Process each selected model
-    for model_key in args.models:
-        print("\n" + "=" * 60)
-        print(f" Running Benchmark Suite for Model: {model_key.upper()}")
-        print("=" * 60)
+    with tempfile.TemporaryDirectory(prefix="benchmark_upsampled_", dir="tmp") as temp_dir:
+        benchmark_files = [
+            upsample_fasta(fasta_file, args.upsample_nseqs_to, Path(temp_dir))
+            if args.upsample_nseqs_to is not None
+            else fasta_file
+            for fasta_file in target_files
+        ]
 
-        runner_cls = MODEL_REGISTRY[model_key]
-        runner = runner_cls(
-            model_name=model_key,
-            device=args.device,
-        )
+        # Process each selected model
+        for model_key in args.models:
+            print("\n" + "=" * 60)
+            print(f" Running Benchmark Suite for Model: {model_key.upper()}")
+            print("=" * 60)
 
-        try:
-            runner.load_model()
-        except Exception as e:
-            print(f"[!] Failed to load model '{model_key}': {e}", file=sys.stderr)
-            continue
+            runner_cls = MODEL_REGISTRY[model_key]
+            runner = runner_cls(
+                model_name=model_key,
+                device=args.device,
+            )
 
-        # Iterate over target FASTA files and repeat each benchmark.
-        for fasta_file in target_files:
-            for repetition in range(1, args.repeats + 1):
-                print(
-                    f"\n[+] Executing: {model_key} | File: {fasta_file.name} "
-                    f"| Repetition: {repetition}/{args.repeats}"
-                )
+            try:
+                runner.load_model()
+            except Exception as e:
+                print(f"[!] Failed to load model '{model_key}': {e}", file=sys.stderr)
+                continue
 
-                try:
-                    result = runner.run_benchmark(fasta_file)
-                    append_result_to_csv(
-                        args.results_file,
-                        result,
-                        repetition=repetition,
-                    )
-
-                    avg_sec_per_seq = (
-                        result.wall_time_seconds / result.num_sequences
-                        if result.num_sequences > 0
-                        else 0.0
-                    )
-
+            # Iterate over target FASTA files and repeat each benchmark.
+            for original_file, fasta_file in zip(target_files, benchmark_files):
+                for repetition in range(1, args.repeats + 1):
                     print(
-                        f"    Done ({result.num_sequences} seqs, {result.total_residues} res) -> "
-                        f"Wall Time: {result.wall_time_seconds:.2f}s | "
-                        f"Avg/Seq: {avg_sec_per_seq:.3f}s | "
-                        f"Res/s: {result.residues_per_second:.1f} | "
-                        f"Peak VRAM: {result.peak_vram_gb:.2f} GB"
+                        f"\n[+] Executing: {model_key} | File: {original_file.name} "
+                        f"| Repetition: {repetition}/{args.repeats}"
                     )
 
-                except Exception as e:
-                    print(
-                        f"[!] Benchmark failed for {model_key} on "
-                        f"{fasta_file.name}, repetition {repetition}: {e}",
-                        file=sys.stderr,
-                    )
+                    try:
+                        result = runner.run_benchmark(fasta_file)
+                        append_result_to_csv(
+                            args.results_file,
+                            result,
+                            repetition=repetition,
+                        )
 
-        del runner
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+                        avg_sec_per_seq = (
+                            result.wall_time_seconds / result.num_sequences
+                            if result.num_sequences > 0
+                            else 0.0
+                        )
+
+                        print(
+                            f"    Done ({result.num_sequences} seqs, {result.total_residues} res) -> "
+                            f"Wall Time: {result.wall_time_seconds:.2f}s | "
+                            f"Avg/Seq: {avg_sec_per_seq:.3f}s | "
+                            f"Res/s: {result.residues_per_second:.1f} | "
+                            f"Peak VRAM: {result.peak_vram_gb:.2f} GB"
+                        )
+
+                    except Exception as e:
+                        print(
+                            f"[!] Benchmark failed for {model_key} on "
+                            f"{original_file.name}, repetition {repetition}: {e}",
+                            file=sys.stderr,
+                        )
+
+            del runner
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
     print("\n" + "=" * 60)
     print(f"[+] Benchmark execution finished. Results saved to: {args.results_file}")

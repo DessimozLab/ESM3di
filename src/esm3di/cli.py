@@ -23,7 +23,12 @@ from .io import (
     resolve_output_path,
     resolve_checkpoint_path
 )
-from .inference import ESM3DiPredictor, DEFAULT_HF_REPO, DEFAULT_BATCH_SIZE, DEFAULT_REVISION
+from .inference import (
+    ESM3DiPredictor,
+    DEFAULT_HF_REPO,
+    DEFAULT_BATCH_SIZE,
+    DEFAULT_REVISION,
+)
 
 logger = logging.getLogger("esm3di")
 
@@ -74,11 +79,12 @@ def add_common_args(subparser: argparse.ArgumentParser):
         default=None,
         help="Number of GPUs to use (default: use all available)"
     )
+    """
     subparser.add_argument(
         "--revision",
         default=DEFAULT_REVISION,
         help=f"Base model Hugging Face revision/commit SHA (default: {DEFAULT_REVISION})"
-    )
+    )"""
     subparser.add_argument(
         "--batch-size",
         type=int,
@@ -244,7 +250,7 @@ def main():
                 f"output_dir={output_dir.resolve()}",
                 f"esm3di_model_ckpt={args.model_ckpt}",
                 f"esm3di_batch_size={args.batch_size}",
-                f"esm3di_revision={args.revision}",
+                #f"esm3di_revision={args.revision}",
                 f"use_prostt5={args.use_prostt5}"
             ]
             if args.num_gpus is not None:
@@ -285,7 +291,7 @@ def main():
     try:
         predictor = ESM3DiPredictor.from_pretrained(
             model_path_or_id,
-            revision=args.revision
+            #revision=args.revision
         )
 
         if args.command == "predict":
