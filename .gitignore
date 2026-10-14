@@ -87,6 +87,7 @@ ckp/
 *.fa
 data/
 *.json
+!configs/**/*.json
 
 # Logs
 *.log

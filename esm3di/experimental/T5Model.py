@@ -21,10 +21,10 @@ from transformers import (
     AutoTokenizer,
     AutoConfig,
 )
-from .ESM3di_model import read_fasta
+from ..ESM3di_model import read_fasta
 from transformers.modeling_outputs import TokenClassifierOutput
 from peft import get_peft_model, LoraConfig, TaskType
-from .model_outputs import TokenClassifierOutputWithPLDDT
+from ..model_outputs import TokenClassifierOutputWithPLDDT
 
 # Import iterative head from shared module
 from .iterative_head import (

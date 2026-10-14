@@ -373,7 +373,7 @@ def predict_3di_from_sequences(
         Path to output FASTA file
     """
     import torch
-    from .ESM3di_model import ESM3DiModel
+    from ..ESM3di_model import ESM3DiModel
     
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"

@@ -4,7 +4,7 @@ Utility script to split paired AA/3Di FASTA files into train/test/validation set
 Optionally also splits a pLDDT bins FASTA file.
 
 Example usage:
-  python -m esm3di.split_data \
+  python -m esm3di.experimental.split_data \
       --aa-fasta data_aa.fasta \
       --three-di-fasta data_3di.fasta \
       --plddt-bins-fasta data_plddt_bins.fasta \
@@ -292,7 +292,7 @@ def main():
     val_aa = os.path.join(args.output_dir, f"{args.output_prefix}_val_aa.fasta")
     val_3di = os.path.join(args.output_dir, f"{args.output_prefix}_val_3di.fasta")
     
-    print(f"  python -m esm3di.esmretrain \\")
+    print(f"  python -m esm3di.experimental.esmretrain_full \\")
     print(f"    --aa-fasta {train_aa} \\")
     print(f"    --three-di-fasta {train_3di} \\")
     if has_plddt:

@@ -1,0 +1,15 @@
+{
+  "_comment": "Stage 1: MLM fine-tuning of ESM++ small. Paths are relative to the working directory; data/ is the output of `esm3di prepare`, add unlabelled FASTAs to input_fasta as needed.",
+  "input_fasta": ["data/train_aa.fasta"],
+  "val_fasta": ["data/val_aa.fasta"],
+  "model_name": "Synthyra/ESMplusplus_small",
+  "output_dir": "runs/mlm_esmpp_small",
+  "epochs": 3,
+  "batch_size": 4,
+  "learning_rate": 2e-5,
+  "weight_decay": 0.01,
+  "max_length": 1024,
+  "mlm_probability": 0.15,
+  "precision": "bf16",
+  "use_lora": false
+}

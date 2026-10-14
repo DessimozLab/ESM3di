@@ -319,7 +319,7 @@ Notes:
 	
 	print("\n✓ Ready to use with build_trainingset.py!")
 	print(f"\nNext steps:")
-	print(f"  python -m esm3di.build_trainingset \\")
+	print(f"  python -m esm3di.experimental.build_trainingset \\")
 	print(f"      --pdb-dir {args.output_dir} \\")
 	print(f"      --output-prefix training_data \\")
 	print(f"      --plddt-threshold 70")
