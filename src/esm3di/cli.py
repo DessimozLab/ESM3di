@@ -235,13 +235,6 @@ def main():
             with as_file(pkg_wf_resource) as src_path:
                 shutil.copytree(src_path, staged_wf_dir)
 
-            # Ensure bundled binaries retain executable permissions
-            madroot_dir = staged_wf_dir / "madroot"
-            if madroot_dir.exists():
-                for bin_path in madroot_dir.iterdir():
-                    if bin_path.is_file():
-                        bin_path.chmod(bin_path.stat().st_mode | 0o111)
-
             # 2. Store conda environments outside staged workflow so they persist
             conda_prefix = output_dir / ".snakemake_conda"
 

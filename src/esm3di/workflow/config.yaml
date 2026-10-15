@@ -7,7 +7,7 @@ esm3di_threads: 4
 esm3di_gpus: null                
 
 # MAD Rooting Configurations
-mad_path: "madroot/mad"
+mad_path: "madroot/mad.py"
 
 # ProsTt5 Configurations
 use_prostt5: false

@@ -64,10 +64,10 @@ rule mad_root_struct:
     log:
         "{out_dir}/{dataset}/logs/{model}_mad_root_struct.log"
     params:
-        mad=config.get("mad_path", "madroot/mad")
+        mad=config.get("mad_path", "madroot/mad.py")
     shell:
         """
-        "{params.mad}" "{input}" -n >> "{log}" 2>&1
+        python "{params.mad}" "{input}" -n >> "{log}" 2>&1
         """
 
 
