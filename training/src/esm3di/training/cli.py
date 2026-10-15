@@ -1,8 +1,6 @@
-"""Compatibility alias for the supported 3Di trainer."""
-
+"""Compatibility alias for the supported learning CLI."""
 import sys
-from .training import train_3di as _implementation
-
+from esm3di_training import cli as _implementation
 if __name__ == "__main__":
     _implementation.main()
 else:

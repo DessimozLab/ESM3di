@@ -48,7 +48,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader, Dataset
 
-from ..checkpoints import (
+from esm3di.checkpoints import (
     DEFAULT_HF_MODEL,
     THREEDI_VOCAB,
     detect_init_source,
@@ -59,7 +59,7 @@ from ..checkpoints import (
     read_3di_checkpoint,
     resolve_hf_revision,
 )
-from ..losses import DEFAULT_PLDDT_BIN_WEIGHTS, PLDDTWeightedFocalLoss
+from .losses import DEFAULT_PLDDT_BIN_WEIGHTS, PLDDTWeightedFocalLoss
 
 PLDDT_BIN_VOCAB = [str(i) for i in range(10)]
 
@@ -367,7 +367,7 @@ def normalise_config(raw: dict, source: str = "config") -> dict:
             if value:
                 raise ValueError(
                     f"{source}: '{key}' enables an experimental feature that the streamlined trainer "
-                    "does not support. Use `python -m esm3di.experimental.esmretrain_full` instead."
+                    "does not support. Historical implementations are archived under experiments/legacy_runtime."
                 )
             continue
         if key in IGNORED_LEGACY_KEYS:
@@ -426,7 +426,7 @@ def _find_latest_checkpoint(out_dir: str) -> Optional[str]:
 
 def build_model(cfg: dict, resume_ckpt: Optional[dict]):
     """Return ``(esm3di_model, label_vocab, provenance)`` according to cfg."""
-    from ..ESM3di_model import ESM3DiModel
+    from esm3di.ESM3di_model import ESM3DiModel
 
     if resume_ckpt is not None:
         kwargs = model_kwargs_from_checkpoint(resume_ckpt)
@@ -499,9 +499,6 @@ def checkpoint_args(cfg: dict, esm) -> dict:
         cnn_num_layers=esm.cnn_num_layers,
         cnn_kernel_size=esm.cnn_kernel_size,
         cnn_dropout=esm.cnn_dropout,
-        use_transformer_head=esm.use_transformer_head,
-        use_iterative_transformer_head=esm.use_iterative_transformer_head,
-        use_plddt_prediction_head=esm.use_plddt_prediction_head,
         lora_target_modules=list(esm.target_modules),
     )
     # Never rebuild from MLM weights at load time: the .pt holds the full model.

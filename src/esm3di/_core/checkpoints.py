@@ -277,11 +277,15 @@ def load_mlm_model(
         base = base_model or mlm_base_model_name(source)
         if base is None:
             raise ValueError(f"Cannot determine the base model of {source!r}; pass base_model=")
+        if not os.path.isdir(base) and not base.startswith("Synthyra/ESMplusplus_"):
+            raise ValueError(f"Only ESM++ MLM backbones are supported, not {base!r}.")
         model = AutoModelForMaskedLM.from_pretrained(
             base, trust_remote_code=True, revision=resolve_hf_revision(base, revision)
         )
         report = transfer_backbone_weights(model, load_mlm_state_dict(source, revision), include_heads=True)
         return model, base, report
+    if not source.startswith("Synthyra/ESMplusplus_"):
+        raise ValueError(f"Only ESM++ MLM backbones are supported, not {source!r}.")
     model = AutoModelForMaskedLM.from_pretrained(
         source, trust_remote_code=True, revision=resolve_hf_revision(source, revision)
     )
@@ -293,7 +297,7 @@ def load_mlm_model(
 # ---------------------------------------------------------------------------
 
 def get_tokenizer(model=None, hf_model: Optional[str] = None, revision: Optional[str] = None):
-    """Return a tokenizer for an ESM-2 / ESM++ model.
+    """Return a tokenizer for an ESM++ model.
 
     ESM++ exposes its tokenizer as ``model.tokenizer`` (``AutoTokenizer`` does not
     know ``EsmSequenceTokenizer``), so prefer that.
@@ -343,7 +347,10 @@ def read_3di_checkpoint(path: str, map_location="cpu") -> dict:
     return ckpt
 
 
-_UNSUPPORTED_LEGACY_FLAGS = ("use_iterative_backbone_head",)
+_UNSUPPORTED_LEGACY_FLAGS = (
+    "use_iterative_backbone_head", "use_iterative_transformer_head",
+    "use_transformer_head", "use_plddt_prediction_head",
+)
 
 
 def model_kwargs_from_checkpoint(ckpt: dict) -> dict:
@@ -353,17 +360,18 @@ def model_kwargs_from_checkpoint(ckpt: dict) -> dict:
         if args.get(flag):
             raise ValueError(
                 f"Checkpoint was trained with {flag}=True, which is experimental. "
-                "Load it with esm3di.experimental instead."
+                "Its implementation is archived under experiments/legacy_runtime."
             )
-    hf_model = args.get("hf_model") or DEFAULT_HF_MODEL
-    if "t5" in hf_model.lower() or "ankh" in hf_model.lower():
-        raise ValueError(f"T5/Ankh checkpoints ({hf_model}) are experimental and not supported here.")
+    hf_model = args.get("hf_model_name") or args.get("hf_model") or DEFAULT_HF_MODEL
+    if not os.path.isdir(hf_model) and not hf_model.startswith("Synthyra/ESMplusplus_"):
+        raise ValueError(f"Only ESM++ checkpoints are supported, not {hf_model!r}.")
+    if ckpt.get("aux_track_num_bins") or args.get("aux_track_num_bins"):
+        raise ValueError("Auxiliary-track checkpoints are archived and unsupported")
 
     target_modules = ckpt.get("lora_target_modules") or args.get("lora_target_modules")
     if isinstance(target_modules, str):
         target_modules = [m.strip() for m in target_modules.split(",") if m.strip()]
 
-    plddt_vocab = ckpt.get("plddt_label_vocab") or []
     kwargs = dict(
         hf_model_name=hf_model,
         num_labels=len(ckpt["label_vocab"]),
@@ -375,24 +383,7 @@ def model_kwargs_from_checkpoint(ckpt: dict) -> dict:
         cnn_num_layers=args.get("cnn_num_layers", 2),
         cnn_kernel_size=args.get("cnn_kernel_size", 3),
         cnn_dropout=args.get("cnn_dropout", 0.1),
-        use_transformer_head=args.get("use_transformer_head", False),
-        transformer_head_dim=args.get("transformer_head_dim", 256),
-        transformer_head_layers=args.get("transformer_head_layers", 2),
-        transformer_head_dropout=args.get("transformer_head_dropout", 0.1),
-        transformer_head_num_heads=args.get("transformer_head_num_heads"),
-        use_iterative_transformer_head=args.get("use_iterative_transformer_head", False),
-        iterative_head_max_iterations=args.get("iterative_head_max_iterations", 5),
-        iterative_head_halt_threshold=args.get("iterative_head_halt_threshold", 0.95),
-        iterative_head_lambda_p=args.get("iterative_head_lambda_p", 0.01),
-        iterative_head_prior_p=args.get("iterative_head_prior_p", 0.5),
-        use_positional_encoding=args.get("use_positional_encoding", True),
-        use_hidden_state_feedback=args.get("use_hidden_state_feedback", True),
-        use_gru_gate=args.get("use_gru_gate", False),
-        use_plddt_prediction_head=args.get("use_plddt_prediction_head", False),
-        plddt_num_bins=len(plddt_vocab) or 10,
-        plddt_prediction_mode=args.get("plddt_prediction_mode", "classification"),
-        aux_track_num_bins=ckpt.get("aux_track_num_bins") or args.get("aux_track_num_bins"),
-        revision=args.get("hf_revision"),
+        revision=args.get("hf_revision") or args.get("revision"),
     )
     return kwargs
 
@@ -522,7 +513,7 @@ def load_3di_checkpoint(
     loaded ``nn.Module`` (already moved to ``device``) and
     ``esm3di_model.tokenizer`` the matching tokenizer.
     """
-    from .ESM3di_model import ESM3DiModel
+    from .model import ESM3DiModel
 
     ckpt = read_3di_checkpoint(path)
     kwargs = model_kwargs_from_checkpoint(ckpt)

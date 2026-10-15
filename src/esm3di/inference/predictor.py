@@ -76,7 +76,7 @@ class ESM3DiPredictor:
     def _initialize_model_backbone(self) -> None:
         """Internal worker to construct model hierarchy and load trained weights."""
         if Path(self.model_checkpoint_path).is_file():
-            from ..checkpoints import load_3di_checkpoint
+            from .._core.checkpoints import load_3di_checkpoint
 
             esm, checkpoint = load_3di_checkpoint(
                 self.model_checkpoint_path, device=str(self.device),

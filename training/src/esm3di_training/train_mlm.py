@@ -43,7 +43,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader, Dataset
 
-from ..checkpoints import (
+from esm3di.checkpoints import (
     DEFAULT_HF_MODEL,
     THREEDI_VOCAB,
     get_tokenizer,
@@ -437,7 +437,7 @@ def train(cfg: dict) -> str:
         if lora_resume:
             model = PeftModel.from_pretrained(model, os.path.join(resume_dir, "adapter"), is_trainable=True)
         else:
-            from ..ESM3di_model import discover_lora_target_modules
+            from esm3di.ESM3di_model import discover_lora_target_modules
 
             targets = _as_list(cfg.get("lora_targets")) or [
                 m for m in discover_lora_target_modules(model)
@@ -570,7 +570,7 @@ def train(cfg: dict) -> str:
         best_dir = final_dir
 
     if cfg.get("push_to_hub"):
-        from ..hf_publish import publish_directory_to_hub
+        from esm3di.hf_publish import publish_directory_to_hub
 
         url = publish_directory_to_hub(
             local_dir=best_dir,

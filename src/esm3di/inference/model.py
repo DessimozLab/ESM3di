@@ -1,7 +1,7 @@
 """Release architecture backed by the same CNN implementation as training."""
 
-from ..ESM3di_model import CNNClassificationHead as _CNNClassificationHead
-from ..ESM3di_model import ESMWithCNNHead as _ESMWithCNNHead
+from .._core.model import CNNClassificationHead as _CNNClassificationHead
+from .._core.model import ESMWithCNNHead as _ESMWithCNNHead
 
 
 class CNNClassificationHead(_CNNClassificationHead):

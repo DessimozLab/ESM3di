@@ -14,13 +14,12 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
-import pandas as pd
+import csv
 import torch
 import torch.nn as nn
 from Bio import SeqIO
-from transformers import AutoTokenizer, T5Tokenizer
 
-from .. import ESM3DiModel
+from .._core.model import ESM3DiModel
 
 
 class SmallCutSiteFFN(nn.Module):
@@ -83,17 +82,6 @@ class SmallCutSiteTransformer(nn.Module):
         return logits
 
 
-def _get_tokenizer(esm3di_model: ESM3DiModel, hf_model_name: str):
-    if hasattr(esm3di_model, "tokenizer") and esm3di_model.tokenizer is not None:
-        return esm3di_model.tokenizer
-    if esm3di_model.is_t5:
-        try:
-            return T5Tokenizer.from_pretrained(hf_model_name, legacy=True, trust_remote_code=True)
-        except Exception:
-            return AutoTokenizer.from_pretrained(hf_model_name, trust_remote_code=True)
-    return AutoTokenizer.from_pretrained(hf_model_name, do_lower_case=False, trust_remote_code=True)
-
-
 def _forward_for_hidden_states(model: nn.Module, input_ids: torch.Tensor, attention_mask: torch.Tensor):
     """Robust hidden-state extraction across wrapped models."""
     try:
@@ -123,70 +111,47 @@ def load_esm3di_embedding_model(
     requested_revision: Optional[str] = None,
 ):
     """Load ESM3Di model for embedding extraction based on a training checkpoint."""
-    ckpt = torch.load(checkpoint_path, map_location="cpu")
-    args_dict = ckpt.get("args", {})
+    if Path(checkpoint_path).is_dir():
+        from .cutting_bundle import load_bundle_checkpoint, read_bundle
 
-    hf_model_name = args_dict.get("hf_model_name", args_dict.get("hf_model", "facebook/esm2_t33_650M_UR50D"))
-    resolved_revision = args_dict.get("revision", requested_revision)
-    label_vocab = ckpt.get("label_vocab") or []
-    num_labels = len(label_vocab) or int(args_dict.get("num_labels", 20))
+        config = read_bundle(checkpoint_path)
+        if config["format"] == "esm3di-cutting-v2":
+            from huggingface_hub import snapshot_download
+            from .predictor import ESM3DiPredictor
 
-    use_cnn_head = bool(args_dict.get("use_cnn_head", False))
-    use_transformer_head = bool(args_dict.get("use_transformer_head", False))
-    use_plddt_prediction_head = bool(args_dict.get("use_plddt_prediction_head", False))
-    plddt_prediction_mode = args_dict.get("plddt_prediction_mode", "classification")
+            source = config["embedding"]
+            root = snapshot_download(
+                repo_id=source["repo_id"], revision=source["repo_revision"],
+                allow_patterns=["hf_compatible/*"],
+            )
+            predictor = ESM3DiPredictor(
+                str(Path(root) / "hf_compatible"),
+                revision=source["backbone_revision"], device=device,
+            )
+            return predictor.model, predictor.tokenizer, False
 
-    target_modules = ckpt.get("lora_target_modules", args_dict.get("target_modules"))
+        ckpt = load_bundle_checkpoint(Path(checkpoint_path), "embedding")
+    else:
+        from .._core.checkpoints import read_3di_checkpoint
 
-    build_kwargs = dict(
-        hf_model_name=hf_model_name,
-        revision=resolved_revision,
-        num_labels=num_labels,
-        lora_r=args_dict.get("lora_r", 8),
-        lora_alpha=args_dict.get("lora_alpha", 16),
-        lora_dropout=args_dict.get("lora_dropout", 0.05),
-        target_modules=target_modules,
-        use_cnn_head=use_cnn_head,
-        cnn_num_layers=args_dict.get("cnn_num_layers", 2),
-        cnn_kernel_size=args_dict.get("cnn_kernel_size", 3),
-        cnn_dropout=args_dict.get("cnn_dropout", 0.1),
-        use_transformer_head=use_transformer_head,
-        use_plddt_prediction_head=use_plddt_prediction_head,
-        plddt_num_bins=args_dict.get("plddt_num_bins", len(ckpt.get("plddt_label_vocab") or []) or 10),
-        plddt_prediction_mode=plddt_prediction_mode,
-        transformer_head_dim=args_dict.get("transformer_head_dim", 256),
-        transformer_head_layers=args_dict.get("transformer_head_layers", 2),
-        transformer_head_dropout=args_dict.get("transformer_head_dropout", 0.1),
-        transformer_head_num_heads=args_dict.get("transformer_head_num_heads", None),
-        use_iterative_transformer_head=args_dict.get("use_iterative_transformer_head", False),
-        iterative_head_max_iterations=args_dict.get("iterative_head_max_iterations", 5),
-        iterative_head_halt_threshold=args_dict.get("iterative_head_halt_threshold", 0.95),
-        iterative_head_lambda_p=args_dict.get("iterative_head_lambda_p", 0.01),
-        iterative_head_prior_p=args_dict.get("iterative_head_prior_p", 0.5),
-        use_positional_encoding=args_dict.get("use_positional_encoding", True),
-        use_hidden_state_feedback=args_dict.get("use_hidden_state_feedback", True),
-        use_gru_gate=args_dict.get("use_gru_gate", False),
-        aux_track_num_bins=ckpt.get("aux_track_num_bins", args_dict.get("aux_track_num_bins", None)),
+        ckpt = read_3di_checkpoint(checkpoint_path)
+    from .._core.checkpoints import (
+        get_tokenizer, load_state_into_model, lora_scaling_from_checkpoint,
+        model_kwargs_from_checkpoint, strip_module_prefix,
     )
 
-    try:
-        esm3di = ESM3DiModel(**build_kwargs)
-    except ValueError as exc:
-        if "Target modules" not in str(exc):
-            raise
-        build_kwargs["target_modules"] = None
-        esm3di = ESM3DiModel(**build_kwargs)
-
+    kwargs = model_kwargs_from_checkpoint(ckpt)
+    if requested_revision:
+        kwargs["revision"] = requested_revision
+    esm3di = ESM3DiModel(**kwargs)
     model = esm3di.get_model()
-    state_dict = ckpt["model_state_dict"]
-    if any(k.startswith("module.") for k in state_dict):
-        state_dict = {k.replace("module.", "", 1): v for k, v in state_dict.items()}
-    model.load_state_dict(state_dict, strict=False)
-    model = model.to(device)
-    model.eval()
-
-    tokenizer = _get_tokenizer(esm3di, hf_model_name)
-    return model, tokenizer, esm3di.is_t5
+    load_state_into_model(
+        model, strip_module_prefix(ckpt["model_state_dict"]),
+        lora_scaling=lora_scaling_from_checkpoint(ckpt),
+    )
+    model.to(device).eval()
+    tokenizer = get_tokenizer(esm3di, kwargs["hf_model_name"], kwargs.get("revision"))
+    return model, tokenizer, False
 
 
 def embed_sequences(
@@ -198,12 +163,14 @@ def embed_sequences(
     batch_size: int = 8,
 ) -> List[np.ndarray]:
     """Create per-sequence embedding matrices with shape (n_aa, d_embedding)."""
+    if is_t5:
+        raise ValueError("T5 embedding models are archived and unsupported")
     mats: List[np.ndarray] = []
 
     with torch.no_grad():
         for i in range(0, len(sequences), batch_size):
             batch_raw = sequences[i:i + batch_size]
-            batch_for_tok = [" ".join(list(s)) for s in batch_raw] if is_t5 else batch_raw
+            batch_for_tok = batch_raw
 
             enc = tokenizer(
                 batch_for_tok,
@@ -235,7 +202,12 @@ def embed_sequences(
 
 
 def load_ffn_classifier(path: str, device: str) -> Tuple[nn.Module, dict]:
-    ckpt = torch.load(path, map_location="cpu")
+    if Path(path).is_dir():
+        from .cutting_bundle import load_bundle_checkpoint
+
+        ckpt = load_bundle_checkpoint(Path(path), "ffn")
+    else:
+        ckpt = torch.load(path, map_location="cpu", weights_only=False)
     model = SmallCutSiteFFN(
         d_in=int(ckpt["d_in"]),
         d_hidden=int(ckpt.get("d_hidden", 256)),
@@ -248,7 +220,12 @@ def load_ffn_classifier(path: str, device: str) -> Tuple[nn.Module, dict]:
 
 
 def load_transformer_classifier(path: str, device: str) -> Tuple[nn.Module, dict]:
-    ckpt = torch.load(path, map_location="cpu")
+    if Path(path).is_dir():
+        from .cutting_bundle import load_bundle_checkpoint
+
+        ckpt = load_bundle_checkpoint(Path(path), "transformer")
+    else:
+        ckpt = torch.load(path, map_location="cpu", weights_only=False)
     model = SmallCutSiteTransformer(
         d_in=int(ckpt["d_in"]),
         d_model=int(ckpt.get("d_model", 256)),
@@ -320,8 +297,11 @@ def run_cutting_pipeline(
     device: Optional[str] = None,
     batch_size: int = 8,
     revision: Optional[str] = None,
+    output_format: str = "both",
 ) -> Dict[str, Path]:
     """Run full cleavage prediction pipeline and write output artifacts."""
+    if output_format not in {"fasta", "csv", "both"}:
+        raise ValueError("output_format must be fasta, csv, or both")
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -405,9 +385,6 @@ def run_cutting_pipeline(
                 }
             )
 
-    residue_df = pd.DataFrame(residue_rows)
-    summary_df = pd.DataFrame(summary_rows)
-
     out_prefix = Path(output_prefix)
     if out_prefix.suffix:
         out_prefix = out_prefix.with_suffix("")
@@ -417,27 +394,30 @@ def run_cutting_pipeline(
     summary_csv = out_prefix.parent / f"{out_prefix.name}_sequence_summary.csv"
     products_fasta = out_prefix.parent / f"{out_prefix.name}_cleaved_products.fasta"
 
-    residue_df.to_csv(residue_csv, index=False)
-    summary_df.to_csv(summary_csv, index=False)
-    write_fasta(cleaved_records, products_fasta)
+    outputs: Dict[str, Path] = {}
+    if output_format in {"csv", "both"}:
+        for path, rows in ((residue_csv, residue_rows), (summary_csv, summary_rows)):
+            with path.open("w", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+                writer.writeheader()
+                writer.writerows(rows)
+        print(f"Saved residue predictions: {residue_csv}")
+        print(f"Saved sequence summary: {summary_csv}")
+        outputs.update(residue_csv=residue_csv, summary_csv=summary_csv)
+    if output_format in {"fasta", "both"}:
+        write_fasta(cleaved_records, products_fasta)
+        print(f"Saved cleaved products FASTA: {products_fasta}")
+        outputs["products_fasta"] = products_fasta
+    return outputs
 
-    print(f"Saved residue predictions: {residue_csv}")
-    print(f"Saved sequence summary: {summary_csv}")
-    print(f"Saved cleaved products FASTA: {products_fasta}")
 
-    return {
-        "residue_csv": residue_csv,
-        "summary_csv": summary_csv,
-        "products_fasta": products_fasta,
-    }
-
-
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Predict cleavage sites and write cleaved products using ESM3Di embeddings + small classifiers.",
-    )
+def add_cutting_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--input-fasta", required=True, help="Input amino acid FASTA path")
-    parser.add_argument("--esm3di-checkpoint", required=True, help="ESM3Di checkpoint used for embedding extraction")
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--esm3di-checkpoint", help="Trusted local ESM3Di .pt checkpoint used for embeddings")
+    source.add_argument("--cutter-model", help="Local exported cutter directory or Hugging Face repository ID")
+    parser.add_argument("--cutter-subfolder", default="cutter", help="Cutter subfolder in the Hub repository (default: cutter)")
+    parser.add_argument("--cutter-revision", default=None, help="Hub revision for the cutter bundle (not the backbone)")
     parser.add_argument("--ffn-checkpoint", default=None, help="Saved FFN classifier checkpoint")
     parser.add_argument("--transformer-checkpoint", default=None, help="Saved transformer classifier checkpoint")
     parser.add_argument(
@@ -453,26 +433,50 @@ def parse_args() -> argparse.Namespace:
         help="Cleavage certainty cutoff on selected probability",
     )
     parser.add_argument("--output-prefix", required=True, help="Output prefix for CSV/FASTA artifacts")
+    parser.add_argument(
+        "--output-format", choices=["fasta", "csv", "both"], default="both",
+        help="Write cleaved-product FASTA, cut-information CSVs, or both (default)",
+    )
     parser.add_argument("--device", default=None, help="Compute device, e.g. cuda or cpu")
     parser.add_argument("--batch-size", type=int, default=8, help="Embedding batch size")
     parser.add_argument("--revision", default=None, help="Optional model revision fallback for ESM checkpoint")
-    return parser.parse_args()
 
 
-def main() -> None:
-    args = parse_args()
-    run_cutting_pipeline(
+def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Predict cleavage sites and write cleaved products using ESM3Di embeddings + small classifiers.",
+    )
+    add_cutting_args(parser)
+    return parser.parse_args(argv)
+
+
+def run_from_args(args: argparse.Namespace) -> Dict[str, Path]:
+    if args.cutter_model:
+        from .cutting_bundle import resolve_bundle
+
+        if args.ffn_checkpoint or args.transformer_checkpoint or args.revision:
+            raise ValueError("A cutter bundle supplies its own classifiers and backbone revision")
+        bundle = str(resolve_bundle(args.cutter_model, args.cutter_subfolder, args.cutter_revision))
+        embedding = ffn = transformer = bundle
+    else:
+        embedding, ffn, transformer = args.esm3di_checkpoint, args.ffn_checkpoint, args.transformer_checkpoint
+    return run_cutting_pipeline(
         input_fasta=args.input_fasta,
-        esm3di_checkpoint=args.esm3di_checkpoint,
-        ffn_checkpoint=args.ffn_checkpoint,
-        transformer_checkpoint=args.transformer_checkpoint,
+        esm3di_checkpoint=embedding,
+        ffn_checkpoint=ffn,
+        transformer_checkpoint=transformer,
         output_prefix=args.output_prefix,
         cutoff=args.cutoff,
         classifier_mode=args.classifier,
         device=args.device,
         batch_size=args.batch_size,
         revision=args.revision,
+        output_format=args.output_format,
     )
+
+
+def main(argv: Optional[Sequence[str]] = None) -> None:
+    run_from_args(parse_args(argv))
 
 
 if __name__ == "__main__":

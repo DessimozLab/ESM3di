@@ -21,7 +21,7 @@ import os
 import sys
 from typing import List, Optional, Sequence
 
-from ..checkpoints import DEFAULT_HF_MODEL
+from esm3di.checkpoints import DEFAULT_HF_MODEL
 
 
 # ---------------------------------------------------------------------------
@@ -47,7 +47,7 @@ def _cmd_train(ns):
 
 
 def _cmd_predict(ns):
-    from ..predict import run_predict
+    from esm3di.predict import run_predict
 
     run_predict(ns)
 
@@ -59,7 +59,7 @@ def _add_foldseekdb_args(p):
 
 
 def _cmd_foldseekdb(ns):
-    from ..foldseek_db import fasta2foldseek
+    from esm3di.foldseek_db import fasta2foldseek
 
     fasta2foldseek(ns.aa_fasta, ns.three_di_fasta, ns.output_db)
     print(f"Wrote FoldSeek DB {ns.output_db}")
@@ -225,7 +225,7 @@ def build_parser(include_inference: bool = False) -> argparse.ArgumentParser:
     add("mlm", add_train_mlm_args, _cmd_mlm, "Stage 1: masked-LM fine-tuning of ESM++ on sequences.")
     add("train", add_train_3di_args, _cmd_train, "Stage 2: supervised 3Di token training.", aliases=["3di"])
     if include_inference:
-        from ..predict import add_predict_args
+        from esm3di.predict import add_predict_args
 
         add("predict", add_predict_args, _cmd_predict, "Predict 3Di from amino-acid FASTA.")
         add("foldseekdb", _add_foldseekdb_args, _cmd_foldseekdb, "Write a FoldSeek DB from AA + 3Di FASTAs.")

@@ -37,7 +37,7 @@ os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
 import torch
 
-from ..checkpoints import load_3di_checkpoint
+from .._core.checkpoints import load_3di_checkpoint
 
 Record = Tuple[str, str]  # (full header without '>', sequence)
 

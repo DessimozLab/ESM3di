@@ -19,18 +19,31 @@ no structures or training are needed to predict 3Di or build a FoldSeek database
 ## Installation
 
 ```bash
-# Conda (recommended)
-conda env create -f environment.yml             # supported CUDA 12.8 GPUs
-conda env create -f environment_blackwell.yml   # Blackwell GPUs (RTX 50xx, RTX PRO)
-conda activate esm3di                           # or esm3di_blackwell
+# Inference only (from this checkout)
+python -m venv venv && source venv/bin/activate
 pip install -e .
 
-# or plain pip
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt && pip install -e .
+# Full install: inference plus MLM / 3Di training
+pip install -e . -e ./training
+
+# Alternatively, Conda with external bioinformatics tools
+conda env create -f environment_inference.yml   # inference only
+conda env create -f environment.yml             # full training + inference
+conda env create -f environment_blackwell.yml   # full, Blackwell GPUs
+# Activate the one you created:
+conda activate esm3di_inference                 # or esm3di / esm3di_blackwell
 ```
 
-Both Conda specs install stable PyTorch 2.9.1 with CUDA 12.8 via pip, plus
+There are two distributions: **`esm3di`** contains only inference and the
+shared ESM++ checkpoint runtime; **`esm3di-training`** adds the trainers,
+data preparation, publishing utilities, and training dependencies.
+After both distributions are published, use `pip install esm3di` or
+`pip install 'esm3di[training]'`. Until then, use the local commands above,
+or install both locally built wheels together. See [training installation](training/README.md).
+Inference does not require pandas, scipy, scikit-learn, TensorBoard,
+SentencePiece, or any experimental architecture implementation.
+
+All three Conda specs install stable PyTorch 2.9.1 with CUDA 12.8 via pip, plus
 FoldSeek, FoldMason, and FastTree via Bioconda. They require a CUDA
 12.8-compatible NVIDIA driver for GPU use (Linux driver 570 or newer
 recommended); CPU inference also works. The Blackwell spec uses Python 3.11
@@ -47,9 +60,10 @@ put FoldSeek on `PATH`, or pass `--foldseek-bin /path/to/foldseek`
 
 > Keep `transformers` (`>=4.45,<4.49`) and `peft` (`>=0.12,<0.14`) in the ranges given in [requirements.txt](requirements.txt). ESM++ is loaded with `trust_remote_code`, and ESM3Di pins the remote-code revision that works with these versions automatically. Override it with `--hf-revision` if you need to.
 
-After installation, use `esm3di-infer` for inference and `esm3di-learn` for
-training. Their module equivalents are `python -m esm3di.inference` and
-`python -m esm3di.training`.
+After installation, use `esm3di` (or `esm3di-infer`) for inference.
+The full install additionally provides `esm3di-learn` for training.
+Their module equivalents are `python -m esm3di.inference` and
+`python -m esm3di_training`; `python -m esm3di.training` remains a full-install alias.
 
 ## Quick start: FASTA to 3Di or a FoldSeek database
 
@@ -87,8 +101,8 @@ chosen prefix; keep the bundle together.
 > vocabulary. An MLM-only directory is not a trained 3Di predictor.
 
 The release inference path truncates sequences to its model window. For long
-sequences with a custom `.pt` checkpoint, the legacy `esm3di predict` command
-supports overlapping-window prediction (see below).
+sequences with a custom `.pt` checkpoint, `esm3di-predict` supports
+overlapping-window prediction (see below), including in inference-only installs.
 
 ### Other interfaces
 
@@ -96,8 +110,82 @@ supports overlapping-window prediction (see below).
   `pip install '.[workflow]'` for `foldtree`; its external tools are managed
   by the bundled Snakemake environments.
 - `esm3di-learn` provides `prepare`, `mlm`, `train`, and `pipeline`.
-- `esm3di` and the existing standalone entry points retain their legacy
-  arguments. `esm3di-cut` provides polyprotein cleavage prediction.
+- Full installs retain legacy training subcommands through `esm3di`, but
+  its default help lists only inference commands. The experimental training
+  commands are not installed. `esm3di-infer cut` provides polyprotein cleavage prediction;
+  `esm3di-cut` and `python -m esm3di.cutting_cli` remain equivalent standalone
+  interfaces.
+
+### Polyprotein cleavage prediction
+
+Use a local ESM3Di training checkpoint for embeddings and the separate trained
+cut-site classifiers:
+
+```bash
+esm3di-infer cut \
+  --input-fasta polyproteins.fasta \
+  --esm3di-checkpoint /path/to/embedding_model.pt \
+  --ffn-checkpoint experiments/analyses/polyprotein_cut/models/cutsite_ffn_all_data.pt \
+  --transformer-checkpoint experiments/analyses/polyprotein_cut/models/cutsite_transformer_all_data.pt \
+  --classifier ensemble --cutoff 0.5 \
+  --output-prefix outputs/polyproteins
+```
+
+This writes residue probabilities (`_residue_predictions.csv`), per-sequence
+cut summaries (`_sequence_summary.csv`), and product sequences
+(`_cleaved_products.fasta`) by default. Select `--output-format fasta` for
+cleaved products only, `--output-format csv` for cut-information CSVs only,
+or `--output-format both` (the default) for all three files.
+A predicted position cuts **after** that residue.
+`--classifier ffn` or `transformer` needs only its corresponding classifier
+checkpoint. Use `--device cpu` or `cuda` and `--batch-size` as needed.
+
+The cutter can use local `.pt` files as above, or a separate exported cutter
+bundle. The default Hub 3Di adapter/CNN repository by itself is not a cutter.
+Use the embedding checkpoint on which the cut-site classifiers were trained;
+substituting a newly trained backbone is not a validated equivalent.
+The archived heads have limited held-out-group performance, and the default
+cutoff is not a guarantee of biological cleavage. See
+[cut-site methods and checkpoint provenance](experiments/analyses/polyprotein_cut/README.md)
+before interpreting predictions. Existing files with the same output prefix
+are overwritten, as in the standalone cutter.
+
+#### Portable cutter bundle for Hugging Face
+
+Export only the cut-site classifier heads, referencing the existing Hub
+embedding model rather than uploading its backbone again:
+
+```bash
+python -m esm3di.inference.cutting_bundle \
+  --esm3di-checkpoint /path/to/original_embedding_model.pt \
+  --ffn-checkpoint experiments/analyses/polyprotein_cut/models/cutsite_ffn_all_data.pt \
+  --transformer-checkpoint experiments/analyses/polyprotein_cut/models/cutsite_transformer_all_data.pt \
+  --embedding-repo cactuskid13/ESM3di_Small_MLM_3di \
+  --embedding-revision b32e8d308efd435be015122d7a1ca8f2dc671e86 \
+  --output-dir exports/cutter
+```
+
+Upload the four files in that directory to **`cutter/`** at the root of
+`cactuskid13/ESM3di_Small_MLM_3di`, preserving the existing files directly in
+`hf_compatible/`. Then use:
+
+```bash
+esm3di-infer cut --cutter-model cactuskid13/ESM3di_Small_MLM_3di \
+  --input-fasta polyproteins.fasta --output-prefix outputs/polyproteins
+```
+
+This bundle uses a custom ESM3Di loader, not `AutoModel.from_pretrained`.
+It contains both heads (~8.6 MB total), a JSON config, and documentation;
+weights use safetensors with SHA256 integrity checks. The existing Hub model
+and its base-model/tokenizer revision are pinned in the config and reused.
+No `embedding.safetensors` is needed for this heads-only bundle.
+`--cutter-revision` pins the **bundle's Hub revision**; it does not
+change the embedding backbone. `--cutter-subfolder` defaults to
+`cutter`. For local use, pass the exported directory itself to
+`--cutter-model`. Do not combine bundles with individual classifier overrides.
+
+The upload and real inference validation of this cutter bundle are pending;
+the command above is for use after the bundle is uploaded and verified.
 
 ### FoldMason alignment and FastTree inference
 
@@ -142,7 +230,8 @@ The supported recipe is a two-stage fine-tune of
 (MLM) training on domain sequences, followed by supervised 3Di training from
 the MLM backbone with LoRA adapters and a CNN head. FoldSeek supplies labels
 from structures; pLDDT can weight the loss. Other model approaches are
-archived in [esm3di/experimental/](esm3di/experimental) for reference only.
+archived in [experiments/legacy_runtime/](experiments/legacy_runtime) for reference only;
+they are excluded from both installable distributions.
 
 ### One-command training pipeline
 
@@ -263,7 +352,9 @@ foldseek easy-search query_db dbs/proteins hits.m8 tmp --exhaustive-search 1   #
 
 Sequences longer than the model window are predicted in overlapping windows. `esm3di-makefoldseekdb` / `python -m esm3di.fastas2foldseekdb` (see [fastas2foldseekdb_README.md](fastas2foldseekdb_README.md)) does prediction and DB creation in one step.
 
-To sanity-check predictions, run `python -m esm3di.test_output_diversity proteins_3di.fasta`. It warns if the output collapses to a few tokens.
+To sanity-check predictions from a source checkout, run
+`python experiments/legacy_runtime/test_output_diversity.py proteins_3di.fasta`.
+It warns if the output collapses to a few tokens.
 
 ## Configuration files
 
@@ -275,7 +366,8 @@ Both trainers accept `--config file.json`. Keys are the long option names with u
 | [configs/3di_esmpp_small_from_mlm.json](configs/3di_esmpp_small_from_mlm.json), [configs/3di_esmpp_large_from_mlm.json](configs/3di_esmpp_large_from_mlm.json) | 3Di stage from the MLM output |
 | [configs/bfvd/](configs/bfvd) | Same recipe on the BFVD viral structure splits (absolute paths for our cluster) |
 
-Older experimental options (focal loss, iterative heads, T5, auxiliary tracks, …) are rejected with a pointer to `python -m esm3di.experimental.esmretrain_full`.
+Older experimental options (iterative heads, T5, auxiliary tracks, etc.) are
+rejected explicitly. Their historical source is archived, not installed.
 
 ## Checkpoints and compatibility
 
@@ -285,9 +377,19 @@ Older experimental options (focal loss, iterative heads, T5, auxiliary tracks, �
 
 **Compatibility with older checkpoints:**
 
-- Checkpoints written by the old `esmretrain.py` / `esmretrain_mlm.py` (including `checkpoints/esm3di_from_mlm/*.pt` and the `esmc_viral_ft_large` MLM dirs) load in `esm3di predict` and `esm3di train --init-from`. The `DataParallel` `module.` prefix is handled. The default Hub adapter/CNN bundle is loaded through `esm3di-infer`; it is not the same format as a training `.pt` checkpoint.
+- ESM++ LoRA/CNN checkpoints written by the old `esmretrain.py` / `esmretrain_mlm.py`
+  (including `checkpoints/esm3di_from_mlm/*.pt` and the `esmc_viral_ft_large`
+  MLM dirs) remain supported. `.pt` inference needs only `esm3di`;
+  `esm3di-learn train --init-from` requires the training distribution.
+  The `DataParallel` `module.` prefix is handled. The default Hub adapter/CNN
+  bundle is not the same format as a training `.pt` checkpoint.
 - Checkpoints from older PEFT versions that wrapped extra modules with LoRA are merged into dense weights on load, and their outputs are unchanged.
-- `python -m esm3di.esmretrain` and `python -m esm3di.esmretrain_mlm` still work. They forward to the new trainers, or to the experimental full versions if you pass experimental flags.
+- With the training distribution installed, `python -m esm3di.esmretrain` and
+  `python -m esm3di.esmretrain_mlm` still forward to the supported trainers.
+- Retired ESM-2, T5, linear-only, iterative, transformer-head, pLDDT-head, and
+  auxiliary-track architectures are no longer reconstructed by the supported
+  loader. Their historical source remains in the archive. This does not
+  remove the separate, supported transformer cut-site classifier.
 
 > ⚠️ **Note on earlier "MLM → 3Di" runs.** In the previous trainer, the MLM checkpoint given to the 3Di stage was not actually loaded into the backbone, so those 3Di models were trained on the stock ESM++ weights. The new trainer copies the MLM backbone before adding LoRA and logs how many tensors were transferred. Retrain with the new pipeline to get the real benefit of the MLM stage.
 
@@ -313,14 +415,12 @@ from esm3di.fastas2foldseekdb import create_foldseek_db_from_fastas
 
 | Path | Contents |
 |---|---|
-| [esm3di/cli.py](esm3di/cli.py) | `esm3di` command: `prepare`, `mlm`, `train`, `predict`, `foldseekdb`, `pipeline` |
-| [esm3di/prepare_data.py](esm3di/prepare_data.py) | structures → paired AA/3Di/pLDDT FASTAs via FoldSeek |
-| [esm3di/train_mlm.py](esm3di/train_mlm.py) | stage 1: ESM++ MLM fine-tuning |
-| [esm3di/train_3di.py](esm3di/train_3di.py) | stage 2: 3Di token classification |
-| [esm3di/checkpoints.py](esm3di/checkpoints.py) | checkpoint loading, MLM → 3Di backbone transfer, HF revision pinning |
-| [esm3di/ESM3di_model.py](esm3di/ESM3di_model.py) | `ESM3DiModel` (backbone + LoRA + heads), dataset utilities |
-| [esm3di/predict.py](esm3di/predict.py), [esm3di/foldseek_db.py](esm3di/foldseek_db.py) | inference and FoldSeek DB writer |
-| [esm3di/experimental/](esm3di/experimental) | unsupported earlier approaches and data tools |
+| [src/esm3di/inference/](src/esm3di/inference) | inference CLI, predictors, cutter and FoldSeek DB writer |
+| [src/esm3di/_core/](src/esm3di/_core) | shared ESM++ LoRA/CNN model, checkpoint reconstruction, MLM transfer and revision pinning |
+| [src/esm3di/workflow/](src/esm3di/workflow) | optional Snakemake assets, including platform-independent Python MAD rooting |
+| [training/](training) | separately installable `esm3di-training` distribution |
+| [training/src/esm3di_training/](training/src/esm3di_training) | supported trainers, structure preparation, losses and publishing |
+| [experiments/legacy_runtime/](experiments/legacy_runtime) | non-installable historical architectures and data tools |
 | [configs/](configs) | recipes for the supported pipeline |
 | [experiments/](experiments/) | biological case studies, monophyly trees, model-development and scratch material (not part of the package) |
 | [benchmarks/](benchmarks/) | alignment, fold recognition, random baselines and benchmark datasets (not part of the package) |

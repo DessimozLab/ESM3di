@@ -47,6 +47,12 @@ sequence-summary CSV. The metadata records a default cutoff of 0.5 and a
 suggested CLI (`python -m esm3di.cutting_cli` or `esm3di-cut`). These are
 inference examples, not external validation results.
 
+The same cutter is now available as `esm3di-infer cut`, with the same
+arguments as `esm3di-cut` and `python -m esm3di.cutting_cli`. See the
+[usage example](../../../README.md#polyprotein-cleavage-prediction).
+This integrates the interface only; it does not replace the embedding
+checkpoint or retrain the classifiers.
+
 ## Checkpoint provenance
 
 The notebook's recorded run extracts embeddings using

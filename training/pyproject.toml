@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "esm3di-training"
+version = "0.2.0"
+description = "Supported ESM++ MLM and supervised LoRA/CNN training for ESM3Di"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = [
+    "esm3di==0.2.0",
+    "scipy>=1.10.0",
+    "pandas>=2.0.0",
+    "scikit-learn>=1.3.0",
+    "tensorboard>=2.14.0",
+    "pyyaml>=6.0",
+    "requests>=2.28.0",
+    "fsspec>=2023.1.0",
+]
+
+[project.scripts]
+esm3di-learn = "esm3di_training.cli:main"
+esm3di-prepare = "esm3di_training.prepare_data:main"
+esm3di-train-mlm = "esm3di_training.train_mlm:main"
+esm3di-train = "esm3di_training.train_3di:main"
+esm3di-push-to-hub = "esm3di_training.hf_publish:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["esm3di_training*", "esm3di", "esm3di.training"]

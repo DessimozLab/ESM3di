@@ -42,6 +42,7 @@ dependencies:
       - bitsandbytes>=0.42.0
       # Install package in editable mode
       - -e .
+      - -e ./training
 
 # =============================================================================
 # BLACKWELL GPU (sm_120) INSTALLATION NOTES

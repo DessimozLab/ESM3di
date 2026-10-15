@@ -121,6 +121,16 @@ def main(argv=None):
         help="Available subcommands"
     )
 
+    from .cutting import add_cutting_args
+
+    cut_parser = subparsers.add_parser(
+        "cut", help="Predict polyprotein cleavage sites and write cleaved product FASTAs."
+    )
+    add_cutting_args(cut_parser)
+    cut_parser.add_argument(
+        "-v", "--verbosity", type=int, choices=range(4), default=argparse.SUPPRESS,
+    )
+
     def positive_threads(value):
         threads = int(value)
         if threads < 1:
@@ -236,6 +246,16 @@ def main(argv=None):
 
     args = parser.parse_args(argv)
     setup_logging(args.verbosity)
+
+    if args.command == "cut":
+        from .cutting import run_from_args
+
+        try:
+            run_from_args(args)
+            return
+        except (OSError, ValueError, RuntimeError, KeyError) as error:
+            logger.error("Polyprotein cutting failed: %s", error)
+            sys.exit(1)
 
     if args.command in {"foldmason", "fasttree", "foldmason-fasttree"}:
         from .phylogeny import resolve_binary, run_fasttree, run_foldmason

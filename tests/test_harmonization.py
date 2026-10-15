@@ -1,4 +1,5 @@
 import importlib
+import os
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -62,6 +63,7 @@ def test_inference_import_does_not_import_trainers():
          "assert 'esm3di.training.train_3di' not in sys.modules; "
          "assert 'esm3di.training.train_mlm' not in sys.modules"],
         capture_output=True, text=True,
+        env={**os.environ, "PYTHONPATH": os.pathsep.join(sys.path)},
     )
     assert result.returncode == 0, result.stderr
 
