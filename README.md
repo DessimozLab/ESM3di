@@ -43,6 +43,10 @@ or install both locally built wheels together. See [training installation](train
 Inference does not require pandas, scipy, scikit-learn, TensorBoard,
 SentencePiece, or any experimental architecture implementation.
 
+Maintainers: see the [release and Trusted Publishing guide](.github/PUBLISHING.md).
+Automated uploads remain disabled pending confirmation of the bundled Python
+MAD script's redistribution license.
+
 All three Conda specs install stable PyTorch 2.9.1 with CUDA 12.8 via pip, plus
 FoldSeek, FoldMason, and FastTree via Bioconda. They require a CUDA
 12.8-compatible NVIDIA driver for GPU use (Linux driver 570 or newer

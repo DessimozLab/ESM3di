@@ -10,7 +10,15 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
-    {name = "Your Name", email = "your.email@example.com"}
+    {name = "David Moi", email = "dmoi@unil.ch"},
+    {name = "Dongwook Kim", email = "dongwook.kim@unil.ch"},
+    {name = "Finn Tjark Weikert"},
+    {name = "Philippe Le Mercier"},
+    {name = "Christophe Dessimoz"},
+]
+maintainers = [
+    {name = "David Moi", email = "dmoi@unil.ch"},
+    {name = "Dongwook Kim", email = "dongwook.kim@unil.ch"},
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -79,6 +87,7 @@ all = [
 Homepage = "https://github.com/DessimozLab/ESM3di"
 Repository = "https://github.com/DessimozLab/ESM3di"
 Issues = "https://github.com/DessimozLab/ESM3di/issues"
+Documentation = "https://github.com/DessimozLab/ESM3di#readme"
 
 [project.scripts]
 esm3di = "esm3di.cli:main"
