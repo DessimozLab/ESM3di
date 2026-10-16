@@ -65,10 +65,8 @@ rule mad_root_struct:
         "{out_dir}/{dataset}/logs/{model}_mad_root_struct.log"
     params:
         mad=config.get("mad_path", "madroot/mad.py")
-    shell:
-        """
-        python "{params.mad}" "{input}" -n >> "{log}" 2>&1
-        """
+    script:
+        "../scripts/run_madroot.py"
 
 
 rule mad_root_post:

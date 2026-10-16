@@ -68,6 +68,11 @@ Rebuilding the trees requires
 the omitted source alignments/structures and databases, Foldseek, the
 external `fold_tree` module, FastME or QuickTree, and MAD rooting where
 applicable; the notebook embeds machine-specific absolute paths.
+The MAD call now uses the installed ESM3Di Python MAD wrapper instead of an
+absolute native-binary path. Install `esm3di` before rerunning those cells;
+an explicit `madrootpath` override must point to a Python MAD script. Rooting
+uses the notebook's Python interpreter and validates the resulting Newick.
+Saved notebook outputs and historical trees have not been regenerated.
 
 The fraction is a label-purity summary of internal nodes, not a measure of
 tree accuracy, support, or evolutionary model fit. It depends on group

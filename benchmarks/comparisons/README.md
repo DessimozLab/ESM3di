@@ -14,6 +14,19 @@ Monophyly scoring and large-tree visualization now live in the
   `structurealign` comparisons, and compares bitscores and per-sequence 3Di
   identity. Saved cell outputs confirm 10,000 entries and 10,000 comparison
   rows; plots are embedded in the notebook.
+- **MLM comparison — [3di_alignment_mlm_vs_3di_only.ipynb](3di_alignment_mlm_vs_3di_only.ipynb).**
+  Executed on 2026-10-15, comparing the historical effectively 3Di-only
+  `esm3di_from_mlm/epoch_5.pt` with the actual MLM-initialized
+  `esm3di_from_mlm_fixed/epoch_5.pt`. Both were rerun with identical inference
+  settings on all 10,000 MetaVR entries, matched by identifier against the
+  same AF3 reference. Mean per-protein 3Di identity was **60.7938% versus
+  60.3944%**, and mean alignment bitscore was **1112.7748 versus 1104.3969**
+  (3Di-only versus MLM + 3Di). Thus MLM initialization did not improve these
+  aggregate benchmark metrics. This is not a controlled causal ablation:
+  training code/settings also differ, including training truncation.
+  The notebook preserves outputs, paired plots, paths, and software/input
+  hashes. Raw artifacts are under
+  `/mnt/data1/metavir_structs/esm3di_mlm_comparison_20261015/`.
 - **Fold-recognition benchmark — `scope_family.ipynb`.** Uses the viral
   SCOPe40 subset to compare family/fold assignment search results for
   ProstT5, Foldseek structure-derived 3Di, MMseqs2, and ESM3Di. It builds the

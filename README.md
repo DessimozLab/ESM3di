@@ -113,6 +113,10 @@ overlapping-window prediction (see below), including in inference-only installs.
 - `esm3di-infer` also offers `perplexity` and `foldtree`. Install
   `pip install '.[workflow]'` for `foldtree`; its external tools are managed
   by the bundled Snakemake environments.
+  MAD rooting runs the bundled Python script with the workflow environment's
+  interpreter (no native MAD executable). It validates a single rooted Newick
+  tree and unchanged tip labels before accepting the output. A custom workflow
+  `mad_path` must point to a Python script, not the former native binary.
 - `esm3di-learn` provides `prepare`, `mlm`, `train`, and `pipeline`.
 - Full installs retain legacy training subcommands through `esm3di`, but
   its default help lists only inference commands. The experimental training
