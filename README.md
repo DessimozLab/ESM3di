@@ -1,5 +1,7 @@
 # ESM3Di
 
+![ESM3Di logo: viral protLLM](https://raw.githubusercontent.com/DessimozLab/ESM3di/master/logoEMS3Di.png)
+
 Predict per-residue **3Di structural tokens** (the FoldSeek structural alphabet) directly from amino-acid sequences, so you can build FoldSeek databases and run structure-aware searches for proteins without structures.
 
 **Start here:** [install](#installation), then
