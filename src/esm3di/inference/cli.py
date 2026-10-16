@@ -171,6 +171,10 @@ def main(argv=None):
         help="Path to save output 3Di FASTA file (default: outputs/output_3di.fasta)"
     )
     add_common_args(predict_parser)
+    predict_parser.add_argument(
+        "--truncate", action="store_true",
+        help="Explicitly discard residues beyond the first model window (default: predict full sequences).",
+    )
 
     # Subcommand: foldseek-db
     foldseek_parser = subparsers.add_parser(
@@ -205,6 +209,10 @@ def main(argv=None):
         help="Path to save output TSV file (default: outputs/output_confidence.tsv)"
     )
     add_common_args(perplexity_parser)
+    perplexity_parser.add_argument(
+        "--truncate", action="store_true",
+        help="Explicitly limit confidence output to the first model window (default: full sequences).",
+    )
 
     # Subcommand: foldtree
     foldtree_parser = subparsers.add_parser(
@@ -354,7 +362,7 @@ def main(argv=None):
     try:
         predictor = ESM3DiPredictor.from_pretrained(
             model_path_or_id,
-            #revision=args.revision
+            truncate=getattr(args, "truncate", False),
         )
 
         if args.command == "predict":

@@ -20,6 +20,7 @@ import torch.nn as nn
 from Bio import SeqIO
 
 from .._core.model import ESM3DiModel
+from .windowing import windowed_outputs
 
 
 class SmallCutSiteFFN(nn.Module):
@@ -165,40 +166,16 @@ def embed_sequences(
     """Create per-sequence embedding matrices with shape (n_aa, d_embedding)."""
     if is_t5:
         raise ValueError("T5 embedding models are archived and unsupported")
-    mats: List[np.ndarray] = []
+    def forward(input_ids, attention_mask):
+        outputs = _forward_for_hidden_states(model, input_ids=input_ids, attention_mask=attention_mask)
+        if not hasattr(outputs, "hidden_states") or outputs.hidden_states is None:
+            raise RuntimeError("Model output has no hidden_states")
+        return outputs.hidden_states[-1]
 
-    with torch.no_grad():
-        for i in range(0, len(sequences), batch_size):
-            batch_raw = sequences[i:i + batch_size]
-            batch_for_tok = batch_raw
-
-            enc = tokenizer(
-                batch_for_tok,
-                return_tensors="pt",
-                padding=True,
-                truncation=True,
-                add_special_tokens=True,
-                return_special_tokens_mask=True,
-            )
-
-            input_ids = enc["input_ids"].to(device)
-            attention_mask = enc["attention_mask"].to(device)
-            special_mask = enc["special_tokens_mask"].to(device)
-
-            outputs = _forward_for_hidden_states(model, input_ids=input_ids, attention_mask=attention_mask)
-            if not hasattr(outputs, "hidden_states") or outputs.hidden_states is None:
-                raise RuntimeError("Model output has no hidden_states")
-            last_hidden = outputs.hidden_states[-1]
-
-            for b_idx, seq in enumerate(batch_raw):
-                aa_mask = (attention_mask[b_idx] == 1) & (special_mask[b_idx] == 0)
-                emb = last_hidden[b_idx][aa_mask]
-                if emb.shape[0] != len(seq):
-                    n = min(emb.shape[0], len(seq))
-                    emb = emb[:n]
-                mats.append(emb.detach().cpu().numpy().astype(np.float32))
-
-    return mats
+    return [
+        matrix.numpy()
+        for matrix in windowed_outputs(sequences, tokenizer, device, batch_size, forward)
+    ]
 
 
 def load_ffn_classifier(path: str, device: str) -> Tuple[nn.Module, dict]:

@@ -38,6 +38,7 @@ os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 import torch
 
 from .._core.checkpoints import load_3di_checkpoint
+from .windowing import window_ranges
 
 Record = Tuple[str, str]  # (full header without '>', sequence)
 
@@ -122,11 +123,7 @@ class Predictor:
 
     # -- windowing -----------------------------------------------------------
     def _windows(self, length: int) -> List[Tuple[int, int]]:
-        if length <= self.window:
-            return [(0, length)]
-        step = self.window - self.overlap
-        starts = list(range(0, length - self.window, step)) + [length - self.window]
-        return [(s, s + self.window) for s in sorted(set(starts))]
+        return window_ranges(length, self.window, self.overlap)
 
     @torch.no_grad()
     def _probs(self, chunks: Sequence[str]) -> List[torch.Tensor]:

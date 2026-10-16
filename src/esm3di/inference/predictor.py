@@ -8,9 +8,9 @@ import tempfile
 import shutil
 import warnings
 import contextlib
-from tqdm import tqdm
 from pathlib import Path
 from typing import List, Union, Optional, Any, Tuple
+from tqdm import tqdm
 
 # Mute third-party library noise early during import
 warnings.filterwarnings("ignore", category=UserWarning, module="bitsandbytes")
@@ -18,7 +18,6 @@ warnings.filterwarnings("ignore", message=".*bitsandbytes.*")
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 import torch
-import torch.nn.functional as F
 from transformers import AutoModel, AutoTokenizer
 from transformers import logging as hf_logging
 from peft import PeftModel, PeftConfig
@@ -35,6 +34,7 @@ logging.getLogger("torch.nn.attention").setLevel(logging.ERROR)
 
 from .io import read_fasta, write_fasta
 from .model import CNNClassificationHead, ESMWithCNNHead
+from .windowing import windowed_outputs
 
 # Module logger
 logger = logging.getLogger("esm3di")
@@ -54,12 +54,14 @@ class ESM3DiPredictor:
         self,
         model_checkpoint_path: Union[str, Path] = DEFAULT_HF_REPO,
         revision: Optional[str] = DEFAULT_REVISION,
-        device: Optional[str] = None
+        device: Optional[str] = None,
+        truncate: bool = False,
     ):
         """Initializes the predictor, loads model components, and registers runtime device."""
         self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
         self.model_checkpoint_path = str(model_checkpoint_path)
         self.revision = revision
+        self.truncate = truncate
         self.label_vocab = list(VOCAB_3DI)
 
         self._initialize_model_backbone()
@@ -161,10 +163,11 @@ class ESM3DiPredictor:
         cls,
         model_checkpoint_path: Union[str, Path] = DEFAULT_HF_REPO,
         revision: Optional[str] = DEFAULT_REVISION,
-        device: Optional[str] = None
+        device: Optional[str] = None,
+        truncate: bool = False,
     ) -> "ESM3DiPredictor":
         """Factory method to construct an ESM3DiPredictor instance from local or HF weights."""
-        return cls(model_checkpoint_path=model_checkpoint_path, revision=revision, device=device)
+        return cls(model_checkpoint_path=model_checkpoint_path, revision=revision, device=device, truncate=truncate)
 
     # =========================================================================
     # CORE INFERENCE METHODS
@@ -177,46 +180,28 @@ class ESM3DiPredictor:
         return res
 
     def predict_batch(self, sequences: List[str], batch_size: int = DEFAULT_BATCH_SIZE) -> List[str]:
-        """Predicts 3Di structural tokens for a list of in-memory protein sequences."""
-        predicted_strings: List[str] = []
-        disable_pbar = len(sequences) <= 1 or not logger.isEnabledFor(logging.INFO)
+        """Predict every residue by default; average probabilities in window overlaps."""
+        probabilities = tqdm(
+            self._probabilities(sequences, batch_size), total=len(sequences),
+            disable=len(sequences) <= 1 or not logger.isEnabledFor(logging.INFO),
+            desc="Generating 3Di tokens", unit="sequence", leave=False,
+        )
+        return [
+            "".join(self.idx2char[label] for label in probs.argmax(dim=-1).tolist())
+            if len(probs) else ""
+            for probs in probabilities
+        ]
 
-        with torch.no_grad():
-            for i in tqdm(
-                range(0, len(sequences), batch_size),
-                disable=disable_pbar,
-                desc="Generating 3Di tokens",
-                unit="batch",
-                leave=False
-            ):
-                batch_seqs = sequences[i: i + batch_size]
+    def _probabilities(self, sequences, batch_size):
+        def forward(input_ids, attention_mask):
+            return self.model(
+                input_ids=input_ids, attention_mask=attention_mask,
+            ).logits.float().softmax(dim=-1)
 
-                enc = self.tokenizer(
-                    list(batch_seqs),
-                    return_tensors="pt",
-                    padding=True,
-                    truncation=True,
-                    add_special_tokens=True,
-                    return_special_tokens_mask=True
-                )
-
-                input_ids = enc["input_ids"].to(self.device)
-                attention_mask = enc["attention_mask"].to(self.device)
-                special_mask = enc["special_tokens_mask"]
-
-                outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
-                pred_labels = torch.argmax(outputs.logits, dim=-1)
-
-                for j, raw_seq in enumerate(batch_seqs):
-                    pred_3di = []
-                    k = 0
-                    for pos in range(pred_labels.shape[1]):
-                        if special_mask[j, pos] == 0 and k < len(raw_seq):
-                            pred_3di.append(self.idx2char.get(pred_labels[j, pos].item(), 'X'))
-                            k += 1
-                    predicted_strings.append("".join(pred_3di))
-
-        return predicted_strings
+        return windowed_outputs(
+            sequences, self.tokenizer, self.device, batch_size, forward,
+            truncate=self.truncate,
+        )
 
     def predict_records(
         self,
@@ -263,7 +248,8 @@ class ESM3DiPredictor:
             success = _run_multi_gpu_inference(
                 str(input_fasta_path), str(output_fasta_path),
                 self.model_checkpoint_path, resolved_gpus, batch_size=batch_size,
-                sort_by_length=sort_by_length
+                sort_by_length=sort_by_length, truncate=self.truncate,
+                revision=self.revision,
             )
             if success:
                 logger.info(f"Saved predicted 3Di sequences to: {output_fasta_path}")
@@ -305,44 +291,11 @@ class ESM3DiPredictor:
         with open(output_tsv_path, 'w') as out_f:
             out_f.write("sequence_id\tposition\taa\tperplexity\n")
 
-            disable_pbar = len(aa_records) <= 1 or not logger.isEnabledFor(logging.INFO)
-            with torch.no_grad():
-                for i in tqdm(
-                    range(0, len(aa_records), batch_size),
-                    disable=disable_pbar,
-                    desc="Computing perplexity",
-                    unit="batch",
-                    leave=False
-                ):
-                    headers, raw_seqs = zip(*aa_records[i: i + batch_size])
-
-                    enc = self.tokenizer(
-                        list(raw_seqs),
-                        return_tensors="pt",
-                        padding=True,
-                        truncation=True,
-                        add_special_tokens=True,
-                        return_special_tokens_mask=True
-                    )
-
-                    logits = self.model(
-                        input_ids=enc["input_ids"].to(self.device),
-                        attention_mask=enc["attention_mask"].to(self.device)
-                    ).logits
-
-                    probs = torch.softmax(logits, dim=-1)
-                    log_probs = F.log_softmax(logits, dim=-1)
-
-                    entropy = -(probs * log_probs).sum(dim=-1)
-                    token_perplexity = torch.exp(entropy)
-
-                    for j, (header, raw_seq) in enumerate(zip(headers, raw_seqs)):
-                        k = 0
-                        for pos in range(token_perplexity.shape[1]):
-                            if enc["special_tokens_mask"][j, pos] == 0 and k < len(raw_seq):
-                                val = float(token_perplexity[j, pos].item())
-                                out_f.write(f"{header}\t{k + 1}\t{raw_seq[k]}\t{val:.6f}\n")
-                                k += 1
+            probabilities = self._probabilities([seq for _, seq in aa_records], batch_size)
+            for (header, raw_seq), probs in zip(aa_records, probabilities):
+                entropy = -torch.special.xlogy(probs, probs).sum(dim=-1)
+                for k, val in enumerate(entropy.exp().tolist()):
+                    out_f.write(f"{header}\t{k + 1}\t{raw_seq[k]}\t{val:.6f}\n")
 
         logger.info(f"Saved perplexity metrics to: {output_tsv_path}")
 
@@ -352,10 +305,11 @@ class ESM3DiPredictor:
 # =========================================================================
 
 def _gpu_worker(gpu_id: int, shard_fasta: str, output_fasta: str, checkpoint_path: str, batch_size: int,
-                progress_queue: Any, error_event: Any):
+                progress_queue: Any, error_event: Any, truncate: bool = False,
+                revision: Optional[str] = DEFAULT_REVISION):
     try:
         # Target the explicit CUDA device ordinal directly
-        predictor = ESM3DiPredictor(checkpoint_path, device=f"cuda:{gpu_id}")
+        predictor = ESM3DiPredictor(checkpoint_path, device=f"cuda:{gpu_id}", truncate=truncate, revision=revision)
         predictor.predict_fasta(shard_fasta, output_fasta, batch_size=batch_size, num_gpus=1)
         progress_queue.put(("done", gpu_id))
     except Exception as e:
@@ -364,7 +318,8 @@ def _gpu_worker(gpu_id: int, shard_fasta: str, output_fasta: str, checkpoint_pat
 
 
 def _run_multi_gpu_inference(input_fasta: str, output_3di_fasta: str, checkpoint_path: str, num_gpus: int,
-                             batch_size: int = DEFAULT_BATCH_SIZE, sort_by_length: bool = True) -> bool:
+                             batch_size: int = DEFAULT_BATCH_SIZE, sort_by_length: bool = True,
+                             truncate: bool = False, revision: Optional[str] = DEFAULT_REVISION) -> bool:
     import multiprocessing as mp
     from .preprocessing import _shard_fasta, _merge_fasta_outputs, _count_sequences
 
@@ -387,7 +342,8 @@ def _run_multi_gpu_inference(input_fasta: str, output_3di_fasta: str, checkpoint
             shard_outputs.append((shard_fasta, out_path))
             p = ctx.Process(
                 target=_gpu_worker,
-                args=(gpu_id, shard_fasta, out_path, checkpoint_path, batch_size, progress_queue, error_event)
+                args=(gpu_id, shard_fasta, out_path, checkpoint_path, batch_size, progress_queue, error_event,
+                      truncate, revision)
             )
             processes.append(p)
             p.start()

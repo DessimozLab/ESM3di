@@ -69,13 +69,48 @@ the batch size per device. Keep all database files sharing the output prefix
 together. FoldSeek must be installed for searches, but database writing itself
 does not need the FoldSeek executable.
 
-**Long sequences:** the commands above truncate at the model window. For
-overlapping-window prediction with a custom supervised checkpoint:
+**Long sequences are supported by default, including with Hugging Face models.**
+Prediction, confidence output, FoldSeek database generation and cutter embeddings
+use overlapping windows and retain every residue. The standard inference window
+is up to 1,024 tokens including special tokens (normally 1,022 residues), reduced
+if the tokenizer has a smaller limit. Windows overlap by 128 residues (less for
+very small contexts); 3Di probabilities or cutter embeddings are averaged in
+overlaps. Short sequences use a single window. Windowing preserves length, but
+does not provide interactions between residues in distant windows.
+
+### Prediction options
+
+| Option | Applies to | Behavior |
+|---|---|---|
+| `--model-ckpt REPO_OR_PATH` | `predict`, `foldseek-db`, `perplexity` | Select compatible Hub weights, a local adapter/CNN directory, or a supervised `.pt` checkpoint |
+| `--batch-size N` | `predict`, `foldseek-db`, `perplexity` | Maximum windows per model batch (default: 8); reduce if GPU memory is limited |
+| `--num-gpus N` | `predict`, `foldseek-db` | Number of GPUs (default: all available; CPU when none are available) |
+| `--no-sort-by-length` | `predict`, `foldseek-db` | Disable length-sorted batching; output record order is preserved either way |
+| `--truncate` | `predict`, `perplexity` only | **Opt in** to discarding residues after the first model window; never enabled by default |
+| `-v 0` through `-v 3` | All inference commands | Quiet through informational logging (default: 3) |
+
+Truncated predictions are incomplete and must not be paired with full-length AA
+sequences for a FoldSeek database. Accordingly, `foldseek-db` and the cutter do
+not offer truncation. To deliberately generate only first-window predictions:
+
+```bash
+esm3di-infer predict --input-fasta proteins.fasta \
+  --output-fasta outputs/first_window_only.fasta --truncate
+```
+
+For custom supervised checkpoints, the standalone predictor also supports
+explicit window sizes and overlap, plus per-residue confidence digits:
 
 ```bash
 esm3di-predict --checkpoint runs/my_model/3di/best.pt \
-  -i proteins.fasta -o proteins_3di.fasta
+  -i proteins.fasta -o proteins_3di.fasta \
+  --window 1022 --overlap 128 --confidence-output confidence.fasta
 ```
+
+That interface uses the checkpoint's training sequence length by default and
+does not truncate. Use `esm3di-infer perplexity --input-fasta proteins.fasta
+--output-tsv confidence.tsv` for full-length entropy-derived confidence from
+the default Hub model (lower perplexity means a more concentrated prediction).
 
 See the [database wrapper guide](fastas2foldseekdb_README.md) for working with
 precomputed AA/3Di FASTAs.
@@ -104,6 +139,8 @@ esm3di-infer cut \
 This downloads both cut-site classifiers and their matching embedding model
 from Hugging Face. **No local `.pt` file is required.** Downloaded weights are
 cached for subsequent runs.
+Long polyproteins are embedded with overlapping windows without truncation;
+the cut-site classifiers then process the complete embedding sequence.
 
 By default, the command writes:
 
