@@ -1,20 +1,19 @@
 name: esm3di
 channels:
-  - pytorch
-  - nvidia
   - conda-forge
   - bioconda
 dependencies:
   - python=3.10
   - pip
-  # PyTorch with CUDA 11.8 support
-  - pytorch>=2.5.0
-  - pytorch-cuda=11.8
-  - cudatoolkit=11.8
   # FoldSeek for database creation
   - foldseek
+  - foldmason=4.dd3c235
+  - fasttree>=2.2.0
   # Pip dependencies
   - pip:
+      # Stable CUDA 12.8 build, including Blackwell support
+      - --extra-index-url https://download.pytorch.org/whl/cu128
+      - torch==2.9.1+cu128
       # Core ML - compatible with ESM++ (Synthyra) and PEFT
       - transformers>=4.45.0,<4.49.0
       - peft>=0.12.0,<0.14.0
@@ -43,3 +42,4 @@ dependencies:
       - bitsandbytes>=0.42.0
       # Install package in editable mode
       - -e .
+      - -e ./training

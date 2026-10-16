@@ -1,5 +1,6 @@
 #!/bin/bash
 # Quick setup script for ESM3Di
+set -euo pipefail
 
 echo "Setting up ESM3Di environment..."
 
@@ -23,6 +24,6 @@ echo "To activate the environment and start using ESM3Di:"
 echo "  conda activate esm3di"
 echo ""
 echo "To train a model (structures -> [MLM on sequences] -> 3Di):"
-echo "  esm3di pipeline --structures structures/ --sequences proteins.fasta --out-dir runs/my_model"
+echo "  esm3di-learn pipeline --structures structures/ --sequences proteins.fasta --out-dir runs/my_model"
 echo ""
 echo "For more information, see README.md"

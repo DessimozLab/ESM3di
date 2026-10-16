@@ -1,0 +1,429 @@
+"""Command Line Interface (CLI) entry point for the ESM3Di Toolkit."""
+
+import argparse
+import logging
+import sys
+import os
+import subprocess
+import warnings
+from importlib.resources import files
+from pathlib import Path
+
+import torch
+
+
+# Suppress harmless runtime and third-party warnings
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
+
+from .io import (
+    fasta2foldseek,
+    read_fasta,
+    resolve_user_path,
+    resolve_output_path,
+    resolve_checkpoint_path
+)
+from .predictor import (
+    ESM3DiPredictor,
+    DEFAULT_HF_REPO,
+    DEFAULT_BATCH_SIZE,
+    DEFAULT_REVISION,
+)
+
+logger = logging.getLogger("esm3di")
+
+
+def setup_logging(verbosity: int):
+    """Configure CLI logging according to the requested verbosity."""
+    levels = {
+        0: logging.CRITICAL + 1,
+        1: logging.ERROR,
+        2: logging.WARNING,
+        3: logging.INFO,
+    }
+    if verbosity not in levels:
+        raise ValueError("verbosity must be between 0 and 3")
+
+    handler = logging.StreamHandler(sys.stderr)
+    formatter = logging.Formatter(
+        fmt="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%H:%M:%S"
+    )
+    handler.setFormatter(formatter)
+
+    logger.setLevel(levels[verbosity])
+    logger.propagate = False
+    logger.handlers.clear()
+    logger.addHandler(handler)
+
+
+def add_common_args(subparser: argparse.ArgumentParser):
+    """Adds arguments shared across subcommands."""
+    subparser.add_argument(
+        "-v",
+        "--verbosity",
+        type=int,
+        choices=range(4),
+        default=argparse.SUPPRESS,
+        metavar="INT",
+        help="Verbosity level: 0: quiet, 1: +errors, 2: +warnings, 3: +info [3]"
+    )
+    subparser.add_argument(
+        "--model-ckpt",
+        default=str(DEFAULT_HF_REPO),
+        help=f"Path to local checkpoint or Hugging Face repo ID (default: {DEFAULT_HF_REPO})"
+    )
+    subparser.add_argument(
+        "--num-gpus",
+        type=int,
+        default=None,
+        help="Number of GPUs to use (default: use all available)"
+    )
+    """
+    subparser.add_argument(
+        "--revision",
+        default=DEFAULT_REVISION,
+        help=f"Base model Hugging Face revision/commit SHA (default: {DEFAULT_REVISION})"
+    )"""
+    subparser.add_argument(
+        "--batch-size",
+        type=int,
+        default=DEFAULT_BATCH_SIZE,
+        help=f"Inference batch size per device (default: {DEFAULT_BATCH_SIZE})"
+    )
+    subparser.add_argument(
+        "--no-sort-by-length",
+        dest="sort_by_length",
+        action="store_false",
+        help="Disable length sorting before inference"
+    )
+
+
+def main(argv=None):
+    """Parses command-line arguments and routes commands."""
+    parser = argparse.ArgumentParser(
+        prog="esm3di-infer",
+        description="ESM3Di Toolkit: Predict 3Di structural sequences, build Foldseek databases, and infer phylogenies."
+    )
+    parser.add_argument(
+        "-v",
+        "--verbosity",
+        type=int,
+        choices=range(4),
+        default=3,
+        metavar="INT",
+        help="Verbosity level: 0: quiet, 1: +errors, 2: +warnings, 3: +info [3]"
+    )
+
+    subparsers = parser.add_subparsers(
+        dest="command",
+        required=True,
+        help="Available subcommands"
+    )
+
+    from .cutting import add_cutting_args
+
+    cut_parser = subparsers.add_parser(
+        "cut", help="Predict polyprotein cleavage sites and write cleaved product FASTAs."
+    )
+    add_cutting_args(cut_parser)
+    cut_parser.add_argument(
+        "-v", "--verbosity", type=int, choices=range(4), default=argparse.SUPPRESS,
+    )
+
+    def positive_threads(value):
+        threads = int(value)
+        if threads < 1:
+            raise argparse.ArgumentTypeError("threads must be a positive integer")
+        return threads
+
+    for name, help_text in (
+        ("foldmason", "Align a FoldSeek database with FoldMason fast mode."),
+        ("fasttree", "Build an amino acid NJ + NNI tree without ML refinement."),
+        ("foldmason-fasttree", "FoldSeek database to FoldMason alignment and FastTree tree."),
+    ):
+        tool_parser = subparsers.add_parser(name, help=help_text)
+        tool_parser.add_argument("--threads", type=positive_threads, default=8)
+        tool_parser.add_argument("-v", "--verbosity", type=int, choices=range(4), default=argparse.SUPPRESS)
+        if name != "fasttree":
+            tool_parser.add_argument("--input-db", required=True, help="FoldSeek database prefix")
+            tool_parser.add_argument("--output-dir", required=True, help="New output directory (must not exist)")
+            tool_parser.add_argument("--foldmason-bin", help="FoldMason executable (or FOLDMASON_BIN)")
+        if name != "foldmason":
+            tool_parser.add_argument("--fasttree-bin", help="FastTreeMP executable (or FASTTREE_BIN)")
+        if name == "fasttree":
+            tool_parser.add_argument("--input-alignment", required=True, help="Amino acid FASTA/PHYLIP alignment, optionally .gz")
+            tool_parser.add_argument("--output-tree", required=True, help="New Newick output filename")
+
+    # Subcommand: predict
+    predict_parser = subparsers.add_parser(
+        "predict",
+        help="Predict 3Di sequences from an amino acid FASTA file and save to FASTA."
+    )
+    predict_parser.add_argument(
+        "--input-fasta",
+        default="test_data/example_input.fasta",
+        help="Path to input amino acid FASTA file (default: test_data/example_input.fasta)"
+    )
+    predict_parser.add_argument(
+        "--output-fasta",
+        default="outputs/output_3di.fasta",
+        help="Path to save output 3Di FASTA file (default: outputs/output_3di.fasta)"
+    )
+    add_common_args(predict_parser)
+
+    # Subcommand: foldseek-db
+    foldseek_parser = subparsers.add_parser(
+        "foldseek-db",
+        help="Predict 3Di sequences and compile directly into a Foldseek-compatible database."
+    )
+    foldseek_parser.add_argument(
+        "--input-fasta",
+        default="test_data/example_input.fasta",
+        help="Path to input amino acid FASTA file (default: test_data/example_input.fasta)"
+    )
+    foldseek_parser.add_argument(
+        "--output-db",
+        default="outputs/foldseek_db",
+        help="Prefix path for output Foldseek database files (default: outputs/foldseek_db)"
+    )
+    add_common_args(foldseek_parser)
+
+    # Subcommand: perplexity
+    perplexity_parser = subparsers.add_parser(
+        "perplexity",
+        help="Calculate model confidence (perplexity) for each residue position and export to TSV."
+    )
+    perplexity_parser.add_argument(
+        "--input-fasta",
+        default="test_data/example_input.fasta",
+        help="Path to input amino acid FASTA file (default: test_data/example_input.fasta)"
+    )
+    perplexity_parser.add_argument(
+        "--output-tsv",
+        default="outputs/output_confidence.tsv",
+        help="Path to save output TSV file (default: outputs/output_confidence.tsv)"
+    )
+    add_common_args(perplexity_parser)
+
+    # Subcommand: foldtree
+    foldtree_parser = subparsers.add_parser(
+        "foldtree",
+        help="Run end-to-end 3Di prediction and phylogenetic tree inference via Snakemake."
+    )
+    foldtree_parser.add_argument(
+        "-i", "--input-fasta",
+        default="test_data/test_virus.fasta",
+        help="Path to input amino acid FASTA file or directory containing FASTA files."
+    )
+    foldtree_parser.add_argument(
+        "-o", "--output-dir",
+        default="results",
+        help="Directory to save output phylogenetic trees and intermediate files (default: results)"
+    )
+    foldtree_parser.add_argument(
+        "-d", "--dataset",
+        default=None,
+        help="Name prefix/dataset identifier for outputs (defaults to input file name)"
+    )
+    foldtree_parser.add_argument(
+        "-c", "--cores",
+        type=int,
+        default=4,
+        help="Number of CPU cores for Snakemake execution (default: 4)"
+    )
+    foldtree_parser.add_argument(
+        "-n", "--dry-run",
+        action="store_true",
+        help="Do not execute anything; print the execution plan and rules that would be run."
+    )
+    foldtree_parser.add_argument(
+        "--use-prostt5",
+        action="store_true",
+        help="Use ProsTt5 instead of ESM3di for 3Di prediction (default: False)"
+    )
+    add_common_args(foldtree_parser)
+
+    args = parser.parse_args(argv)
+    setup_logging(args.verbosity)
+
+    if args.command == "cut":
+        from .cutting import run_from_args
+
+        try:
+            run_from_args(args)
+            return
+        except (OSError, ValueError, RuntimeError, KeyError) as error:
+            logger.error("Polyprotein cutting failed: %s", error)
+            sys.exit(1)
+
+    if args.command in {"foldmason", "fasttree", "foldmason-fasttree"}:
+        from .phylogeny import resolve_binary, run_fasttree, run_foldmason
+
+        try:
+            if args.command != "fasttree":
+                foldmason = resolve_binary(args.foldmason_bin, "FOLDMASON_BIN", "foldmason")
+            if args.command != "foldmason":
+                fasttree = resolve_binary(args.fasttree_bin, "FASTTREE_BIN", "FastTreeMP")
+            if args.command == "fasttree":
+                run_fasttree(
+                    resolve_user_path(args.input_alignment), resolve_user_path(args.output_tree),
+                    args.threads, fasttree,
+                )
+            else:
+                output_dir = resolve_user_path(args.output_dir)
+                alignment = run_foldmason(
+                    resolve_user_path(args.input_db), output_dir, args.threads, foldmason,
+                )
+                if args.command == "foldmason-fasttree":
+                    run_fasttree(alignment, output_dir / "tree.nwk", args.threads, fasttree)
+            return
+        except (OSError, RuntimeError) as error:
+            logger.error("Phylogeny command failed: %s", error)
+            sys.exit(1)
+
+    input_path = resolve_user_path(args.input_fasta)
+    model_path_or_id = resolve_checkpoint_path(args.model_ckpt)
+
+    # Route `foldtree` early because it manages its own Snakemake workflow
+    if args.command == "foldtree":
+        input_path = resolve_user_path(args.input_fasta)
+        output_dir = resolve_output_path(args.output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        try:
+            import shutil
+            from importlib.resources import as_file, files
+
+            # 1. Stage workflow directory locally to prevent source-cache issues
+            staged_wf_dir = output_dir / ".workflow"
+            pkg_wf_resource = files("esm3di").joinpath("workflow")
+
+            if staged_wf_dir.exists():
+                shutil.rmtree(staged_wf_dir)
+
+            with as_file(pkg_wf_resource) as src_path:
+                shutil.copytree(src_path, staged_wf_dir)
+
+            # Store conda environments outside staged workflow so they persist
+            conda_prefix = output_dir / ".snakemake_conda"
+
+            snakemake_config = [
+                f"input_path={input_path.resolve()}",
+                f"output_dir={output_dir.resolve()}",
+                f"esm3di_model_ckpt={args.model_ckpt}",
+                f"esm3di_batch_size={args.batch_size}",
+                #f"esm3di_revision={args.revision}",
+                f"use_prostt5={args.use_prostt5}"
+            ]
+            if args.num_gpus is not None:
+                snakemake_config.append(f"esm3di_gpus={args.num_gpus}")
+
+            if args.dataset is not None:
+                snakemake_config.append(f"dataset={args.dataset}")
+
+            cmd = [
+                "snakemake",
+                "--snakefile", "Snakefile",
+                "--cores", str(args.cores),
+                "--scheduler", "greedy",
+                "--config", *snakemake_config,
+                "--use-conda",
+                "--conda-frontend", "conda",
+                "--conda-prefix", str(conda_prefix.resolve())
+            ]
+
+            if args.dry_run:
+                cmd.append("--dry-run")
+
+            logger.info("Launching FoldTree Snakemake pipeline...")
+
+            result = subprocess.run(cmd, cwd=staged_wf_dir, env=os.environ.copy())
+
+            # Optional: Clean up .workflow directory after successful execution
+            if result.returncode == 0 and not args.dry_run:
+                shutil.rmtree(staged_wf_dir, ignore_errors=True)
+                logger.info(f"FoldTree pipeline completed successfully. Results saved in: {output_dir}")
+
+            sys.exit(result.returncode)
+
+        except Exception as e:
+            logger.error(f"Failed to execute FoldTree workflow: {str(e)}")
+            sys.exit(1)
+
+    try:
+        predictor = ESM3DiPredictor.from_pretrained(
+            model_path_or_id,
+            #revision=args.revision
+        )
+
+        if args.command == "predict":
+            output_fasta_path = resolve_output_path(args.output_fasta)
+            predictor.predict_fasta(
+                input_fasta_path=input_path,
+                output_fasta_path=output_fasta_path,
+                batch_size=args.batch_size,
+                num_gpus=args.num_gpus,
+                sort_by_length=args.sort_by_length
+            )
+
+        elif args.command == "foldseek-db":
+            output_db_path = resolve_output_path(args.output_db)
+            output_db_path.parent.mkdir(parents=True, exist_ok=True)
+
+            available_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 0
+            requested_gpus = available_gpus if args.num_gpus is None else min(args.num_gpus, available_gpus)
+
+            if requested_gpus > 1:
+                temp_3di_fasta = output_db_path.parent / f"{output_db_path.name}_temp_3di.fasta"
+                try:
+                    predictor.predict_fasta(
+                        input_fasta_path=input_path,
+                        output_fasta_path=temp_3di_fasta,
+                        batch_size=args.batch_size,
+                        num_gpus=args.num_gpus,
+                        sort_by_length=args.sort_by_length
+                    )
+                    aa_input = input_path
+                    tdi_input = temp_3di_fasta
+                    logger.info("Using temporary FASTA output for multi-GPU Foldseek inference.")
+                    logger.info(f"Building Foldseek database at: {output_db_path}")
+                    fasta2foldseek(
+                        aa_input=aa_input,
+                        tdi_input=tdi_input,
+                        output_basename=str(output_db_path)
+                    )
+                finally:
+                    if temp_3di_fasta.exists():
+                        temp_3di_fasta.unlink()
+            else:
+                aa_records = read_fasta(str(input_path))
+                tdi_records = predictor.predict_records(
+                    aa_records,
+                    batch_size=args.batch_size,
+                    sort_by_length=args.sort_by_length
+                )
+
+                logger.info(f"Building Foldseek database at: {output_db_path}")
+                fasta2foldseek(
+                    aa_input=aa_records,
+                    tdi_input=tdi_records,
+                    output_basename=str(output_db_path)
+                )
+            logger.info("Foldseek database generated successfully.")
+
+        elif args.command == "perplexity":
+            output_tsv_path = resolve_output_path(args.output_tsv)
+            predictor.output_per_position_perplexity(
+                input_fasta_path=input_path,
+                output_tsv_path=output_tsv_path,
+                batch_size=args.batch_size
+            )
+
+    except Exception as e:
+        logger.error(f"Execution failed: {str(e)}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

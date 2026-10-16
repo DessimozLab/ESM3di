@@ -51,4 +51,6 @@ Any ESM3Di 3Di checkpoint works, including old `esmretrain.py` checkpoints and t
 
 FoldSeek sequence-DB files `{output_db}`, `{output_db}_ss` (3Di), `{output_db}_h` (headers) plus their `.index`/`.dbtype` files, ready for `foldseek search` / `easy-search`.
 
-The earlier, more feature-rich script (taxonomy, custom models) is kept at `esm3di/experimental/fastas2foldseekdb_full.py`.
+The earlier, more feature-rich script (taxonomy, custom models) is archived at
+[experiments/legacy_runtime/experimental/fastas2foldseekdb_full.py](experiments/legacy_runtime/experimental/fastas2foldseekdb_full.py)
+and is excluded from both installable distributions.

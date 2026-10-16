@@ -1,21 +1,19 @@
 name: esm3di_blackwell
 channels:
-  - pytorch-nightly  # Required for Blackwell (sm_120) support
-  - nvidia
   - conda-forge
   - bioconda
-  - defaults
 dependencies:
   - python=3.11
   - pip
-  # PyTorch nightly with CUDA 12.4+ for Blackwell (sm_120) support
-  # Note: Blackwell GPUs require PyTorch nightly or PyTorch >= 2.6
-  - pytorch
-  - pytorch-cuda=12.4
   # FoldSeek for database creation
   - foldseek
+  - foldmason=4.dd3c235
+  - fasttree>=2.2.0
   # Pip dependencies
   - pip:
+      # Stable CUDA 12.8 build, including Blackwell support
+      - --extra-index-url https://download.pytorch.org/whl/cu128
+      - torch==2.9.1+cu128
       # Core ML - compatible with ESM++ (Synthyra) and PEFT
       - transformers>=4.45.0,<4.49.0
       - peft>=0.12.0,<0.14.0
@@ -44,22 +42,23 @@ dependencies:
       - bitsandbytes>=0.42.0
       # Install package in editable mode
       - -e .
+      - -e ./training
 
 # =============================================================================
 # BLACKWELL GPU (sm_120) INSTALLATION NOTES
 # =============================================================================
 #
-# Blackwell architecture (RTX PRO 4000, RTX 5090, etc.) requires:
-#   - CUDA 12.4 or newer
-#   - PyTorch with sm_120 compute capability support
-#   - Driver version 550+ recommended
+# This spec uses stable PyTorch 2.9.1 with its CUDA 12.8 runtime.
+# Blackwell architecture (RTX PRO 4000, RTX 5090, etc.) requires
+# a PyTorch build with sm_120 support and a CUDA 12.8-compatible driver
+# (Linux driver 570 or newer recommended).
 #
 # Option 1: Use this conda environment (recommended)
 #   conda env create -f environment_blackwell.yml
 #   conda activate esm3di_blackwell
 #
-# Option 2: Manual PyTorch nightly installation
-#   pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu124
+# Option 2: Manual installation of the same stable build
+#   pip install torch==2.9.1+cu128 --index-url https://download.pytorch.org/whl/cu128
 #
 # Verify Blackwell support:
 #   python -c "import torch; print(torch.cuda.get_arch_list())"

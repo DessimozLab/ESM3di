@@ -1,0 +1,48 @@
+from pathlib import Path
+import snakemake.utils
+
+configfile: "config.yaml"
+
+# -----------------------------------------------------------------------------
+# Input Sequence Resolution
+# -----------------------------------------------------------------------------
+raw_input = Path(config.get("input_path", "test_data/test_virus.fasta"))
+
+if raw_input.is_dir():
+    fasta_extensions = {".fasta", ".fa", ".fas", ".fna", ".ffn", ".frn", ".aa", ".faa"}
+    found_files = [f for f in raw_input.iterdir() if f.suffix.lower() in fasta_extensions]
+
+    if len(found_files) == 1:
+        raw_input = found_files[0]
+        print(f"Directory provided. Using found FASTA file: {raw_input}")
+    elif len(found_files) > 1:
+        raise ValueError(
+            f"Directory '{raw_input}' contains multiple FASTA files: {[f.name for f in found_files]}. "
+            "Please specify the exact file path using -i/--input-fasta."
+        )
+    else:
+        raise FileNotFoundError(f"No FASTA files found inside directory: {raw_input}")
+
+if not raw_input.is_file():
+    raise FileNotFoundError(f"Input sequence file not found: {raw_input}")
+
+# Resolve absolute path and set dataset identifier
+config["resolved_sequences"] = str(raw_input.resolve())
+OUT_DIR = Path(config.get("output_dir", "results"))
+DATASET = config.get("dataset") or raw_input.stem
+
+# Set default model dynamically based on use_prostt5 flag
+if config.get("use_prostt5", False):
+    config["model"] = "prostt5"
+    include: "rules/prostt5_db.smk"
+else:
+    config["model"] = "esm3di"
+    include: "rules/database_ops.smk"
+
+include: "rules/tree_building.smk"
+
+MODEL = config["model"]
+
+rule all:
+    input:
+        f"{OUT_DIR}/{DATASET}/{MODEL}_struct_tree.PP.nwk.rooted"
