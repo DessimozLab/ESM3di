@@ -78,6 +78,18 @@ very small contexts); 3Di probabilities or cutter embeddings are averaged in
 overlaps. Short sequences use a single window. Windowing preserves length, but
 does not provide interactions between residues in distant windows.
 
+**Verified with real model weights:** the default Hugging Face model, a legacy
+supervised `.pt` checkpoint and a corrected MLM-to-3Di `.pt` checkpoint each
+produced exactly one 3Di token per input residue for sequences of 22, 1,022,
+1,023 and 2,051 residues. Predictions matched the existing standalone windowed
+predictor, and short-sequence predictions were unchanged. Confidence output and
+paired AA/3Di FoldSeek records also retained every residue. The Hugging Face
+cutter produced probabilities for all 2,051 residues of a test polyprotein,
+and concatenating its predicted products reconstructed the complete input.
+These checks verify output completeness and compatibility, not prediction
+accuracy or unlimited sequence length; available memory still limits inference.
+Existing model weights and checkpoints were not modified.
+
 ### Prediction options
 
 | Option | Applies to | Behavior |
