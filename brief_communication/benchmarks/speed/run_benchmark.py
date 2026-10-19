@@ -236,7 +236,13 @@ def main():
         print(f"[!] Error: {e}", file=sys.stderr)
         sys.exit(1)
 
-    with tempfile.TemporaryDirectory(prefix="benchmark_upsampled_", dir="tmp") as temp_dir:
+    temporary_root = Path("tmp")
+    temporary_root.mkdir(parents=True, exist_ok=True)
+
+    with tempfile.TemporaryDirectory(
+        prefix="benchmark_upsampled_",
+        dir=temporary_root,
+    ) as temp_dir:
         benchmark_files = [
             upsample_fasta(fasta_file, args.upsample_nseqs_to, Path(temp_dir))
             if args.upsample_nseqs_to is not None

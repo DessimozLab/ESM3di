@@ -20,11 +20,12 @@ WIDTH_ONEHALF = 120 * MM
 WIDTH_DOUBLE = 183 * MM
 
 # --- Method colours: a method always has the same colour in every figure -------
-# ESM3Di / ProstT5 are the Okabe-Ito vermillion / blue pair: distinguishable under
-# all common colour-vision deficiencies and dark enough for coloured labels on white.
+# ESM3Di uses a blue-violet from its logo (between the wordmark blue and the violet);
+# ProstT5 a deep burnt orange. The pair stays distinguishable under all common
+# colour-vision deficiencies, and both are dark enough for coloured labels on white.
 METHOD_COLOURS = {
-    "ESM3Di": "#D55E00",
-    "ProstT5": "#0072B2",
+    "ESM3Di": "#3A36E0",
+    "ProstT5": "#C2410C",
     "Baseline": "#8C8C8C",
     "AF3": "#2B2B2B",
     # Foldseek on real structures is the structural reference, like AF3; MMseqs2

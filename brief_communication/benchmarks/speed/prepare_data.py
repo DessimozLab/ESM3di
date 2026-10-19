@@ -264,8 +264,8 @@ def main():
             raw_fasta=raw_fasta_path,
             output_dir=args.data_dir / "length_bins",
             #target_lengths=sorted(args.subsets),
-            seqs_per_bin=1, #32
-            tolerance=0
+            seqs_per_bin=32,
+            tolerance=2
         )
     else:
         # Generate nested subsets

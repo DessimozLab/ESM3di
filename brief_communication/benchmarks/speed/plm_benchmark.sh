@@ -15,6 +15,6 @@ conda activate esm3di
 export TMPDIR="/tmp"
 
 # Execute benchmark
-#python run_benchmark.py --models esm3di --repeats 6 --results-file results/final_nseq_esm3di_cli.csv --subsets 10 30 100 300 1000 3000 10000
+python run_benchmark.py --models esm3di --repeats 5 --results-file results/new_nseq_esm3di_cli.csv --subsets 10 30 100 300 1000 3000 10000
 
-python run_benchmark.py --models esm3di prostt5 --length-bins --repeats 6 --results-file results/final_length_bins_plms.csv --upsample-nseqs-to 512
+#python run_benchmark.py --models esm3di prostt5 --length-bins --repeats 6 --results-file results/final_length_bins_plms.csv --upsample-nseqs-to 512
