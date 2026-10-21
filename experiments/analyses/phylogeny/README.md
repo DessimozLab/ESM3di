@@ -22,14 +22,25 @@ It is separate from [alignment and fold-recognition evaluation](../../../benchma
   Drawing reduction and taxonomic branch colouring are visualization methods,
   not independent tests of tree accuracy.
 
+## Taxonomy preparation
+
+- `metavr_taxonomy.ipynb` extracts an IMG/VR protein-cluster to UViG/ICTV
+  taxonomy mapping (`data/metavr/metavr_taxonomy.tsv`).
+- `taxonomy_split.ipynb` splits the MetaVR and SCOPe40 amino-acid FASTAs by the
+  clades listed in `clades.txt`. The SCOPe40 inputs (`scope40_taxonomy.tsv`,
+  `scope40_viral_aa.fa`) are written by the
+  [SCOPe benchmark](../../../benchmarks/quality/README.md) and must be copied
+  into `data/scope/` here.
+
+These are supporting data-preparation materials, not independent results.
+They moved here from `benchmarks/comparisons/`.
+
 ## Running and limitations
 
 Run notebooks from this directory, with the repository installed in their
 environment. Supply the external Newick trees and metadata paths used by the
 cells; these inputs are not bundled here. The taxonomy-preparation notebooks
-remain in [benchmark comparisons](../../../benchmarks/comparisons/README.md).
-They write to their own local `data/` directory; supply that output explicitly
-when using it here.
+read and write the local `data/` directory, which is not tracked.
 
 The standalone renderer needs NumPy and Matplotlib. Run
 `python massive_radial_tree.py --help` for input and rendering options.

@@ -12,7 +12,7 @@ Start with the [analysis index](analyses/README.md), the
 [report guide](reports/README.md) for experiment-specific methods and caveats.
 Supporting data and result subdirectories are documented with their parent
 experiment rather than treated as independent experiments.
-Alignment, fold-recognition, and random-baseline evaluation and benchmark
+Alignment, fold-recognition, random-baseline and speed benchmarks and benchmark
 datasets are filed separately in [benchmarks/](../benchmarks/README.md).
 
 Install the repository in the notebook's environment (`pip install -e .` from

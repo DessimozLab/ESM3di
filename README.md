@@ -265,15 +265,16 @@ Individual stages support `--resume auto`; supervised `--init-from model.pt`
 starts a new fine-tune rather than restoring optimizer state.
 
 **Evidence:** MLM initialization is supported, but is not guaranteed to improve
-your results. The [paired MetaVR benchmark](benchmarks/comparisons/README.md)
+your results. The [paired MetaVR comparison](benchmarks/quality/README.md#mlm-versus-3di-only-fine-tuning--3di_alignment_mlm_vs_3di_onlyipynb)
 did not show an aggregate improvement for the evaluated epoch-5 checkpoints.
 Historical checkpoints named `esm3di_from_mlm` did not receive MLM weights;
 do not interpret their results as evidence of an MLM benefit.
 
 ## Research and benchmarks
 
-- [Benchmark comparisons](benchmarks/comparisons/README.md): alignment,
-  fold recognition, random baselines and MLM comparisons.
+- [Benchmarks](benchmarks/README.md): 3Di accuracy on MetaVR and SCOPe40,
+  speed against ProstT5 and ColabFold, MLM versus 3Di-only fine-tuning, and
+  the brief communication figures.
 - [Phylogeny experiments](experiments/analyses/phylogeny/README.md): monophyly
   scoring and tree visualization.
 - [Flavivirus](experiments/analyses/flavi_redo/README.md),

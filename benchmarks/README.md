@@ -1,25 +1,54 @@
-# Benchmark archive
+# Benchmarks
 
-This directory holds historical evaluation material, separate from the
+This directory holds the evaluation of ESM3Di against ProstT5 (and structure-based
+references), separate from the
 [biological and model-development experiments](../experiments/README.md):
 
-- [comparisons](comparisons/README.md): MetaVR alignment, SCOPe40 fold
-  recognition, the frequency-only random 3Di baseline, and supporting taxonomy
-  preparation notebooks.
-- [proteomes](proteomes/README.md): an archived search-database bundle with
-  incomplete construction provenance.
+| Folder | Content |
+|---|---|
+| [quality](quality/README.md) | 3Di accuracy against AF3-derived 3Di on MetaVR (bitscore, identity, random baseline), SCOPe40 viral fold recognition, and the MLM-vs-3Di-only checkpoint comparison |
+| [speed](speed/README.md) | Runtime and throughput of ESM3Di, ProstT5 and ColabFold vs number of sequences and sequence length |
+| [paper](paper/README.md) | Assembled figures for the brief communication (Figure 1 and supplementary figures) |
+| [proteomes](proteomes/README.md) | An archived search-database bundle with incomplete construction provenance |
 
-Monophyly scoring and large-tree visualization belong to the
+Monophyly scoring, large-tree visualization and the MetaVR/SCOPe40 taxonomy
+preparation belong to the
 [phylogeny experiments](../experiments/analyses/phylogeny/README.md), not this
 benchmark collection.
 
-Install the repository in the notebook environment with `pip install -e .`
-from the repository root. Run notebooks from their containing directory;
-relative checkpoint paths assume that working directory. External datasets,
-tools, and absolute machine-specific paths still need to be supplied. Review
-cells that overwrite external outputs before running them.
+## Shared plotting
 
-These are saved research records, not newly reproduced evaluations. Historical
-`esm3di_from_mlm` checkpoints did not receive the intended MLM weights, so their
-results do not establish an MLM benefit. Current code and supported recipes
-remain outside both archives; see the [usage guide](../README.md).
+All benchmark and paper figures use the same code, so a method has the same
+colour and a panel looks the same wherever it appears:
+
+- [pub_style.py](pub_style.py): matplotlib style (fonts, sizes, Nature column
+  widths, method colours) and `save_pub`, which writes every figure as a vector
+  PDF and a 600 dpi PNG.
+- [fig_panels.py](fig_panels.py): the plotting function for each panel
+  (identity/bitscore scatter, identity distributions, SCOPe sensitivity curves,
+  runtime curves). Each draws into a given axes from a results table.
+
+Notebooks in `quality/`, `speed/` and `paper/` import both with
+`sys.path.insert(0, "..")`, so run them from their own directory.
+
+## Data flow
+
+Each benchmark notebook runs the external tools, writes its per-item results to
+`<benchmark>/results/*.csv` and draws its own figures into
+`<benchmark>/figures/`. The paper notebooks read only those CSVs, so the paper
+figures can be redrawn without rerunning any benchmark:
+
+```
+quality/3di_alignment.ipynb  -> quality/results/3di_benchmark.csv    --\
+quality/scope_family.ipynb   -> quality/results/scope_sensitivity.csv -+-> paper/*.ipynb -> paper/figure1/, paper/supplementary/
+speed/run_benchmark.py       -> speed/results/*.csv                 --/
+```
+
+## Running
+
+Install the repository in the notebook environment with `pip install -e .`
+from the repository root. Foldseek, ProstT5 weights, LocalColabFold and the
+external datasets are not bundled. The notebooks contain absolute,
+machine-specific data paths (e.g. `/scratch/fweikert/data`) that must be
+adapted before rerunning. Some cells download large datasets or overwrite files
+in those data directories; review them before running a notebook top to bottom.

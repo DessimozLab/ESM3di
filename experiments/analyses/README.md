@@ -7,9 +7,10 @@ saved notebook figures or attempting a rerun.
 
 | Experiment or archive | Documentation |
 |---|---|
-| Structural classification and alignment benchmarks | [comparisons](../../benchmarks/comparisons/README.md) |
+| Structural classification and alignment benchmarks | [quality](../../benchmarks/quality/README.md) |
+| Speed benchmarks | [speed](../../benchmarks/speed/README.md) |
 | Proteome-scale search material | [proteomes](../../benchmarks/proteomes/README.md) |
-| Monophyly scoring and large-tree visualization | [phylogeny](phylogeny/README.md) |
+| Monophyly scoring, large-tree visualization and taxonomy preparation | [phylogeny](phylogeny/README.md) |
 | HIV mutation analyses | [HIV_mutations](HIV_mutations/README.md) |
 | Ebola protein analyses | [ebola_data](ebola_data/README.md) |
 | Flavivirus analyses | [flavi_redo](flavi_redo/README.md) |
