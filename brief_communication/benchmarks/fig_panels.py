@@ -27,11 +27,13 @@ IDENTITY_ARGS = dict(
 )
 
 
-def plot_method_scatter(ax, df, x_col, y_col, x_label, y_label, title=None, log_scale=False):
+def plot_method_scatter(ax, df, x_col, y_col, x_label, y_label, title=None, log_scale=False,
+                        baseline=None):
     """One point per protein: ESM3Di (y) vs ProstT5 (x).
 
     Points are coloured by the method that scores higher; the share of proteins on
-    each side of y = x is written in the matching triangle.
+    each side of y = x is written in the matching triangle. `baseline` (e.g. the median
+    identity of the random baseline) is drawn as dashed guides on both axes.
     """
     values = df[[x_col, y_col]].replace([np.inf, -np.inf], np.nan).dropna()
     if log_scale:
@@ -79,16 +81,33 @@ def plot_method_scatter(ax, df, x_col, y_col, x_label, y_label, title=None, log_
         ax.annotate(text, xy, xycoords="axes fraction", xytext=(0, dy), textcoords="offset points",
                     ha=ha, va=va, **kwargs)
 
+    # With baseline guides, the win-rate labels move clear of them: ESM3Di's right of the
+    # vertical guide, ProstT5's above the horizontal one
+    esm_x, prost_y, prost_dy = 0.04, 0.025, 7
+    if baseline is not None:
+        # Lighter than the y = x line, which carries the comparison; labelled along the
+        # vertical guide in the empty strip left of it, in the guides' own grey
+        guide_colour = "0.6"
+        guide = dict(color=guide_colour, lw=0.5, ls=(0, (3, 2)), zorder=0.5)
+        ax.axvline(baseline, **guide)
+        ax.axhline(baseline, **guide)
+        ax.annotate("Random baseline", (baseline, 0.98), xycoords=("data", "axes fraction"),
+                    xytext=(-2, 0), textcoords="offset points", ha="right", va="top",
+                    rotation=90, fontsize=5.5, color=guide_colour)
+        position = ax.transLimits.transform((baseline, baseline))  # data -> axes fraction
+        esm_x, prost_y, prost_dy = position[0] + 0.03, position[1] + 0.02, 0
+
     esm_mask, esm_colour = groups["ESM3Di"]
-    corner_text((0.04, 0.97), f"{100 * esm_mask.mean():.1f}%", 0, "left", "top",
+    corner_text((esm_x, 0.97), f"{100 * esm_mask.mean():.1f}%", 0, "left", "top",
                 color=esm_colour, fontsize=8, fontweight="bold")
-    corner_text((0.04, 0.97), "ESM3Di higher", -9, "left", "top", color=esm_colour, fontsize=6)
-    # Lower right, stacked upwards from the n / ties line
-    prost_mask, prost_colour = groups["ProstT5"]
+    corner_text((esm_x, 0.97), "ESM3Di higher", -9, "left", "top", color=esm_colour, fontsize=6)
     corner_text((0.97, 0.025), f"n = {len(x):,}; ties {100 * groups['Tie'][0].mean():.1f}%", 0,
                 "right", "bottom", fontsize=5.5, color=MUTED_TEXT)
-    corner_text((0.97, 0.025), "ProstT5 higher", 7, "right", "bottom", color=prost_colour, fontsize=6)
-    corner_text((0.97, 0.025), f"{100 * prost_mask.mean():.1f}%", 14, "right", "bottom",
+    # Stacked upwards from the n / ties line, or from the baseline guide
+    prost_mask, prost_colour = groups["ProstT5"]
+    corner_text((0.97, prost_y), "ProstT5 higher", prost_dy, "right", "bottom",
+                color=prost_colour, fontsize=6)
+    corner_text((0.97, prost_y), f"{100 * prost_mask.mean():.1f}%", prost_dy + 7, "right", "bottom",
                 color=prost_colour, fontsize=8, fontweight="bold")
     return ax
 
@@ -279,29 +298,32 @@ def label_line(ax, x, y, text, model, dx=0, dy=6, ha="left", va="bottom", **kwar
 
 
 def plot_runtime_vs_nseq(ax, nseq_df, title=None):
-    """Runtime vs number of sequences (log-log), with power-law fits.
+    """Runtime vs number of sequences (log-log), measured means connected.
 
-    ColabFold was only run up to 300 sequences; its fit is extrapolated (dashed) to 10,000.
+    ColabFold was only run up to 300 sequences; a power-law fit to its measurements is drawn
+    through them (solid) and extrapolated (dashed) to 10,000 sequences.
     """
-    fits = {}
+    summaries, extrapolations = {}, {}
     for model in MODEL_LABELS:
         summary = runtime_summary(nseq_df, model, "num_sequences")
         n = summary.index.to_numpy(dtype=float)
-        # Model loading dominates the two smallest PLM runs, so they are left out of the fit
-        fit = summary.iloc[2:] if model in {"esm3di", "prostt5"} else summary
-        slope, intercept = np.polyfit(np.log10(fit.index), np.log10(fit["mean"]), 1)
-        fits[model] = lambda x, s=slope, i=intercept: 10 ** (i + s * np.log10(x))
-
-        x_fit = np.geomspace(fit.index.min(), n.max(), 100)
-        ax.plot(x_fit, fits[model](x_fit), color=model_colour(model), lw=0.8, zorder=2)
         if n.max() < MAX_EXTRAPOLATE_SEQ:
-            x_ext = np.geomspace(n.max(), MAX_EXTRAPOLATE_SEQ, 100)
-            ax.plot(x_ext, fits[model](x_ext), color=model_colour(model), lw=0.8, ls=(0, (3, 2)),
-                    zorder=2)
-            ax.plot(MAX_EXTRAPOLATE_SEQ, fits[model](MAX_EXTRAPOLATE_SEQ), marker="o", ms=3.5,
-                    mfc="white", mec=model_colour(model), mew=0.8, zorder=3)
+            # Power-law fit (straight on log-log axes): solid over the measured range, dashed
+            # beyond it up to the extrapolated point
+            slope, intercept = np.polyfit(np.log10(n), np.log10(summary["mean"]), 1)
+            extrapolations[model] = lambda x, b=slope, a=intercept: 10 ** a * x ** b
+            x_fit = np.array([n.min(), n.max()])
+            ax.plot(x_fit, extrapolations[model](x_fit), color=model_colour(model), lw=0.8, zorder=2)
+            x_ext = np.array([n.max(), MAX_EXTRAPOLATE_SEQ])
+            y_ext = extrapolations[model](x_ext)
+            ax.plot(x_ext, y_ext, color=model_colour(model), lw=0.8, ls=(0, (3, 2)), zorder=2)
+            ax.plot(x_ext[-1], y_ext[-1], marker="o", ms=3.5, mfc="white", mec=model_colour(model),
+                    mew=0.8, zorder=3)
+        else:
+            ax.plot(n, summary["mean"], color=model_colour(model), lw=0.8, zorder=2)
         ax.errorbar(n, summary["mean"], yerr=summary["std"].fillna(0), color=model_colour(model),
                     elinewidth=0.6, capsize=0, **MARKER)
+        summaries[model] = summary
 
     ax.set_xscale("log")
     ax.set_yscale("log")
@@ -318,11 +340,14 @@ def plot_runtime_vs_nseq(ax, nseq_df, title=None):
     if title:
         ax.set_title(title)
 
-    # ColabFold and ProstT5 above-left of their lines, ESM3Di below-right of its line, so the
-    # two language-model labels frame the gap between their lines
-    label_line(ax, 1000, fits["colabfold"](1000), "ColabFold", "colabfold", dx=-3, dy=4, ha="right")
-    label_line(ax, 1000, fits["prostt5"](1000), "ProstT5", "prostt5", dx=-3, dy=4, ha="right")
-    label_line(ax, 1000, fits["esm3di"](1000), "ESM3Di", "esm3di", dx=3, dy=-4, va="top")
+    # ColabFold (on its extrapolated segment) and ProstT5 above-left of their lines, ESM3Di
+    # below-right, so the two language-model labels frame the gap between their lines
+    label_line(ax, 1000, extrapolations["colabfold"](1000), "ColabFold", "colabfold",
+               dx=-3, dy=4, ha="right")
+    label_line(ax, 1000, summaries["prostt5"].loc[1000, "mean"], "ProstT5", "prostt5",
+               dx=-3, dy=4, ha="right")
+    label_line(ax, 1000, summaries["esm3di"].loc[1000, "mean"], "ESM3Di", "esm3di",
+               dx=3, dy=-4, va="top")
 
     # Line-style key: what solid vs dashed (open circle) means, in neutral grey
     key_colour = "0.45"
@@ -335,7 +360,7 @@ def plot_runtime_vs_nseq(ax, nseq_df, title=None):
         loc="lower right", handlelength=1.6, handletextpad=0.4, borderaxespad=0.2,
         labelspacing=0.25, fontsize=5.5,
     )
-    return fits
+    return summaries
 
 
 def plot_runtime_vs_length(ax, length_df, models, log_y, title=None):
@@ -369,3 +394,40 @@ def plot_runtime_vs_length(ax, length_df, models, log_y, title=None):
     if title:
         ax.set_title(title)
     return curves
+
+
+def plot_esm3di_runtime_modes(ax, nseq_df, esm3di_cli_df):
+    """ESM3Di runtime vs number of sequences, timed end to end (CLI call, including model
+    loading; filled markers) and inference only (model already loaded; open markers), with
+    ProstT5 (always end to end) as a thin reference line. Measured means connected."""
+    colour = model_colour("esm3di")
+    end_to_end = runtime_summary(esm3di_cli_df, "esm3di", "num_sequences")
+    inference = runtime_summary(nseq_df, "esm3di", "num_sequences")
+    prostt5 = runtime_summary(nseq_df, "prostt5", "num_sequences")
+
+    ax.plot(prostt5.index, prostt5["mean"], color=model_colour("prostt5"), lw=0.8, alpha=0.7, zorder=1)
+    for summary, open_marker in ((end_to_end, False), (inference, True)):
+        ax.plot(summary.index, summary["mean"], color=colour, zorder=2)
+        marker = dict(MARKER, mfc="white", mec=colour, mew=0.8) if open_marker else MARKER
+        ax.errorbar(summary.index, summary["mean"], yerr=summary["std"].fillna(0), color=colour,
+                    elinewidth=0.6, capsize=0, **marker)
+
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    use_log_axis(ax.xaxis)
+    use_log_axis(ax.yaxis)
+    ax.set_xlim(6, 1.6e4)
+    ax.set_ylim(0.15, 1e3)
+    ax.yaxis.set_major_locator(ticker.FixedLocator(10.0 ** np.arange(0, 4)))
+    ax.set_box_aspect(1)
+    ax.set_xlabel("Number of sequences")
+    ax.set_ylabel("Runtime (s)")
+
+    # Both ESM3Di labels where the two curves are a decade apart: end to end above its flat
+    # (start-up dominated) part, inference only below-right of its line; ProstT5 above-left
+    label_line(ax, 10, end_to_end.loc[10, "mean"], "ESM3Di\n(end to end)", "esm3di", dy=5,
+               linespacing=1.1)
+    label_line(ax, 100, inference.loc[100, "mean"], "ESM3Di\n(inference only)", "esm3di",
+               dx=4, dy=-4, va="top", linespacing=1.1)
+    label_line(ax, 1000, prostt5.loc[1000, "mean"], "ProstT5", "prostt5", dx=-3, dy=4, ha="right")
+    return {"end to end": end_to_end, "inference only": inference, "ProstT5": prostt5}

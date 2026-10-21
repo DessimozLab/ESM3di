@@ -106,3 +106,26 @@ def save_pub(fig, name, outdir="figures"):
     for path in paths:
         fig.savefig(path)
     return paths
+
+
+def add_aligned_panel_labels(fig, panels):
+    """Bold panel letters at the top-left of each panel's full extent (axes plus tick and axis
+    labels), aligned per grid column and row. `panels` maps letter -> axes, or letter -> list
+    of axes for a panel made of several axes. Freezes the layout, so call it last."""
+    fig.canvas.draw()  # runs the layout, so the extents below are final
+    fig.set_layout_engine("none")  # keep that layout when the letters are added
+    to_fig = fig.transFigure.inverted()
+    panels = {letter: axes if isinstance(axes, (list, tuple)) else [axes]
+              for letter, axes in panels.items()}
+    first = {letter: axes[0] for letter, axes in panels.items()}
+    extents = {letter: axes[0].get_tightbbox().transformed(to_fig) for letter, axes in panels.items()}
+    # Share x within a grid column and y within a grid row
+    columns, rows = {}, {}
+    for letter, ax in first.items():
+        spec = ax.get_subplotspec()
+        columns.setdefault(spec.colspan.start, []).append(letter)
+        rows.setdefault(spec.rowspan.start, []).append(letter)
+    x = {l: min(extents[m].x0 for m in group) for group in columns.values() for l in group}
+    y = {l: max(extents[m].y1 for m in group) for group in rows.values() for l in group}
+    for letter in panels:
+        fig.text(x[letter], y[letter], letter, fontsize=9, fontweight="bold", ha="left", va="top")
