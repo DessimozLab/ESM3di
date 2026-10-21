@@ -162,8 +162,8 @@ def main(argv=None):
     )
     predict_parser.add_argument(
         "--input-fasta",
-        default="test_data/example_input.fasta",
-        help="Path to input amino acid FASTA file (default: test_data/example_input.fasta)"
+        required=True,
+        help="Path to input amino acid FASTA file"
     )
     predict_parser.add_argument(
         "--output-fasta",
@@ -183,8 +183,8 @@ def main(argv=None):
     )
     foldseek_parser.add_argument(
         "--input-fasta",
-        default="test_data/example_input.fasta",
-        help="Path to input amino acid FASTA file (default: test_data/example_input.fasta)"
+        required=True,
+        help="Path to input amino acid FASTA file"
     )
     foldseek_parser.add_argument(
         "--output-db",
@@ -200,8 +200,8 @@ def main(argv=None):
     )
     perplexity_parser.add_argument(
         "--input-fasta",
-        default="test_data/example_input.fasta",
-        help="Path to input amino acid FASTA file (default: test_data/example_input.fasta)"
+        required=True,
+        help="Path to input amino acid FASTA file"
     )
     perplexity_parser.add_argument(
         "--output-tsv",
@@ -221,7 +221,7 @@ def main(argv=None):
     )
     foldtree_parser.add_argument(
         "-i", "--input-fasta",
-        default="test_data/test_virus.fasta",
+        required=True,
         help="Path to input amino acid FASTA file or directory containing FASTA files."
     )
     foldtree_parser.add_argument(

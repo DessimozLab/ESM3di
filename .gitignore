@@ -94,3 +94,7 @@ data/
 
 # PyTorch
 *.tar.gz
+
+
+# Brief communication working copy (benchmarks integrated into benchmarks/)
+/brief_communication/

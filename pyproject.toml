@@ -12,7 +12,7 @@ license = {text = "MIT"}
 authors = [
     {name = "David Moi", email = "dmoi@unil.ch"},
     {name = "Dongwook Kim", email = "dongwook.kim@unil.ch"},
-    {name = "Finn Tjark Weikert"},
+    {name = "Finn Weikert"},
     {name = "Philippe Le Mercier"},
     {name = "Christophe Dessimoz"},
 ]
