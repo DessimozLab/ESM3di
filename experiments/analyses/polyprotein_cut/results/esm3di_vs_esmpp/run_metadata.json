@@ -1,0 +1,47 @@
+{
+  "checkpoint": "/home/dmoi/projects/ESM3di/checkpoints/esm3di_from_mlm/epoch_5.pt",
+  "checkpoint_sha256": "4e8143a48b6e31975aa75e6d1f4074e7895e968d3df64b8de2a1301127d62ac9",
+  "model": "Synthyra/ESMplusplus_small",
+  "revision": "46c5f7d",
+  "seeds": [
+    17
+  ],
+  "window_overlap": 128,
+  "max_model_tokens": 1024,
+  "tolerance_ap": "residue-level AP after dilating each positive label by +/- radius",
+  "top10_site_recovery": "macro mean per-protein recall among top 10 scores after +/-5 residue nonmaximum suppression; one-to-one +/-5 matching",
+  "unannotated_sequences": "excluded; only ICTV records with parsed cleavage annotations are evaluated",
+  "outer_split": "leave one of four viral groups out; sequences are unique ICTV protein records",
+  "heads": {
+    "ffn": {
+      "hidden": [
+        256,
+        128
+      ],
+      "dropout": 0.45,
+      "input_dropout": 0.1,
+      "epochs": 8,
+      "learning_rate": 0.001,
+      "weight_decay": 0.0003,
+      "oscar_l1": 1e-06,
+      "oscar_pair": 2e-07
+    },
+    "transformer": {
+      "d_model": 256,
+      "heads": 8,
+      "layers": 2,
+      "dropout": 0.35,
+      "input_dropout": 0.08,
+      "epochs": 8,
+      "learning_rate": 0.001,
+      "weight_decay": 0.0003,
+      "oscar_l1": 1e-06,
+      "oscar_pair": 2e-07,
+      "classifier_window": 512,
+      "classifier_overlap": 64
+    }
+  },
+  "selection": "fixed settings; no outer-test hyperparameter selection",
+  "device": "cuda",
+  "threads": 8
+}
