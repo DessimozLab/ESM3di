@@ -1,0 +1,343 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- Created with Inkscape (http://www.inkscape.org/) --><svg xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg" width="165mm" height="40.5mm" viewBox="0.5 192.5 165 40.5" version="1.1" id="svg5" inkscape:version="1.1.2 (0a00cf5339, 2022-02-04)" sodipodi:docname="networkLORA.svg">
+  <sodipodi:namedview id="namedview7" pagecolor="#ffffff" bordercolor="#666666" borderopacity="1.0" inkscape:pageshadow="2" inkscape:pageopacity="0.0" inkscape:pagecheckerboard="0" inkscape:document-units="mm" showgrid="false" showguides="true" inkscape:guide-bbox="true" inkscape:zoom="2.520921" inkscape:cx="270.73439" inkscape:cy="741.19736" inkscape:window-width="2560" inkscape:window-height="1408" inkscape:window-x="0" inkscape:window-y="0" inkscape:window-maximized="1" inkscape:current-layer="layer1">
+    <sodipodi:guide position="243.86855,9.9386552" orientation="1,0" id="guide48098"/>
+    <sodipodi:guide position="1036.2091,-1.9714356" orientation="0,-1" id="guide82159"/>
+  </sodipodi:namedview>
+  <defs id="defs2">
+    <marker style="overflow:visible;" id="marker9512" refX="0.0" refY="0.0" orient="auto" inkscape:stockid="Arrow1Send" inkscape:isstock="true">
+      <path transform="scale(0.2) rotate(180) translate(6,0)" style="fill-rule:evenodd;fill:context-stroke;stroke:context-stroke;stroke-width:1.0pt;" d="M 0.0,0.0 L 5.0,-5.0 L -12.5,0.0 L 5.0,5.0 L 0.0,0.0 z " id="path9266"/>
+    </marker>
+    <marker style="overflow:visible;" id="marker82647" refX="0.0" refY="0.0" orient="auto" inkscape:stockid="Arrow1Send" inkscape:isstock="true">
+      <path transform="scale(0.2) rotate(180) translate(6,0)" style="fill-rule:evenodd;fill:context-stroke;stroke:context-stroke;stroke-width:1.0pt;" d="M 0.0,0.0 L 5.0,-5.0 L -12.5,0.0 L 5.0,5.0 L 0.0,0.0 z " id="path1557"/>
+    </marker>
+    <marker style="overflow:visible;" id="Arrow1Lend" refX="0.0" refY="0.0" orient="auto" inkscape:stockid="Arrow1Lend" inkscape:isstock="true">
+      <path transform="scale(0.8) rotate(180) translate(12.5,0)" style="fill-rule:evenodd;fill:context-stroke;stroke:context-stroke;stroke-width:1.0pt;" d="M 0.0,0.0 L 5.0,-5.0 L -12.5,0.0 L 5.0,5.0 L 0.0,0.0 z " id="path1545"/>
+    </marker>
+    <marker style="overflow:visible" id="marker1820" refX="0.0" refY="0.0" orient="auto" inkscape:stockid="DotS" inkscape:isstock="true">
+      <path transform="scale(0.2) translate(7.4, 1)" style="fill-rule:evenodd;fill:context-stroke;stroke:context-stroke;stroke-width:1.0pt" d="M -2.5,-1.0 C -2.5,1.7600000 -4.7400000,4.0 -7.5,4.0 C -10.260000,4.0 -12.5,1.7600000 -12.5,-1.0 C -12.5,-3.7600000 -10.260000,-6.0 -7.5,-6.0 C -4.7400000,-6.0 -2.5,-3.7600000 -2.5,-1.0 z " id="path1818"/>
+    </marker>
+    <marker style="overflow:visible" id="DotS" refX="0.0" refY="0.0" orient="auto" inkscape:stockid="DotS" inkscape:isstock="true">
+      <path transform="scale(0.2) translate(7.4, 1)" style="fill-rule:evenodd;fill:context-stroke;stroke:context-stroke;stroke-width:1.0pt" d="M -2.5,-1.0 C -2.5,1.7600000 -4.7400000,4.0 -7.5,4.0 C -10.260000,4.0 -12.5,1.7600000 -12.5,-1.0 C -12.5,-3.7600000 -10.260000,-6.0 -7.5,-6.0 C -4.7400000,-6.0 -2.5,-3.7600000 -2.5,-1.0 z " id="path1609"/>
+    </marker>
+    <marker style="overflow:visible" id="DotM" refX="0.0" refY="0.0" orient="auto" inkscape:stockid="DotM" inkscape:isstock="true">
+      <path transform="scale(0.4) translate(7.4, 1)" style="fill-rule:evenodd;fill:context-stroke;stroke:context-stroke;stroke-width:1.0pt" d="M -2.5,-1.0 C -2.5,1.7600000 -4.7400000,4.0 -7.5,4.0 C -10.260000,4.0 -12.5,1.7600000 -12.5,-1.0 C -12.5,-3.7600000 -10.260000,-6.0 -7.5,-6.0 C -4.7400000,-6.0 -2.5,-3.7600000 -2.5,-1.0 z " id="path1606"/>
+    </marker>
+    <marker style="overflow:visible;" id="Arrow1Send" refX="0.0" refY="0.0" orient="auto" inkscape:stockid="Arrow1Send" inkscape:isstock="true">
+      <path transform="scale(0.2) rotate(180) translate(6,0)" style="fill-rule:evenodd;fill:context-stroke;stroke:context-stroke;stroke-width:1.0pt;" d="M 0.0,0.0 L 5.0,-5.0 L -12.5,0.0 L 5.0,5.0 L 0.0,0.0 z " id="path98674"/>
+    </marker>
+    <marker style="overflow:visible;" id="Arrow1Mend" refX="0.0" refY="0.0" orient="auto" inkscape:stockid="Arrow1Mend" inkscape:isstock="true">
+      <path transform="scale(0.4) rotate(180) translate(10,0)" style="fill-rule:evenodd;fill:context-stroke;stroke:context-stroke;stroke-width:1.0pt;" d="M 0.0,0.0 L 5.0,-5.0 L -12.5,0.0 L 5.0,5.0 L 0.0,0.0 z " id="path98668"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Send-2" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Send" inkscape:isstock="true">
+      <path transform="matrix(-0.2,0,0,-0.2,-1.2,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path98674-0"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Send-2-1" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Send" inkscape:isstock="true">
+      <path transform="matrix(-0.2,0,0,-0.2,-1.2,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path98674-0-5"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Send-2-1-4" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Send" inkscape:isstock="true">
+      <path transform="matrix(-0.2,0,0,-0.2,-1.2,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path98674-0-5-7"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Send-2-1-4-5" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Send" inkscape:isstock="true">
+      <path transform="matrix(-0.2,0,0,-0.2,-1.2,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path98674-0-5-7-6"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Send-4" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Send" inkscape:isstock="true">
+      <path transform="matrix(-0.2,0,0,-0.2,-1.2,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path98674-3"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Send-2-1-4-5-1" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Send" inkscape:isstock="true">
+      <path transform="matrix(-0.2,0,0,-0.2,-1.2,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path98674-0-5-7-6-7"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Send-2-1-4-5-10" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Send" inkscape:isstock="true">
+      <path transform="matrix(-0.2,0,0,-0.2,-1.2,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path98674-0-5-7-6-6"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Lend-9" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Lend" inkscape:isstock="true">
+      <path transform="matrix(-0.8,0,0,-0.8,-10,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path1545-6"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Lend-1" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Lend" inkscape:isstock="true">
+      <path transform="matrix(-0.8,0,0,-0.8,-10,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path1545-7"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Lend-9-5" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Lend" inkscape:isstock="true">
+      <path transform="matrix(-0.8,0,0,-0.8,-10,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path1545-6-7"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Lend-18" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Lend" inkscape:isstock="true">
+      <path transform="matrix(-0.8,0,0,-0.8,-10,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path1545-5"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Lend-9-9" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Lend" inkscape:isstock="true">
+      <path transform="matrix(-0.8,0,0,-0.8,-10,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path1545-6-75"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Lend-9-5-3" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Lend" inkscape:isstock="true">
+      <path transform="matrix(-0.8,0,0,-0.8,-10,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path1545-6-7-8"/>
+    </marker>
+    <marker style="overflow:visible" id="marker58421" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Lend" inkscape:isstock="true">
+      <path transform="matrix(-0.8,0,0,-0.8,-10,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path58419"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Lend-1-8" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Lend" inkscape:isstock="true">
+      <path transform="matrix(-0.8,0,0,-0.8,-10,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path1545-7-3"/>
+    </marker>
+    <marker id="arrow" markerHeight="10" markerUnits="userSpaceOnUse" markerWidth="12" orient="auto" refX="10" refY="5">
+      <path d="M 0,0 10,5 0,10 Z" fill="#17283c" id="path79833"/>
+    </marker>
+    <marker id="marker80371" markerHeight="10" markerUnits="userSpaceOnUse" markerWidth="12" orient="auto" refX="10" refY="5">
+      <path d="M 0,0 10,5 0,10 Z" fill="#17283c" id="path80369"/>
+    </marker>
+    <marker id="marker80375" markerHeight="10" markerUnits="userSpaceOnUse" markerWidth="12" orient="auto" refX="10" refY="5">
+      <path d="M 0,0 10,5 0,10 Z" fill="#17283c" id="path80373"/>
+    </marker>
+    <marker id="marker80379" markerHeight="10" markerUnits="userSpaceOnUse" markerWidth="12" orient="auto" refX="10" refY="5">
+      <path d="M 0,0 10,5 0,10 Z" fill="#17283c" id="path80377"/>
+    </marker>
+    <marker id="marker80383" markerHeight="10" markerUnits="userSpaceOnUse" markerWidth="12" orient="auto" refX="10" refY="5">
+      <path d="M 0,0 10,5 0,10 Z" fill="#17283c" id="path80381"/>
+    </marker>
+    <marker id="marker80387" markerHeight="10" markerUnits="userSpaceOnUse" markerWidth="12" orient="auto" refX="10" refY="5">
+      <path d="M 0,0 10,5 0,10 Z" fill="#17283c" id="path80385"/>
+    </marker>
+    <marker id="marker80391" markerHeight="10" markerUnits="userSpaceOnUse" markerWidth="12" orient="auto" refX="10" refY="5">
+      <path d="M 0,0 10,5 0,10 Z" fill="#17283c" id="path80389"/>
+    </marker>
+    <marker id="marker80395" markerHeight="10" markerUnits="userSpaceOnUse" markerWidth="12" orient="auto" refX="10" refY="5">
+      <path d="M 0,0 10,5 0,10 Z" fill="#17283c" id="path80393"/>
+    </marker>
+    <marker id="marker80399" markerHeight="10" markerUnits="userSpaceOnUse" markerWidth="12" orient="auto" refX="10" refY="5">
+      <path d="M 0,0 10,5 0,10 Z" fill="#17283c" id="path80397"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Lend-9-5-4" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Lend" inkscape:isstock="true">
+      <path transform="matrix(-0.8,0,0,-0.8,-10,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path1545-6-7-7"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Lend-9-5-40" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Lend" inkscape:isstock="true">
+      <path transform="matrix(-0.8,0,0,-0.8,-10,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path1545-6-7-6"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Lend-9-5-9" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Lend" inkscape:isstock="true">
+      <path transform="matrix(-0.8,0,0,-0.8,-10,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path1545-6-7-0"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Lend-9-5-1" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Lend" inkscape:isstock="true">
+      <path transform="matrix(-0.8,0,0,-0.8,-10,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path1545-6-7-3"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Lend-9-5-10" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Lend" inkscape:isstock="true">
+      <path transform="matrix(-0.8,0,0,-0.8,-10,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path1545-6-7-34"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Lend-9-5-39" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Lend" inkscape:isstock="true">
+      <path transform="matrix(-0.8,0,0,-0.8,-10,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path1545-6-7-1"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Lend-9-5-6" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Lend" inkscape:isstock="true">
+      <path transform="matrix(-0.8,0,0,-0.8,-10,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path1545-6-7-9"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Lend-3" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Lend" inkscape:isstock="true">
+      <path transform="matrix(-0.8,0,0,-0.8,-10,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path1545-67"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Lend-9-53" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Lend" inkscape:isstock="true">
+      <path transform="matrix(-0.8,0,0,-0.8,-10,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path1545-6-5"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Lend-9-5-62" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Lend" inkscape:isstock="true">
+      <path transform="matrix(-0.8,0,0,-0.8,-10,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path1545-6-7-91"/>
+    </marker>
+    <marker style="overflow:visible" id="marker3443" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Lend" inkscape:isstock="true">
+      <path transform="matrix(-0.8,0,0,-0.8,-10,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path3441"/>
+    </marker>
+    <marker style="overflow:visible" id="Arrow1Lend-1-2" refX="0" refY="0" orient="auto" inkscape:stockid="Arrow1Lend" inkscape:isstock="true">
+      <path transform="matrix(-0.8,0,0,-0.8,-10,0)" style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt" d="M 0,0 5,-5 -12.5,0 5,5 Z" id="path1545-7-7"/>
+    </marker>
+  </defs>
+  <g inkscape:label="Layer 1" inkscape:groupmode="layer" id="layer1">
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="8.46667px" font-style="normal" font-weight="bold" text-anchor="start" x="655.82111" y="217.2794" id="text79842" style="stroke-width:0.264583"/>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.57219px" font-style="normal" font-weight="bold" text-anchor="middle" x="44.580387" y="195.81252" id="text79846" style="stroke-width:0.087344">Amino-acid input</text>
+    <text fill="#60758a" font-family="Arial, Helvetica, sans-serif" font-size="1.48485px" font-style="normal" font-weight="normal" text-anchor="middle" x="44.580387" y="197.99612" id="text79848" style="stroke-width:0.087344">(unmasked)</text>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="2.00891px" font-style="normal" font-weight="bold" text-anchor="middle" x="40.824593" y="203.84818" id="text79850" style="stroke-width:0.087344">M</text>
+    <rect fill="#b2e8e4" height="2.6203225" rx="0.17468816" ry="0.17468816" stroke="#0e9f9c" stroke-width="0.0698754" width="2.008914" x="43.706951" y="202.01395" id="rect79852"/>
+    <rect fill="#b2e8e4" height="2.6203225" rx="0.17468816" ry="0.17468816" stroke="#0e9f9c" stroke-width="0.0698754" width="2.008914" x="44.143658" y="201.66457" id="rect79854"/>
+    <rect fill="#b2e8e4" height="2.6203225" rx="0.17468816" ry="0.17468816" stroke="#0e9f9c" stroke-width="0.0698754" width="2.008914" x="44.580387" y="201.31519" id="rect79856"/>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="2.00891px" font-style="normal" font-weight="bold" text-anchor="middle" x="40.824593" y="208.21538" id="text79858" style="stroke-width:0.087344">D</text>
+    <rect fill="#b2e8e4" height="2.6203225" rx="0.17468816" ry="0.17468816" stroke="#0e9f9c" stroke-width="0.0698754" width="2.008914" x="43.706951" y="206.38115" id="rect79860"/>
+    <rect fill="#b2e8e4" height="2.6203225" rx="0.17468816" ry="0.17468816" stroke="#0e9f9c" stroke-width="0.0698754" width="2.008914" x="44.143658" y="206.03177" id="rect79862"/>
+    <rect fill="#b2e8e4" height="2.6203225" rx="0.17468816" ry="0.17468816" stroke="#0e9f9c" stroke-width="0.0698754" width="2.008914" x="44.580387" y="205.6824" id="rect79864"/>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="2.00891px" font-style="normal" font-weight="bold" text-anchor="middle" x="40.824593" y="212.58258" id="text79866" style="stroke-width:0.087344">V</text>
+    <rect fill="#b2e8e4" height="2.6203225" rx="0.17468816" ry="0.17468816" stroke="#0e9f9c" stroke-width="0.0698754" width="2.008914" x="43.706951" y="210.74835" id="rect79868"/>
+    <rect fill="#b2e8e4" height="2.6203225" rx="0.17468816" ry="0.17468816" stroke="#0e9f9c" stroke-width="0.0698754" width="2.008914" x="44.143658" y="210.39897" id="rect79870"/>
+    <rect fill="#b2e8e4" height="2.6203225" rx="0.17468816" ry="0.17468816" stroke="#0e9f9c" stroke-width="0.0698754" width="2.008914" x="44.580387" y="210.04961" id="rect79872"/>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="2.00891px" font-style="normal" font-weight="bold" text-anchor="middle" x="40.824593" y="216.94978" id="text79874" style="stroke-width:0.087344">E</text>
+    <rect fill="#b2e8e4" height="2.6203225" rx="0.17468816" ry="0.17468816" stroke="#0e9f9c" stroke-width="0.0698754" width="2.008914" x="43.706951" y="215.11555" id="rect79876"/>
+    <rect fill="#b2e8e4" height="2.6203225" rx="0.17468816" ry="0.17468816" stroke="#0e9f9c" stroke-width="0.0698754" width="2.008914" x="44.143658" y="214.76619" id="rect79878"/>
+    <rect fill="#b2e8e4" height="2.6203225" rx="0.17468816" ry="0.17468816" stroke="#0e9f9c" stroke-width="0.0698754" width="2.008914" x="44.580387" y="214.41681" id="rect79880"/>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="2.00891px" font-style="normal" font-weight="bold" text-anchor="middle" x="40.824593" y="221.31699" id="text79882" style="stroke-width:0.087344">Q</text>
+    <rect fill="#b2e8e4" height="2.6203225" rx="0.17468816" ry="0.17468816" stroke="#0e9f9c" stroke-width="0.0698754" width="2.008914" x="43.706951" y="219.48276" id="rect79884"/>
+    <rect fill="#b2e8e4" height="2.6203225" rx="0.17468816" ry="0.17468816" stroke="#0e9f9c" stroke-width="0.0698754" width="2.008914" x="44.143658" y="219.13339" id="rect79886"/>
+    <rect fill="#b2e8e4" height="2.6203225" rx="0.17468816" ry="0.17468816" stroke="#0e9f9c" stroke-width="0.0698754" width="2.008914" x="44.580387" y="218.78401" id="rect79888"/>
+    <path d="m 47.812118,201.22785 h 1.48485 v 20.26383 h -1.48485" fill="none" stroke="#17283c" stroke-width="0.174688" id="path79890"/>
+    <line marker-end="url(#arrow)" stroke="#17283c" stroke-width="0.529167" x1="49.296959" x2="51.655266" y1="211.35976" y2="211.35976" id="line79892" style="stroke-width:0.108609;stroke-miterlimit:4;stroke-dasharray:none;marker-end:url(#Arrow1Lend-9-5)"/>
+    <line marker-end="url(#arrow)" stroke="#17283c" stroke-width="0.529167" x1="61.570591" x2="63.928898" y1="211.60567" y2="211.60567" id="line79892-2" style="stroke-width:0.108609;stroke-miterlimit:4;stroke-dasharray:none;marker-end:url(#Arrow1Lend-9-5-4)"/>
+    <rect fill="#e2f8f6" height="5.9393978" rx="0.61140859" ry="0.61140859" stroke="#0e9f9c" stroke-width="0.157219" width="9.1711283" x="52.004627" y="208.4774" id="rect79894"/>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.48485px" font-style="normal" font-weight="bold" text-anchor="middle" x="56.546528" y="210.83571" id="text79896" style="stroke-width:0.087344">Token</text>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.48485px" font-style="normal" font-weight="bold" text-anchor="middle" x="56.546528" y="212.84462" id="text79898" style="stroke-width:0.087344">embedding</text>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.48485px" font-style="normal" font-weight="bold" text-anchor="middle" x="67.901253" y="205.76974" id="text79902" style="stroke-width:0.087344">Input states</text>
+    <rect fill="#f4fcfb" height="13.975053" rx="0" ry="0" stroke="#0e9f9c" stroke-width="0.131016" width="8.035656" x="63.883423" y="207.0799" id="rect79904"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="65.222694" x2="65.222694" y1="207.0799" y2="221.05496" id="line79906"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="66.561974" x2="66.561974" y1="207.0799" y2="221.05496" id="line79908"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="67.901253" x2="67.901253" y1="207.0799" y2="221.05496" id="line79910"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="69.240532" x2="69.240532" y1="207.0799" y2="221.05496" id="line79912"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="70.579803" x2="70.579803" y1="207.0799" y2="221.05496" id="line79914"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="63.883423" x2="71.919083" y1="208.4774" y2="208.4774" id="line79916"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="63.883423" x2="71.919083" y1="209.87491" y2="209.87491" id="line79918"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="63.883423" x2="71.919083" y1="211.27242" y2="211.27242" id="line79920"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="63.883423" x2="71.919083" y1="212.66992" y2="212.66992" id="line79922"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="63.883423" x2="71.919083" y1="214.06743" y2="214.06743" id="line79924"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="63.883423" x2="71.919083" y1="215.46494" y2="215.46494" id="line79926"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="63.883423" x2="71.919083" y1="216.86244" y2="216.86244" id="line79928"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="63.883423" x2="71.919083" y1="218.25995" y2="218.25995" id="line79930"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="63.883423" x2="71.919083" y1="219.65746" y2="219.65746" id="line79932"/>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.57219px" font-style="italic" font-weight="normal" text-anchor="middle" x="67.901253" y="223.67528" id="text79934" style="stroke-width:0.087344">L × 960</text>
+    <rect fill="#e2f8f6" height="4.9786129" rx="0.78609669" ry="0.78609669" stroke="#0e9f9c" stroke-width="0.174688" width="9.0837851" x="73.22924" y="202.88739" id="rect79936" style="fill:#ffaaaa"/>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.65954px" font-style="normal" font-weight="bold" text-anchor="middle" x="77.771141" y="205.94443" id="text79938" style="stroke-width:0.087344">Layer 1</text>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.48485px" font-style="normal" font-weight="normal" text-anchor="middle" x="77.771141" y="198.69487" id="text79940" style="stroke-width:0.087344">Self-attention</text>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.48485px" font-style="normal" font-weight="normal" text-anchor="middle" x="77.771141" y="200.70378" id="text79942" style="stroke-width:0.087344">+ SwiGLU FFN</text>
+    <line stroke="#17283c" stroke-width="0.174688" x1="71.919083" x2="73.22924" y1="214.06743" y2="214.06743" id="line79944"/>
+    <line stroke="#17283c" stroke-width="0.174688" x1="73.22924" x2="73.22924" y1="214.06743" y2="205.50771" id="line79946"/>
+    <line stroke="#17283c" stroke-width="0.174688" x1="82.313026" x2="83.710533" y1="205.42036" y2="205.42036" id="line79948"/>
+    <line stroke="#17283c" stroke-width="0.174688" x1="83.710533" x2="83.710533" y1="205.42036" y2="214.06743" id="line79950"/>
+    <circle cx="83.710533" cy="214.06743" fill="#ffffff" r="1.2228172" stroke="#17283c" stroke-width="0.157219" id="circle79952"/>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.83423px" font-style="normal" font-weight="normal" text-anchor="middle" x="83.710533" y="214.67883" id="text79954" style="stroke-width:0.087344">+</text>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.48485px" font-style="normal" font-weight="bold" text-anchor="middle" x="90.508209" y="205.76974" id="text79958" style="stroke-width:0.087344">Layer 1 states</text>
+    <rect fill="#f4fcfb" height="13.975053" rx="0" ry="0" stroke="#0e9f9c" stroke-width="0.131016" width="8.035656" x="87.276329" y="207.0799" id="rect79960"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="88.615608" x2="88.615608" y1="207.0799" y2="221.05496" id="line79962"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="89.95488" x2="89.95488" y1="207.0799" y2="221.05496" id="line79964"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="91.294159" x2="91.294159" y1="207.0799" y2="221.05496" id="line79966"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="92.633438" x2="92.633438" y1="207.0799" y2="221.05496" id="line79968"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="93.97271" x2="93.97271" y1="207.0799" y2="221.05496" id="line79970"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="87.276329" x2="95.311989" y1="208.4774" y2="208.4774" id="line79972"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="87.276329" x2="95.311989" y1="209.87491" y2="209.87491" id="line79974"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="87.276329" x2="95.311989" y1="211.27242" y2="211.27242" id="line79976"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="87.276329" x2="95.311989" y1="212.66992" y2="212.66992" id="line79978"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="87.276329" x2="95.311989" y1="214.06743" y2="214.06743" id="line79980"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="87.276329" x2="95.311989" y1="215.46494" y2="215.46494" id="line79982"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="87.276329" x2="95.311989" y1="216.86244" y2="216.86244" id="line79984"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="87.276329" x2="95.311989" y1="218.25995" y2="218.25995" id="line79986"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="87.276329" x2="95.311989" y1="219.65746" y2="219.65746" id="line79988"/>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.57219px" font-style="italic" font-weight="normal" text-anchor="middle" x="91.294159" y="223.67528" id="text79990" style="stroke-width:0.087344">L × 960</text>
+    <rect fill="#e2f8f6" height="4.9786129" rx="0.78609669" ry="0.78609669" stroke="#0e9f9c" stroke-width="0.174688" width="9.0837851" x="96.185425" y="202.88739" id="rect79992" style="fill:#ffaaaa"/>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.65954px" font-style="normal" font-weight="bold" text-anchor="middle" x="100.72733" y="205.94443" id="text79994" style="stroke-width:0.087344">Layer 2</text>
+    <line stroke="#17283c" stroke-width="0.174688" x1="95.311989" x2="96.185425" y1="214.06743" y2="214.06743" id="line80000"/>
+    <line stroke="#17283c" stroke-width="0.174688" x1="96.185425" x2="96.185425" y1="214.06743" y2="205.50771" id="line80002"/>
+    <line stroke="#17283c" stroke-width="0.174688" x1="105.26921" x2="106.66673" y1="205.42036" y2="205.42036" id="line80004"/>
+    <line stroke="#17283c" stroke-width="0.174688" x1="106.66673" x2="106.66673" y1="205.42036" y2="214.06743" id="line80006"/>
+    <circle cx="106.66673" cy="214.06743" fill="#ffffff" r="1.2228172" stroke="#17283c" stroke-width="0.157219" id="circle80008"/>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.83423px" font-style="normal" font-weight="normal" text-anchor="middle" x="106.66673" y="214.67883" id="text80010" style="stroke-width:0.087344">+</text>
+    <rect fill="#e2f8f6" height="4.9786129" rx="0.78609669" ry="0.78609669" stroke="#0e9f9c" stroke-width="0.174688" width="9.0837851" x="115.26493" y="202.88739" id="rect80108" style="fill:#ffaaaa"/>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.65954px" font-style="normal" font-weight="bold" text-anchor="middle" x="119.80688" y="205.94443" id="text80110" style="stroke-width:0.087344">Layer 30</text>
+    <line stroke="#17283c" stroke-width="1.09973" x1="111.86983" x2="115.26493" y1="214.06743" y2="214.06743" id="line80116" style="stroke-width:0.163;stroke-miterlimit:4;stroke-dasharray:none"/>
+    <line stroke="#17283c" stroke-width="0.174688" x1="115.26493" x2="115.26493" y1="214.06743" y2="205.50771" id="line80118"/>
+    <line stroke="#17283c" stroke-width="0.174688" x1="124.34875" x2="125.74628" y1="205.42036" y2="205.42036" id="line80120"/>
+    <line stroke="#17283c" stroke-width="0.174688" x1="125.74628" x2="125.74628" y1="205.42036" y2="214.06743" id="line80122"/>
+    <circle cx="125.74628" cy="214.06743" fill="#ffffff" r="1.2228172" stroke="#17283c" stroke-width="0.157219" id="circle80124"/>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.83423px" font-style="normal" font-weight="normal" text-anchor="middle" x="125.74628" y="214.67883" id="text80126" style="stroke-width:0.087344">+</text>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.48485px" font-style="normal" font-weight="bold" text-anchor="middle" x="134.21901" y="205.76974" id="text80130" style="stroke-width:0.087344">Final states</text>
+    <rect fill="#f4fcfb" height="13.975053" rx="0" ry="0" stroke="#0e9f9c" stroke-width="0.131016" width="8.035656" x="130.20091" y="207.0799" id="rect80132"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="131.54033" x2="131.54033" y1="207.0799" y2="221.05496" id="line80134"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="132.87967" x2="132.87967" y1="207.0799" y2="221.05496" id="line80136"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="134.21901" x2="134.21901" y1="207.0799" y2="221.05496" id="line80138"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="135.5583" x2="135.5583" y1="207.0799" y2="221.05496" id="line80140"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="136.89764" x2="136.89764" y1="207.0799" y2="221.05496" id="line80142"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="130.20091" x2="138.23683" y1="208.4774" y2="208.4774" id="line80144"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="130.20091" x2="138.23683" y1="209.87491" y2="209.87491" id="line80146"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="130.20091" x2="138.23683" y1="211.27242" y2="211.27242" id="line80148"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="130.20091" x2="138.23683" y1="212.66992" y2="212.66992" id="line80150"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="130.20091" x2="138.23683" y1="214.06743" y2="214.06743" id="line80152"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="130.20091" x2="138.23683" y1="215.46494" y2="215.46494" id="line80154"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="130.20091" x2="138.23683" y1="216.86244" y2="216.86244" id="line80156"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="130.20091" x2="138.23683" y1="218.25995" y2="218.25995" id="line80158"/>
+    <line stroke="#8bdad3" stroke-width="0.0786097" x1="130.20091" x2="138.23683" y1="219.65746" y2="219.65746" id="line80160"/>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.57219px" font-style="italic" font-weight="normal" text-anchor="middle" x="134.21901" y="223.67528" id="text80162" style="stroke-width:0.087344">L × 960</text>
+    <rect fill="#e2f8f6" height="9.6078491" rx="0.61140859" ry="0.61140859" stroke="#0e9f9c" stroke-width="0.157219" width="9.9572258" x="140.59526" y="208.56476" id="rect80166"/>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.92157px" font-style="normal" font-weight="bold" text-anchor="middle" x="145.57416" y="211.44711" id="text80168" style="stroke-width:0.087344">3Di</text>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.48485px" font-style="normal" font-weight="normal" text-anchor="middle" x="145.57416" y="213.71805" id="text80170" style="stroke-width:0.087344">prediction</text>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.48485px" font-style="normal" font-weight="normal" text-anchor="middle" x="145.57416" y="215.72696" id="text80172" style="stroke-width:0.087344">head</text>
+    <text fill="#60758a" font-family="Arial, Helvetica, sans-serif" font-size="1.31016px" font-style="normal" font-weight="normal" text-anchor="middle" x="145.57416" y="217.47385" id="text80174" style="stroke-width:0.087344">960 → 20</text>
+    <g id="g96312" transform="matrix(0.33011937,0,0,0.33011937,-207.6792,115.37117)">
+      <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="4.49792px" font-style="normal" font-weight="bold" text-anchor="middle" x="1110.028" y="258.75476" id="text80176" style="stroke-width:0.264583">3Di logits</text>
+      <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="4.49792px" font-style="italic" font-weight="normal" text-anchor="middle" x="1110.028" y="265.36935" id="text80178" style="stroke-width:0.264583">L × 20</text>
+      <rect fill="#9157ba" height="2.9104166" width="1.0583333" x="1100.5029" y="280.45059" id="rect80180" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="7.6729164" width="1.0583333" x="1102.355" y="275.68811" id="rect80182" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="5.2916665" width="1.0583333" x="1104.207" y="278.06934" id="rect80184" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="9.260417" width="1.0583333" x="1106.0592" y="274.10059" id="rect80186" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="3.96875" width="1.0583333" x="1107.9113" y="279.39227" id="rect80188" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="6.3499999" width="1.0583333" x="1109.7633" y="277.01102" id="rect80190" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="2.6458333" width="1.0583333" x="1111.6154" y="280.71518" id="rect80192" style="stroke-width:0.264583"/>
+      <text fill="#9157ba" font-family="Arial, Helvetica, sans-serif" font-size="5.82083px" font-style="normal" font-weight="bold" text-anchor="middle" x="1119.8175" y="281.50894" id="text80194" style="stroke-width:0.264583">d</text>
+      <rect fill="#72c7c0" height="2.9104166" width="1.0583333" x="1100.5029" y="293.67975" id="rect80196" style="stroke-width:0.264583"/>
+      <rect fill="#9157ba" height="7.6729164" width="1.0583333" x="1102.355" y="288.91727" id="rect80198" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="5.2916665" width="1.0583333" x="1104.207" y="291.29852" id="rect80200" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="9.260417" width="1.0583333" x="1106.0592" y="287.32977" id="rect80202" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="3.96875" width="1.0583333" x="1107.9113" y="292.62143" id="rect80204" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="6.3499999" width="1.0583333" x="1109.7633" y="290.24017" id="rect80206" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="2.6458333" width="1.0583333" x="1111.6154" y="293.94434" id="rect80208" style="stroke-width:0.264583"/>
+      <text fill="#9157ba" font-family="Arial, Helvetica, sans-serif" font-size="5.82083px" font-style="normal" font-weight="bold" text-anchor="middle" x="1119.8175" y="294.7381" id="text80210" style="stroke-width:0.264583">a</text>
+      <rect fill="#72c7c0" height="2.9104166" width="1.0583333" x="1100.5029" y="306.90894" id="rect80212" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="7.6729164" width="1.0583333" x="1102.355" y="302.14642" id="rect80214" style="stroke-width:0.264583"/>
+      <rect fill="#9157ba" height="5.2916665" width="1.0583333" x="1104.207" y="304.52768" id="rect80216" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="9.260417" width="1.0583333" x="1106.0592" y="300.55893" id="rect80218" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="3.96875" width="1.0583333" x="1107.9113" y="305.85059" id="rect80220" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="6.3499999" width="1.0583333" x="1109.7633" y="303.46933" id="rect80222" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="2.6458333" width="1.0583333" x="1111.6154" y="307.17352" id="rect80224" style="stroke-width:0.264583"/>
+      <text fill="#9157ba" font-family="Arial, Helvetica, sans-serif" font-size="5.82083px" font-style="normal" font-weight="bold" text-anchor="middle" x="1119.8175" y="307.96725" id="text80226" style="stroke-width:0.264583">g</text>
+      <rect fill="#72c7c0" height="2.9104166" width="1.0583333" x="1100.5029" y="320.13809" id="rect80228" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="7.6729164" width="1.0583333" x="1102.355" y="315.37558" id="rect80230" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="5.2916665" width="1.0583333" x="1104.207" y="317.75684" id="rect80232" style="stroke-width:0.264583"/>
+      <rect fill="#9157ba" height="9.260417" width="1.0583333" x="1106.0592" y="313.78809" id="rect80234" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="3.96875" width="1.0583333" x="1107.9113" y="319.07977" id="rect80236" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="6.3499999" width="1.0583333" x="1109.7633" y="316.69852" id="rect80238" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="2.6458333" width="1.0583333" x="1111.6154" y="320.40268" id="rect80240" style="stroke-width:0.264583"/>
+      <text fill="#9157ba" font-family="Arial, Helvetica, sans-serif" font-size="5.82083px" font-style="normal" font-weight="bold" text-anchor="middle" x="1119.8175" y="321.19644" id="text80242" style="stroke-width:0.264583">f</text>
+      <rect fill="#72c7c0" height="2.9104166" width="1.0583333" x="1100.5029" y="333.36725" id="rect80244" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="7.6729164" width="1.0583333" x="1102.355" y="328.60477" id="rect80246" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="5.2916665" width="1.0583333" x="1104.207" y="330.98602" id="rect80248" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="9.260417" width="1.0583333" x="1106.0592" y="327.01727" id="rect80250" style="stroke-width:0.264583"/>
+      <rect fill="#9157ba" height="3.96875" width="1.0583333" x="1107.9113" y="332.30893" id="rect80252" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="6.3499999" width="1.0583333" x="1109.7633" y="329.92767" id="rect80254" style="stroke-width:0.264583"/>
+      <rect fill="#72c7c0" height="2.6458333" width="1.0583333" x="1111.6154" y="333.63184" id="rect80256" style="stroke-width:0.264583"/>
+      <text fill="#9157ba" font-family="Arial, Helvetica, sans-serif" font-size="5.82083px" font-style="normal" font-weight="bold" text-anchor="middle" x="1119.8175" y="334.4256" id="text80258" style="stroke-width:0.264583">k</text>
+    </g>
+    <text fill="#9157ba" font-family="Arial, Helvetica, sans-serif" font-size="1.48485px" font-style="normal" font-weight="bold" text-anchor="middle" x="145.77557" y="222.31387" id="text80282" style="stroke-width:0.087344">Supervised 3Di</text>
+    <text fill="#9157ba" font-family="Arial, Helvetica, sans-serif" font-size="1.48485px" font-style="normal" font-weight="normal" text-anchor="middle" x="145.88541" y="223.99117" id="text80284" style="stroke-width:0.087344">cross-entropy loss</text>
+    <line marker-end="url(#arrow)" stroke="#17283c" stroke-width="0.16407" x1="50.265556" x2="144.54041" y1="226.22093" y2="226.22093" id="line80288" style="stroke-width:0.164;stroke-miterlimit:4;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"/>
+    <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.74688px" font-style="normal" font-weight="bold" text-anchor="middle" x="97.353363" y="228.88857" id="text80290" style="stroke-width:0.087344">Transformer depth (30 layers)</text>
+    <text fill="#60758a" font-family="Arial, Helvetica, sans-serif" font-size="1.3975px" font-style="normal" font-weight="normal" text-anchor="middle" x="97.647217" y="231.25229" id="text80292" style="stroke-width:0.087344">All intermediate residue representations retain shape L × 960.</text>
+    <path style="fill:none;stroke:#000000;stroke-width:0.219529;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" d="m 109.24253,216.53031 3.54086,-6.13298" id="path82023"/>
+    <path style="fill:none;stroke:#000000;stroke-width:0.219529;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" d="m 110.42804,216.53031 3.54087,-6.13298" id="path82023-6"/>
+    <line marker-end="url(#arrow)" stroke="#17283c" stroke-width="0.529167" x1="84.893074" x2="87.251373" y1="214.06743" y2="214.06743" id="line79892-29" style="stroke-width:0.108609;stroke-miterlimit:4;stroke-dasharray:none;marker-end:url(#Arrow1Lend-9-5-40)"/>
+    <line marker-end="url(#arrow)" stroke="#17283c" stroke-width="0.529167" x1="107.81895" x2="110.17725" y1="214.06743" y2="214.06743" id="line79892-8" style="stroke-width:0.108609;stroke-miterlimit:4;stroke-dasharray:none;marker-end:url(#Arrow1Lend-9-5-9)"/>
+    <line marker-end="url(#arrow)" stroke="#17283c" stroke-width="0.529167" x1="127.00526" x2="129.36363" y1="214.06743" y2="214.06743" id="line79892-0" style="stroke-width:0.108609;stroke-miterlimit:4;stroke-dasharray:none;marker-end:url(#Arrow1Lend-9-5-10)"/>
+    <line marker-end="url(#arrow)" stroke="#17283c" stroke-width="0.529167" x1="138.23683" x2="140.59526" y1="214.06743" y2="214.06743" id="line79892-9" style="stroke-width:0.108609;stroke-miterlimit:4;stroke-dasharray:none;marker-end:url(#Arrow1Lend-9-5-39)"/>
+    <line marker-end="url(#arrow)" stroke="#17283c" stroke-width="0.529167" x1="145.50212" x2="145.50212" y1="218.38478" y2="220.74309" id="line79892-3" style="stroke-width:0.108609;stroke-miterlimit:4;stroke-dasharray:none;marker-end:url(#Arrow1Lend-9-5-6)"/>
+    <g id="g9249" transform="translate(2.1166667)">
+      <g id="g58405-0" transform="matrix(0.13848583,0,0,0.13848583,-10.165672,166.34048)">
+        <rect style="fill:#ffffff;fill-rule:evenodd;stroke:#ff0000;stroke-width:2.46331;stroke-miterlimit:4;stroke-dasharray:2.46331, 2.46331;stroke-dashoffset:0;stop-color:#000000" id="rect25606-9" width="70.886826" height="131.24437" x="238.52638" y="260.00864" rx="4.290503" ry="3.9285088"/>
+        <rect style="fill:#ffffff;fill-rule:evenodd;stroke:#4d4d4d;stroke-width:1.32292;stroke-miterlimit:4;stroke-dasharray:none;stop-color:#000000" id="rect22056-3" width="50.458363" height="31.184982" x="248.74161" y="279.81976" rx="5" ry="5"/>
+        <rect style="fill:#ffffff;fill-rule:evenodd;stroke:#4d4d4d;stroke-width:1.32292;stroke-miterlimit:4;stroke-dasharray:none;stop-color:#000000" id="rect22056-4-6" width="50.458363" height="14.216117" x="248.74161" y="265.60364" rx="5" ry="5"/>
+        <rect style="fill:#ffffff;fill-rule:evenodd;stroke:#4d4d4d;stroke-width:1.32292;stroke-miterlimit:4;stroke-dasharray:none;stop-color:#000000" id="rect22056-8-0" width="50.458363" height="31.184982" x="248.74161" y="344.04584" rx="5" ry="5"/>
+        <rect style="fill:#ffffff;fill-rule:evenodd;stroke:#4d4d4d;stroke-width:1.32292;stroke-miterlimit:4;stroke-dasharray:none;stop-color:#000000" id="rect22056-4-1-6" width="50.458363" height="14.216117" x="248.74161" y="329.82971" rx="5" ry="5"/>
+        <text xml:space="preserve" style="font-size:4.23333px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;stroke-width:0.264583" x="262.09967" y="274.85919" id="text30672-2"><tspan sodipodi:role="line" id="tspan30670-6" style="stroke-width:0.264583" x="262.09967" y="274.85919">Add &amp; Nom</tspan></text>
+        <text xml:space="preserve" style="font-size:4.23333px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;stroke-width:0.264583" x="262.09967" y="338.06635" id="text30672-3-1"><tspan sodipodi:role="line" id="tspan30670-0-8" style="stroke-width:0.264583" x="262.09967" y="338.06635">Add &amp; Nom</tspan></text>
+        <text xml:space="preserve" style="font-size:4.23333px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;stroke-width:0.264583" x="259.72049" y="296.35785" id="text30672-4-7"><tspan sodipodi:role="line" id="tspan30670-4-9" style="stroke-width:0.264583" x="259.72049" y="296.35785">Feed Forward</tspan></text>
+        <text xml:space="preserve" style="font-size:4.23333px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;stroke-width:0.264583" x="274.43588" y="357.80737" id="text30672-4-4-2"><tspan sodipodi:role="line" id="tspan30670-4-4-0" style="text-align:center;text-anchor:middle;stroke-width:0.264583" x="274.43588" y="357.80737">Multi Head </tspan><tspan sodipodi:role="line" style="text-align:center;text-anchor:middle;stroke-width:0.264583" x="274.43588" y="363.09903" id="tspan39397-2">Attention</tspan></text>
+        <g id="g47037-3">
+          <rect style="fill:#ffffff;fill-rule:evenodd;stroke:#4d4d4d;stroke-width:1.32292;stroke-miterlimit:4;stroke-dasharray:none;stop-color:#000000" id="rect22056-4-0-7" width="50.458363" height="14.216117" x="248.74161" y="396.86688" rx="5" ry="5"/>
+          <text xml:space="preserve" style="font-size:4.23333px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;stroke-width:0.264583" x="273.81369" y="405.00778" id="text30672-4-4-7-5"><tspan sodipodi:role="line" style="text-align:center;text-anchor:middle;stroke-width:0.264583" x="273.81369" y="405.00778" id="tspan39397-3-9">Input</tspan></text>
+        </g>
+        <g id="g47032-2">
+          <rect style="fill:#ffffff;fill-rule:evenodd;stroke:#4d4d4d;stroke-width:1.32292;stroke-miterlimit:4;stroke-dasharray:none;stop-color:#000000" id="rect22056-4-0-1-2" width="50.458363" height="14.216117" x="248.74161" y="233.94035" rx="5" ry="5"/>
+          <text xml:space="preserve" style="font-size:4.23333px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;stroke-width:0.264583" x="273.90256" y="242.08125" id="text30672-4-4-7-7-8"><tspan sodipodi:role="line" style="text-align:center;text-anchor:middle;stroke-width:0.264583" x="273.90256" y="242.08125" id="tspan39397-3-5-9">Output</tspan></text>
+        </g>
+        <path style="fill:none;stroke:#000000;stroke-width:0.529167;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;marker-end:url(#Arrow1Lend-3)" d="M 273.50729,396.31786 V 376.28925" id="path47072-7"/>
+        <path style="fill:none;stroke:#000000;stroke-width:0.529167;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;marker-end:url(#Arrow1Lend-9-53)" d="M 273.50729,329.20271 V 311.66796" id="path47072-2-3" sodipodi:nodetypes="cc"/>
+        <path style="fill:none;stroke:#000000;stroke-width:0.529167;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;marker-end:url(#Arrow1Lend-9-5-62)" d="M 273.50729,266.24602 V 248.71127" id="path47072-2-4-6" sodipodi:nodetypes="cc"/>
+        <path style="fill:none;stroke:#000000;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-end:url(#Arrow1Lend-3)" d="m 273.87989,321.59059 c 0,0 -26.28979,1.28992 -29.48217,-0.83313 -2.07294,-0.63884 -2.97918,-45.84623 0,-48.55522 2.13114,-0.50535 4.4097,-0.78366 4.4097,-0.78366" id="path47355-1" sodipodi:nodetypes="cccc"/>
+        <path style="fill:none;stroke:#000000;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-end:url(#Arrow1Lend-1-2)" d="m 273.35072,386.89652 c 0,0 -26.28979,1.28992 -29.48217,-0.83313 -2.07294,-0.63884 -2.97918,-45.84623 0,-48.55522 2.13114,-0.50535 4.4097,-0.78366 4.4097,-0.78366" id="path47355-8-2" sodipodi:nodetypes="cccc"/>
+        <text xml:space="preserve" style="font-size:7.05556px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#ff0000;fill-opacity:1;stroke-width:0.264583" x="-359.28656" y="235.54787" id="text50597-9" transform="rotate(-90)"><tspan sodipodi:role="line" id="tspan50595-3" style="font-size:7.05556px;fill:#ff0000;fill-opacity:1;stroke-width:0.264583" x="-359.28656" y="235.54787">LORA fine tuning</tspan></text>
+      </g>
+      <rect fill="#f5fbfb" height="32.026245" rx="1.3319488" stroke="#0e9f9c" stroke-dasharray="5, 5" stroke-width="0.269651" width="33.298721" x="1.4524947" y="193.85585" id="rect80260" style="fill:none"/>
+      <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.48485px" font-style="normal" font-weight="bold" text-anchor="start" x="7.130096" y="196.49765" id="text80262" style="font-size:2.11667px;stroke-width:0.087344">Per-layer architecture</text>
+      <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.48485px" font-style="normal" font-weight="normal" text-anchor="start" x="2.1070414" y="208.21985" id="text80264" style="stroke-width:0.087344">15 heads × 64 dimensions</text>
+      <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.48485px" font-style="normal" font-weight="normal" text-anchor="start" x="2.1498175" y="210.40346" id="text80266" style="stroke-width:0.087344">Q/K/V: 960 → 960</text>
+      <text fill="#17283c" font-family="Arial, Helvetica, sans-serif" font-size="1.48485px" font-style="normal" font-weight="normal" text-anchor="start" x="2.1527188" y="212.58705" id="text80268" style="stroke-width:0.087344">SwiGLU: 960 → 2560 → 960</text>
+      <text xml:space="preserve" style="font-size:1.3975px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;stroke-width:0.087344" x="2.0829835" y="214.57956" id="text100033"><tspan sodipodi:role="line" id="tspan100031" style="stroke-width:0.087344" x="2.0829835" y="214.57956">LORA rank 16</tspan></text>
+    </g>
+  </g>
+</svg>
