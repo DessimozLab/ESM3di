@@ -1,6 +1,6 @@
 # ESM3Di
 
-![ESM3Di logo: viral protLLM](https://raw.githubusercontent.com/DessimozLab/ESM3di/master/logoEMS3Di.png)
+<p align="center"><img src="logo_ESM3Di_transparent.png" alt="ESM3Di logo: viral protLLM" width="50%"></p>
 
 Predict per-residue **3Di structural tokens** from amino-acid sequences, build
 FoldSeek search databases, and predict polyprotein cleavage sites.
