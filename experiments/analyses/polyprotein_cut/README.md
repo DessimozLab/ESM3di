@@ -11,7 +11,7 @@
 - **Metrics:** ROC AUC, strict residue-level AP, residue-level AP after expanding labels by ±2 and ±5 residues, and macro per-protein top-10 site recovery with non-maximum suppression and one-to-one matching within ±5 residues.
 - **Long proteins:** both embedding sources use identical 1024-token overlapping windows; overlap embeddings are averaged so no residues are dropped.
 
-The summary has one row per held-out group, embedding source, and head. `seed_metrics.csv` has the run-level values; only one seed is currently used, so seed variability is not estimated. `oof_ffn_predictions.csv` stores per-residue out-of-fold FFN scores for ROC analysis. `figure2_ap_by_group.png` plots strict AP by group for both embedding sources. `run_metadata.json` records checkpoint hash, seed list, device, and metric definitions.
+The summary has one row per held-out group, embedding source, and head. `seed_metrics.csv` has the run-level values; only one seed is currently used, so seed variability is not estimated. `oof_ffn_predictions.csv` stores per-residue out-of-fold FFN scores for ROC analysis. Figures are saved as PNG and SVG. `run_metadata.json` records checkpoint hash, seed list, device, and metric definitions.
 
 ## Data audit
 

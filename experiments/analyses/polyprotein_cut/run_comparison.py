@@ -453,6 +453,7 @@ def save_figure(summary: pd.DataFrame, output_dir: Path):
     fig.suptitle("Held-out cut-site AP by group and embedding source")
     fig.tight_layout()
     fig.savefig(output_dir / "figure2_ap_by_group.png", dpi=220)
+    fig.savefig(output_dir / "figure2_ap_by_group.svg")
     plt.close(fig)
 
 
