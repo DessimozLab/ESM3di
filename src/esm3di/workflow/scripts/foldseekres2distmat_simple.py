@@ -1,4 +1,5 @@
 import foldseek2tree
+import tipnames
 import numpy as np
 import pandas as pd
 
@@ -14,7 +15,8 @@ if snakemake.params.fmt is None:
     res.columns = 'query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits'.split(',')
 else:
     res.columns = snakemake.params.fmt.split(',')
-ids = list( set(list(res['query'].unique()) + list(res['target'].unique())))
+# Sorted, so the matrix row order (and QuickTree's tie-breaking) is the same in every run
+ids = sorted( set(list(res['query'].unique()) + list(res['target'].unique())))
 pos = { protid : i for i,protid in enumerate(ids)}
 kernels = ['fident']
 
@@ -46,4 +48,6 @@ for i,k in enumerate(matrices):
     np.fill_diagonal(tajima, 0)
     matrices[k] = tajima
     np.save( infolder + k + '_distmat.npy' , matrices[k])
-    distmat_txt = foldseek2tree.distmat_to_txt( ids , matrices[k] , snakemake.output[i] )
+    # QuickTree truncates long names; write placeholders and restore them in postprocess
+    distmat_txt = foldseek2tree.distmat_to_txt( tipnames.placeholder_names(ids) , matrices[k] , snakemake.output[i] )
+tipnames.write_name_map(ids, snakemake.output.names)

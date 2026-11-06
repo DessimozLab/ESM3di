@@ -9,7 +9,8 @@ rule foldseek2distmat:
     input:
         "{out_dir}/{dataset}/allvall_1.csv"
     output:
-        "{out_dir}/{dataset}/{model}_fastmemat.txt"
+        matrix="{out_dir}/{dataset}/{model}_fastmemat.txt",
+        names="{out_dir}/{dataset}/{model}_fastmemat.names.tsv"
     params:
         fmt=None
     log:
@@ -42,7 +43,8 @@ rule postprocess_tree:
     conda:
         "../envs/foldtree.yaml"
     input:
-        "{out_dir}/{dataset}/{model}_struct_tree.nwk"
+        tree="{out_dir}/{dataset}/{model}_struct_tree.nwk",
+        names="{out_dir}/{dataset}/{model}_fastmemat.names.tsv"
     output:
         "{out_dir}/{dataset}/{model}_struct_tree.PP.nwk"
     log:

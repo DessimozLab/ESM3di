@@ -56,7 +56,7 @@ rule foldseek_allvall:
     log:
         "{out_dir}/{dataset}/logs/foldseek_allvall.log"
     threads:
-        config.get("foldseek_threads", 8)
+        workflow.cores
     shell:
         """
         # Ensure cleanup of tmp directory even on unexpected failure

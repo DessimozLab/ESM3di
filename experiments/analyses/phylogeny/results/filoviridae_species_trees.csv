@@ -1,0 +1,7 @@
+protein,tree,species,RF to amino-acid tree,Orthoebolavirus,Orthomarburgvirus + Dianlovirus,Mammalian filoviruses,Thamnovirus,Orthoebolavirus + Cuevavirus
+GP,ESM3Di FoldTree,14,2,yes,yes,yes,yes,
+GP,ProstT5 FoldTree,14,4,yes,no,yes,yes,
+GP,Amino acid (IQ-TREE),14,0,yes (100),yes (53),yes (100),yes (93),
+NP,ESM3Di FoldTree,10,2,yes,,yes,,yes
+NP,ProstT5 FoldTree,10,2,yes,,yes,,yes
+NP,Amino acid (IQ-TREE),10,0,yes (96),,yes (100),,yes (95)

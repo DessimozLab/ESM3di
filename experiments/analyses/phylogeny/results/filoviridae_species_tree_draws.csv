@@ -1,0 +1,5 @@
+protein,tree,Orthoebolavirus,Orthoebolavirus + Cuevavirus,Orthomarburgvirus + Dianlovirus,Mammalian filoviruses,Thamnovirus
+GP,ESM3Di FoldTree,1.0,,1.0,1.0,1.0
+GP,ProstT5 FoldTree,1.0,,0.0,1.0,0.98
+NP,ESM3Di FoldTree,1.0,1.0,,1.0,
+NP,ProstT5 FoldTree,1.0,1.0,,1.0,

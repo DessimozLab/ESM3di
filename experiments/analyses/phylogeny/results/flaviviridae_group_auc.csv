@@ -1,0 +1,13 @@
+score,method,AUC,CI low,CI high
+fident,AlphaFold2,0.8907,0.8687,0.9093
+fident,ESM3Di,0.8664,0.8423,0.8863
+fident,ProstT5,0.8419,0.8155,0.8649
+fident,MMseqs2,0.52,0.4882,0.5477
+bitscore,AlphaFold2,0.9176,0.8959,0.9361
+bitscore,ESM3Di,0.8605,0.8424,0.8766
+bitscore,ProstT5,0.8768,0.859,0.8928
+bitscore,MMseqs2,0.9283,0.9131,0.9414
+E-value,AlphaFold2,0.9114,0.8908,0.9287
+E-value,ESM3Di,0.867,0.8494,0.8822
+E-value,ProstT5,0.8829,0.8655,0.8978
+E-value,MMseqs2,0.9287,0.912,0.9407

@@ -2,7 +2,7 @@
 
 Notebooks that measure how close predicted 3Di is to structure-derived 3Di.
 The two main benchmarks draw their figures with the shared [plotting code](../README.md#shared-plotting)
-and write the per-item results that the [paper figures](../paper/README.md) use.
+and write the per-item results that the [paper figures](../../paper/README.md) use.
 
 ## MetaVR 3Di alignment — [3di_alignment.ipynb](3di_alignment.ipynb)
 

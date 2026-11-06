@@ -1,0 +1,15 @@
+protein,trees,tree,root_to_tip_cv
+GP,X <= 5%,ESM3Di FoldTree,0.07431860864253297
+GP,X <= 5%,ProstT5 FoldTree,0.042833567545144
+GP,all sequences,ESM3Di FoldTree,0.006524104670144361
+GP,all sequences,ProstT5 FoldTree,0.04837995548377069
+GP,one per species,Amino acid (IQ-TREE),0.011601173432149099
+GP,one per species,ESM3Di FoldTree,0.0076487420829695904
+GP,one per species,ProstT5 FoldTree,0.017152461478662426
+NP,X <= 5%,ESM3Di FoldTree,0.01095262758427568
+NP,X <= 5%,ProstT5 FoldTree,0.010564742518835
+NP,all sequences,ESM3Di FoldTree,0.04464620244966865
+NP,all sequences,ProstT5 FoldTree,0.01879664967173741
+NP,one per species,Amino acid (IQ-TREE),0.002401197001963823
+NP,one per species,ESM3Di FoldTree,0.004164076478016344
+NP,one per species,ProstT5 FoldTree,0.002769014613451757

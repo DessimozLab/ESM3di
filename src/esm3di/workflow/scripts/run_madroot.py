@@ -23,6 +23,10 @@ def run_mad_root(treefile, output=None, mad_script=None, log=None):
     )
     if not script.is_file():
         raise FileNotFoundError(f"Python MAD script not found: {script}")
+    # Bio.Phylo recurses once per tree level, and trees of many near-identical
+    # sequences can be as deep as they have tips.
+    ntips = source.read_text().count(",") + 1
+    sys.setrecursionlimit(max(sys.getrecursionlimit(), 10 * ntips + 1000))
     original = Phylo.read(source, "newick")
     tips = Counter(tip.name for tip in original.get_terminals())
     if sum(tips.values()) < 3 or None in tips:

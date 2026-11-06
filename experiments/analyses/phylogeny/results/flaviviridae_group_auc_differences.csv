@@ -1,0 +1,13 @@
+score,difference,AUC difference,CI low,CI high,share > 0
+fident,ESM3Di - ProstT5,0.0245,0.0163,0.0321,1.0
+fident,AlphaFold2 - ESM3Di,0.0243,0.0176,0.032,1.0
+fident,MMseqs2 - ESM3Di,-0.3464,-0.3737,-0.3185,0.0
+fident,MMseqs2 - AlphaFold2,-0.3707,-0.4022,-0.3459,0.0
+bitscore,ESM3Di - ProstT5,-0.0164,-0.0268,-0.0058,0.005
+bitscore,AlphaFold2 - ESM3Di,0.0572,0.0412,0.0747,1.0
+bitscore,MMseqs2 - ESM3Di,0.0679,0.0535,0.0813,1.0
+bitscore,MMseqs2 - AlphaFold2,0.0107,-0.0062,0.0264,0.9
+E-value,ESM3Di - ProstT5,-0.0159,-0.0262,-0.0058,0.005
+E-value,AlphaFold2 - ESM3Di,0.0444,0.0302,0.06,1.0
+E-value,MMseqs2 - ESM3Di,0.0617,0.0477,0.0758,1.0
+E-value,MMseqs2 - AlphaFold2,0.0172,0.0025,0.0334,0.99

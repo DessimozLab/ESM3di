@@ -28,7 +28,7 @@ DATA_DIR = Path(__file__).resolve().parent / "dataset" / "Amarillovirales"
 DEFAULT_CHECKPOINT = REPO_ROOT / "checkpoints/esm3di_from_mlm/epoch_5.pt"
 MODEL_NAME = "Synthyra/ESMplusplus_small"
 MODEL_REVISION = "46c5f7d"
-SEEDS = (17,)
+DEFAULT_SEEDS = (17,)
 WINDOW_OVERLAP = 128
 TOP_K = 10
 TOP_K_TOLERANCE = 5
@@ -111,11 +111,11 @@ def digest_file(path: Path) -> str:
 
 
 def load_or_extract_embeddings(records: list[dict], source: str, checkpoint: Path, cache_dir: Path,
-                               device: str, batch_size: int) -> np.ndarray:
+                               device: str, batch_size: int, adapter: str | None = None) -> np.ndarray:
     from esm3di.inference.windowing import window_ranges, residue_window_size
 
     cache_dir.mkdir(parents=True, exist_ok=True)
-    checkpoint_sha = digest_file(checkpoint) if source == "esm3di" else None
+    checkpoint_sha = (f"adapter:{adapter}" if adapter else digest_file(checkpoint)) if source == "esm3di" else None
     sequence_sha = hashlib.sha256("\n".join(r["sequence"] for r in records).encode()).hexdigest()
     metadata = {
         "source": source,
@@ -135,7 +135,21 @@ def load_or_extract_embeddings(records: list[dict], source: str, checkpoint: Pat
             print(f"Using cached {source} embeddings: {data_path}", flush=True)
             return matrix
 
-    if source == "esm3di":
+    if source == "esm3di" and adapter is not None:
+        from transformers import AutoModel
+        from peft import PeftModel
+
+        base = AutoModel.from_pretrained(MODEL_NAME, revision=MODEL_REVISION, trust_remote_code=True)
+        tokenizer = base.tokenizer
+        model = PeftModel.from_pretrained(base, adapter).to(device).eval()
+
+        def forward(input_ids, attention_mask):
+            out = model(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=True)
+            hs = getattr(out, "hidden_states", None)
+            return hs[-1] if hs is not None else out.last_hidden_state
+
+        max_len = 1024
+    elif source == "esm3di":
         from esm3di._core.checkpoints import load_3di_checkpoint
 
         esm, ckpt = load_3di_checkpoint(str(checkpoint), device=device, hf_revision=MODEL_REVISION)
@@ -151,16 +165,13 @@ def load_or_extract_embeddings(records: list[dict], source: str, checkpoint: Pat
         max_len = int((ckpt.get("args") or {}).get("max_seq_length") or 1024)
     else:
         from transformers import AutoModel
-        from esm3di._core.checkpoints import load_3di_checkpoint
 
-        # Use the ESM++ tokenizer paired with the checkpoint and the stock backbone at its pinned revision.
-        esm, ckpt = load_3di_checkpoint(str(checkpoint), device="cpu", hf_revision=MODEL_REVISION)
-        tokenizer = esm.tokenizer
-        del esm
-        del ckpt
+        # Stock backbone at its pinned revision, with its own paired tokenizer.
         model = AutoModel.from_pretrained(
             MODEL_NAME, revision=MODEL_REVISION, trust_remote_code=True,
-        ).to(device).eval()
+        )
+        tokenizer = model.tokenizer
+        model = model.to(device).eval()
 
         def forward(input_ids, attention_mask):
             output = model(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=True)
@@ -465,8 +476,15 @@ def main():
     parser.add_argument("--threads", type=int, default=min(8, os.cpu_count() or 1))
     parser.add_argument("--embedding-batch-size", type=int, default=4)
     parser.add_argument("--epochs", type=int, default=8)
+    parser.add_argument("--seeds", type=lambda v: tuple(int(x) for x in v.split(",")),
+                        default=DEFAULT_SEEDS, help="comma-separated seeds (default: 17)")
+    parser.add_argument("--adapter", type=str, default=None,
+                        help="HF PEFT adapter dir/repo to use instead of --checkpoint "
+                             "(e.g. the hf_compatible folder of cactuskid13/ESM3di_Small_MLM_3di)")
+    parser.add_argument("--architectures", type=lambda v: tuple(v.split(",")),
+                        default=("ffn", "transformer"))
     args = parser.parse_args()
-    if not args.checkpoint.exists():
+    if args.adapter is None and not args.checkpoint.exists():
         raise FileNotFoundError(args.checkpoint)
     torch.set_num_threads(args.threads)
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -477,7 +495,7 @@ def main():
 
     features = {}
     for source in ("esm3di", "esmpp_base"):
-        features[source] = load_or_extract_embeddings(records, source, args.checkpoint, args.cache_dir, device, args.embedding_batch_size)
+        features[source] = load_or_extract_embeddings(records, source, args.checkpoint, args.cache_dir, device, args.embedding_batch_size, args.adapter)
 
     offsets = np.cumsum([0] + [len(r["sequence"]) for r in records])
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -496,8 +514,8 @@ def main():
     for group in sorted({r["group"] for r in records}):
         test = [i for i, r in enumerate(records) if r["group"] == group]
         for source in ("esm3di", "esmpp_base"):
-            for architecture in ("ffn", "transformer"):
-                for seed in SEEDS:
+            for architecture in args.architectures:
+                for seed in args.seeds:
                     key = (group, source, architecture, seed)
                     needs_predictions = architecture == "ffn" and (group, source, seed) not in prediction_completed
                     if key in completed and not needs_predictions:
@@ -539,8 +557,9 @@ def main():
     summary.to_csv(args.output_dir / "summary.csv", index=False)
     save_figure(summary, args.output_dir)
     (args.output_dir / "run_metadata.json").write_text(json.dumps({
-        "checkpoint": str(args.checkpoint.resolve()), "checkpoint_sha256": digest_file(args.checkpoint),
-        "model": MODEL_NAME, "revision": MODEL_REVISION, "seeds": SEEDS,
+        "checkpoint": (args.adapter or str(args.checkpoint.resolve())),
+        "checkpoint_sha256": (None if args.adapter else digest_file(args.checkpoint)),
+        "model": MODEL_NAME, "revision": MODEL_REVISION, "seeds": list(args.seeds),
         "window_overlap": WINDOW_OVERLAP, "max_model_tokens": 1024,
         "tolerance_ap": "residue-level AP after dilating each positive label by +/- radius",
         "top10_site_recovery": "macro mean per-protein recall among top 10 scores after +/-5 residue nonmaximum suppression; one-to-one +/-5 matching",

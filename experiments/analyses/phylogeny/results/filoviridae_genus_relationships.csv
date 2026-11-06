@@ -1,0 +1,8 @@
+protein,clade,species,ESM3Di FoldTree,ProstT5 FoldTree
+GP,Orthoebolavirus,6,50/50,50/50
+GP,Orthomarburgvirus + Dianlovirus,3,50/50,0/50
+GP,Mammalian clade vs fish-infecting clade,9 vs 5,50/50,50/50
+GP,Thamnovirus,3,50/50,49/50
+NP,Orthoebolavirus,6,50/50,50/50
+NP,Orthoebolavirus + Cuevavirus,7,50/50,50/50
+NP,Mammalian clade vs fish-infecting clade,8 vs 2,50/50,50/50

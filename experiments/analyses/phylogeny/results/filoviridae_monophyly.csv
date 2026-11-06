@@ -1,0 +1,9 @@
+protein,data,tree,tips,monophyletic,species clades,genera not clades
+GP,X <= 5%,ESM3Di FoldTree,417,403/416 (0.9688),7/7,Dianlovirus (+Orthomarburgvirus); Thamnovirus (+Oblavirus)
+GP,X <= 5%,ProstT5 FoldTree,417,403/416 (0.9688),7/7,"Dianlovirus (+Loebevirus, Oblavirus, Orthomarburgvirus, Thamnovirus)"
+GP,deduplicated,ESM3Di FoldTree,550,535/549 (0.9745),6/7,Dianlovirus (+Orthomarburgvirus); Thamnovirus (+Oblavirus)
+GP,deduplicated,ProstT5 FoldTree,550,534/549 (0.9727),5/7,"Dianlovirus (+Loebevirus, Oblavirus, Orthomarburgvirus, Thamnovirus); Orthomarburgvirus (+Dianlovirus, Loebevirus, Oblavirus, Thamnovirus)"
+NP,X <= 5%,ESM3Di FoldTree,373,363/372 (0.9758),7/7,-
+NP,X <= 5%,ProstT5 FoldTree,373,363/372 (0.9758),7/7,-
+NP,deduplicated,ESM3Di FoldTree,499,483/498 (0.9699),6/7,Orthoebolavirus (+Cuevavirus)
+NP,deduplicated,ProstT5 FoldTree,499,476/498 (0.9558),6/7,Orthoebolavirus (+Cuevavirus)

@@ -11,6 +11,7 @@ sizes, colours and export settings:
 from pathlib import Path
 
 import matplotlib as mpl
+import matplotlib.font_manager as fm
 import matplotlib.pyplot as plt
 
 # --- Figure widths (Nature-style column widths) -------------------------------
@@ -88,6 +89,16 @@ def use_pub_style(base_size=7):
         "savefig.facecolor": "white",
         "figure.dpi": 150,
         "figure.facecolor": "white",
+    })
+    # Italics inside $...$ (used for species and family names) must come from the same family as
+    # the rest of the figure; matplotlib's default maths font would silently fall back to DejaVu.
+    family = fm.FontProperties(fname=fm.findfont(
+        fm.FontProperties(family=mpl.rcParams["font.sans-serif"]))).get_name()
+    mpl.rcParams.update({
+        "mathtext.fontset": "custom",
+        "mathtext.rm": family,
+        "mathtext.it": f"{family}:italic",
+        "mathtext.bf": f"{family}:bold",
     })
 
 

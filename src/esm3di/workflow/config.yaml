@@ -2,7 +2,6 @@
 foldseek_path: "foldseek"
 
 # Execution Configurations
-foldseek_threads: 8
 esm3di_threads: 4
 esm3di_gpus: null
 

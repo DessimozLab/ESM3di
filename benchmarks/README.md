@@ -8,8 +8,9 @@ references), separate from the
 |---|---|
 | [quality](quality/README.md) | 3Di accuracy against AF3-derived 3Di on MetaVR (bitscore, identity, random baseline), SCOPe40 viral fold recognition, and the MLM-vs-3Di-only checkpoint comparison |
 | [speed](speed/README.md) | Runtime and throughput of ESM3Di, ProstT5 and ColabFold vs number of sequences and sequence length |
-| [paper](paper/README.md) | Assembled figures for the brief communication (Figure 1 and supplementary figures) |
 | [proteomes](proteomes/README.md) | An archived search-database bundle with incomplete construction provenance |
+
+The assembled figures of the brief communication are in [paper/](../paper/README.md).
 
 Monophyly scoring, large-tree visualization and the MetaVR/SCOPe40 taxonomy
 preparation belong to the
@@ -28,19 +29,20 @@ colour and a panel looks the same wherever it appears:
   (identity/bitscore scatter, identity distributions, SCOPe sensitivity curves,
   runtime curves). Each draws into a given axes from a results table.
 
-Notebooks in `quality/`, `speed/` and `paper/` import both with
-`sys.path.insert(0, "..")`, so run them from their own directory.
+Notebooks in `quality/` and `speed/` import both with `sys.path.insert(0, "..")`, and those in
+[paper/](../paper/README.md) and the phylogeny experiments with the path to this directory, so run them from their
+own directory.
 
 ## Data flow
 
 Each benchmark notebook runs the external tools, writes its per-item results to
 `<benchmark>/results/*.csv` and draws its own figures into
-`<benchmark>/figures/`. The paper notebooks read only those CSVs, so the paper
+`<benchmark>/figures/`. The notebooks in `../paper/` read only those CSVs, so the paper
 figures can be redrawn without rerunning any benchmark:
 
 ```
 quality/3di_alignment.ipynb  -> quality/results/3di_benchmark.csv    --\
-quality/scope_family.ipynb   -> quality/results/scope_sensitivity.csv -+-> paper/*.ipynb -> paper/figure1/, paper/supplementary/
+quality/scope_family.ipynb   -> quality/results/scope_sensitivity.csv -+-> ../paper/*.ipynb -> ../paper/figures/, ../paper/supplementary/
 speed/run_benchmark.py       -> speed/results/*.csv                 --/
 ```
 

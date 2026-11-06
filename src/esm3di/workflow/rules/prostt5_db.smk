@@ -52,7 +52,7 @@ rule foldseek_allvall:
         foldseek=config.get("foldseek_path", "foldseek")
     log:
         "{out_dir}/{dataset}/logs/foldseek_allvall.log"
-    #threads: config.get("foldseek_threads", 8)
+    threads: workflow.cores
     shell:
         """
         mkdir -p {params.tmp_dir}
@@ -62,6 +62,7 @@ rule foldseek_allvall:
             {params.db_prefix} \
             {output.aln} \
             {params.tmp_dir} \
+            --threads {threads} \
             --format-output 'query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits' \
             --exhaustive-search \
             --alignment-type 2 \

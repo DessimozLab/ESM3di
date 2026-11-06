@@ -213,21 +213,22 @@ def load_scope_sensitivity(datapath):
     return pd.concat(tables, ignore_index=True)
 
 
-def plot_scope_level(ax, sensitivity_df, level, show_ylabel=True, show_title=True, table_xy=None):
-    """Cumulative sensitivity-up-to-first-FP curves for one SCOPe level, with an AUC table."""
+def plot_scope_level(ax, sensitivity_df, level, show_ylabel=True, show_title=True, table_xy=None, x_max=1):
+    """Cumulative sensitivity-up-to-first-FP curves for one SCOPe level, with an AUC table. x_max zooms in
+    on the first queries; the AUC stays that of all queries."""
     aucs = {}
     for method in SCOPE_METHODS:
         rows = (sensitivity_df["level"] == level) & (sensitivity_df["method"] == method)
         sensitivity = np.sort(sensitivity_df.loc[rows, "sensitivity"].to_numpy())[::-1]
         fraction = np.arange(1, len(sensitivity) + 1) / len(sensitivity)
         ax.step(np.r_[0, fraction], np.r_[sensitivity[0], sensitivity], where="pre",
-                color=METHOD_COLOURS[method], clip_on=False)
+                color=METHOD_COLOURS[method], clip_on=x_max < 1)
         aucs[method] = sensitivity.mean()
 
-    ax.set_xlim(0, 1)
+    ax.set_xlim(0, x_max)
     ax.set_ylim(0, 1)
     ax.set_box_aspect(1)
-    ax.xaxis.set_major_locator(ticker.MultipleLocator(0.2))
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(x_max / 5))
     ax.yaxis.set_major_locator(ticker.MultipleLocator(0.2))
     ax.set_xlabel("Fraction of queries")
     if show_ylabel:
@@ -429,5 +430,70 @@ def plot_esm3di_runtime_modes(ax, nseq_df, esm3di_cli_df):
                linespacing=1.1)
     label_line(ax, 100, inference.loc[100, "mean"], "ESM3Di\n(inference only)", "esm3di",
                dx=4, dy=-4, va="top", linespacing=1.1)
-    label_line(ax, 1000, prostt5.loc[1000, "mean"], "ProstT5", "prostt5", dx=-3, dy=4, ha="right")
+    label_line(ax, 1000, prostt5.loc[1000, "mean"], "ProstT5\n(end to end)", "prostt5", dx=-3, dy=4, ha="right", linespacing=1.1)
     return {"end to end": end_to_end, "inference only": inference, "ProstT5": prostt5}
+
+
+def plot_runtime_end_to_end_and_inference(ax, nseq_df, esm3di_cli_df):
+    """Runtime vs number of sequences, for a fair comparison of the three methods.
+
+    Timed end to end (full CLI call, including model loading; filled markers) for all methods, and
+    inference only (model already loaded; open markers) where that was measured, which is ESM3Di
+    alone: ProstT5 and ColabFold exist only as CLI calls here. ColabFold ran up to 300 sequences; a
+    power-law fit to its measurements is drawn through them and extrapolated (dashed, no marker, as
+    nothing was measured there) to 10,000 sequences.
+    """
+    end_to_end = runtime_summary(esm3di_cli_df, "esm3di", "num_sequences")
+    inference = runtime_summary(nseq_df, "esm3di", "num_sequences")
+    prostt5 = runtime_summary(nseq_df, "prostt5", "num_sequences")
+    colabfold = runtime_summary(nseq_df, "colabfold", "num_sequences")
+
+    def measured(summary, model, open_marker=False):
+        colour = model_colour(model)
+        ax.plot(summary.index, summary["mean"], color=colour, lw=0.8, zorder=2)
+        marker = dict(MARKER, mfc="white", mec=colour, mew=0.8) if open_marker else MARKER
+        ax.errorbar(summary.index, summary["mean"], yerr=summary["std"].fillna(0), color=colour,
+                    elinewidth=0.6, capsize=0, **marker)
+
+    n = colabfold.index.to_numpy(dtype=float)
+    slope, intercept = np.polyfit(np.log10(n), np.log10(colabfold["mean"]), 1)
+    fit = lambda x: 10 ** intercept * x ** slope
+    x_fit, x_ext = np.array([n.min(), n.max()]), np.array([n.max(), MAX_EXTRAPOLATE_SEQ])
+    ax.plot(x_fit, fit(x_fit), color=model_colour("colabfold"), lw=0.8, zorder=2)
+    ax.plot(x_ext, fit(x_ext), color=model_colour("colabfold"), lw=0.8, ls=(0, (3, 2)), zorder=2)
+    ax.errorbar(n, colabfold["mean"], yerr=colabfold["std"].fillna(0), color=model_colour("colabfold"),
+                elinewidth=0.6, capsize=0, **MARKER)
+    measured(prostt5, "prostt5")
+    measured(end_to_end, "esm3di")
+    measured(inference, "esm3di", open_marker=True)
+
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    use_log_axis(ax.xaxis)
+    use_log_axis(ax.yaxis)
+    ax.set_xlim(6, 1.6e4)
+    ax.set_ylim(0.15, 1e5)
+    ax.yaxis.set_major_locator(ticker.FixedLocator(10.0 ** np.arange(0, 6)))
+    ax.set_box_aspect(1)
+    ax.set_xlabel("Number of sequences")
+    ax.set_ylabel("Runtime (s)")
+
+    # One name per method, in its colour; the key says what the markers mean
+    label_line(ax, 1000, fit(1000), "ColabFold", "colabfold", dx=3, dy=-5, va="top")
+    label_line(ax, 1000, prostt5.loc[1000, "mean"], "ProstT5", "prostt5", dx=-3, dy=4, ha="right")
+    label_line(ax, 1000, inference.loc[1000, "mean"], "ESM3Di", "esm3di", dx=3, dy=-4, va="top")
+
+    # Key: what the markers and the dashed line mean, in neutral grey
+    key_colour = "0.45"
+    ax.legend(
+        handles=[
+            Line2D([], [], color=key_colour, lw=0.8, marker="o", ms=3, mew=0, label="End to end"),
+            Line2D([], [], color=key_colour, lw=0.8, marker="o", ms=3, mfc="white", mec=key_colour, mew=0.8,
+                   label="Inference only"),
+            Line2D([], [], color=key_colour, lw=0.8, ls=(0, (3, 2)), label="Extrapolated"),
+        ],
+        loc="upper left", handlelength=1.6, handletextpad=0.4, borderaxespad=0.2,
+        labelspacing=0.25, fontsize=5.5,
+    )
+    return {"esm3di end to end": end_to_end, "esm3di inference only": inference, "prostt5": prostt5,
+            "colabfold": colabfold, "colabfold extrapolated 10000": fit(MAX_EXTRAPOLATE_SEQ)}
