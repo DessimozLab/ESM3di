@@ -59,6 +59,11 @@ of all 550 unique sequences. Over all 550, the median is 93% within a species, 5
 between genera; these pairs are not shown because the genera are sampled very unevenly, 90% of between-genus pairs being
 *Orthoebolavirus* against *Orthomarburgvirus*.
 
+**Supplementary Fig. 7 | Runtime vs sequence length.** Runtime of ESM3Di and ProstT5 on one A100 GPU for 512 sequences
+per length bin: 32 Swiss-Prot viral proteins of about 100 to 1,000 residues per bin, each repeated 16 times. Mean ± s.d.
+over five repetitions after a warm-up run. Filled markers: end to end, through a CLI call including model loading. Open markers: inference only, with the
+model already loaded (measured for ESM3Di only), as in Fig. 1d.
+
 **Supplementary Table 1 | *Filoviridae* glycoprotein (GP) accessions.** The 2,869 NCBI protein accessions with their species; the accession
 representing each of the 550 unique sequences in the trees; whether that sequence is in the trees without X-rich sequences (at most 5% X, Supplementary Fig. 2); and the
 accessions used as species representatives in Fig. 2a.

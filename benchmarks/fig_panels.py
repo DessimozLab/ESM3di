@@ -266,6 +266,8 @@ MODEL_REPEATS = {
     "prostt5": [2, 3, 4, 5, 6],
     "colabfold": [1, 2],
 }
+# ESM3Di end to end vs number of sequences: every call starts a new process, so no warm-up is dropped
+ESM3DI_END_TO_END_REPEATS = [1, 2, 3, 4, 5]
 MAX_EXTRAPOLATE_SEQ = 10_000
 MARKER = dict(marker="o", ms=3.5, mew=0, ls="none", zorder=3)
 
@@ -274,9 +276,11 @@ def model_colour(model):
     return METHOD_COLOURS[MODEL_LABELS[model]]
 
 
-def runtime_summary(df, model, by):
-    """Mean and s.d. of wall time per `by` value for one model (kept repetitions only)."""
-    rows = df[(df["model_name"] == model) & (df["repetition"].isin(MODEL_REPEATS[model]))]
+def runtime_summary(df, model, by, repetitions=None):
+    """Mean and s.d. of wall time per `by` value for one model, over `repetitions` (default: the
+    kept repetitions of that model in MODEL_REPEATS)."""
+    repetitions = MODEL_REPEATS[model] if repetitions is None else repetitions
+    rows = df[(df["model_name"] == model) & (df["repetition"].isin(repetitions))]
     return (
         rows.groupby(by)["wall_time_seconds"]
         .agg(mean="mean", std="std")
@@ -364,19 +368,25 @@ def plot_runtime_vs_nseq(ax, nseq_df, title=None):
     return summaries
 
 
+def length_summary(length_df, model):
+    """Mean and s.d. of wall time per length bin for one model (kept repetitions only), with the
+    bin's mean sequence length, sorted by length."""
+    rows = length_df[(length_df["model_name"] == model)
+                     & (length_df["repetition"].isin(MODEL_REPEATS[model]))]
+    return (
+        rows.assign(seq_length=rows["total_residues"] / rows["num_sequences"])
+        .groupby("dataset_name")
+        .agg(mean=("wall_time_seconds", "mean"), std=("wall_time_seconds", "std"),
+             seq_length=("seq_length", "mean"))
+        .sort_values("seq_length")
+    )
+
+
 def plot_runtime_vs_length(ax, length_df, models, log_y, title=None):
     """Runtime vs sequence length (one point per length bin, mean ± s.d. over repetitions)."""
-    length_df = length_df.assign(seq_length=length_df["total_residues"] / length_df["num_sequences"])
     curves = {}
     for model in models:
-        rows = length_df[(length_df["model_name"] == model)
-                         & (length_df["repetition"].isin(MODEL_REPEATS[model]))]
-        summary = (
-            rows.groupby("dataset_name")
-            .agg(mean=("wall_time_seconds", "mean"), std=("wall_time_seconds", "std"),
-                 seq_length=("seq_length", "mean"))
-            .sort_values("seq_length")
-        )
+        summary = length_summary(length_df, model)
         ax.plot(summary["seq_length"], summary["mean"], color=model_colour(model), zorder=2)
         ax.errorbar(summary["seq_length"], summary["mean"], yerr=summary["std"].fillna(0),
                     color=model_colour(model), elinewidth=0.6, capsize=0, **MARKER)
@@ -397,12 +407,58 @@ def plot_runtime_vs_length(ax, length_df, models, log_y, title=None):
     return curves
 
 
+def plot_runtime_vs_length_end_to_end_and_inference(ax, length_df, esm3di_cli_length_df):
+    """Runtime vs sequence length (512 sequences per bin), marked as in Figure 1d.
+
+    Timed end to end (full CLI call, including model loading; filled markers) for ProstT5 and
+    ESM3Di, and inference only (model already loaded; open markers) for ESM3Di. `length_df` holds
+    ESM3Di inference only and ProstT5; `esm3di_cli_length_df` ESM3Di end to end.
+    """
+    curves = {
+        "prostt5": length_summary(length_df, "prostt5"),
+        "esm3di end to end": length_summary(esm3di_cli_length_df, "esm3di"),
+        "esm3di inference only": length_summary(length_df, "esm3di"),
+    }
+    for name, summary in curves.items():
+        model = name.split()[0]
+        colour = model_colour(model)
+        marker = dict(MARKER, mfc="white", mec=colour, mew=0.8) if "inference" in name else MARKER
+        ax.plot(summary["seq_length"], summary["mean"], color=colour, lw=0.8, zorder=2)
+        ax.errorbar(summary["seq_length"], summary["mean"], yerr=summary["std"].fillna(0),
+                    color=colour, elinewidth=0.6, capsize=0, **marker)
+
+    ax.set_xlim(0, 1050)
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(200))
+    ax.set_ylim(0, None)
+    ax.set_box_aspect(1)
+    ax.set_xlabel("Sequence length (residues)")
+    ax.set_ylabel("Runtime (s)")
+
+    # One name per method, in its colour; the key says what the markers mean
+    point = curves["prostt5"].iloc[6]
+    label_line(ax, point["seq_length"], point["mean"], "ProstT5", "prostt5", dx=-3, dy=3, ha="right")
+    point = curves["esm3di inference only"].iloc[6]
+    label_line(ax, point["seq_length"], point["mean"], "ESM3Di", "esm3di", dx=3, dy=-4, va="top")
+
+    key_colour = "0.45"
+    ax.legend(
+        handles=[
+            Line2D([], [], color=key_colour, lw=0.8, marker="o", ms=3, mew=0, label="End to end"),
+            Line2D([], [], color=key_colour, lw=0.8, marker="o", ms=3, mfc="white", mec=key_colour, mew=0.8,
+                   label="Inference only"),
+        ],
+        loc="upper left", handlelength=1.6, handletextpad=0.4, borderaxespad=0.2,
+        labelspacing=0.25, fontsize=5.5,
+    )
+    return curves
+
+
 def plot_esm3di_runtime_modes(ax, nseq_df, esm3di_cli_df):
     """ESM3Di runtime vs number of sequences, timed end to end (CLI call, including model
     loading; filled markers) and inference only (model already loaded; open markers), with
     ProstT5 (always end to end) as a thin reference line. Measured means connected."""
     colour = model_colour("esm3di")
-    end_to_end = runtime_summary(esm3di_cli_df, "esm3di", "num_sequences")
+    end_to_end = runtime_summary(esm3di_cli_df, "esm3di", "num_sequences", ESM3DI_END_TO_END_REPEATS)
     inference = runtime_summary(nseq_df, "esm3di", "num_sequences")
     prostt5 = runtime_summary(nseq_df, "prostt5", "num_sequences")
 
@@ -443,7 +499,7 @@ def plot_runtime_end_to_end_and_inference(ax, nseq_df, esm3di_cli_df):
     power-law fit to its measurements is drawn through them and extrapolated (dashed, no marker, as
     nothing was measured there) to 10,000 sequences.
     """
-    end_to_end = runtime_summary(esm3di_cli_df, "esm3di", "num_sequences")
+    end_to_end = runtime_summary(esm3di_cli_df, "esm3di", "num_sequences", ESM3DI_END_TO_END_REPEATS)
     inference = runtime_summary(nseq_df, "esm3di", "num_sequences")
     prostt5 = runtime_summary(nseq_df, "prostt5", "num_sequences")
     colabfold = runtime_summary(nseq_df, "colabfold", "num_sequences")

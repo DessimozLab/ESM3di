@@ -14,7 +14,7 @@ Swiss-Prot proteins.
 
 The ESM3Di runner loads the model once and times `predict_fasta` (inference
 only). ProstT5 and ColabFold are timed as full CLI calls, so they include
-model loading. The ESM3Di end-to-end timings in `final_nseq_esm3di_cli.csv`
+model loading. The ESM3Di end-to-end timings in `final2_nseq_esm3di_cli.csv`
 come from the runner's `_run_inference_cli` method, which calls `esm3di
 predict`; `run_benchmark.py` has no option for it, so it has to be swapped in
 for `_run_inference` by hand.
@@ -23,13 +23,15 @@ for `_run_inference` by hand.
 
 | CSV | Models | Input | Used by |
 |---|---|---|---|
-| `final_nseq.csv` | ESM3Di (inference only), ProstT5, ColabFold | 10–10,000 sequences (ColabFold up to 300) | `plot_results.ipynb`, Figure 1d |
-| `final_nseq_esm3di_cli.csv` | ESM3Di end to end | 10–10,000 sequences | `plot_results.ipynb`, Figure 1d |
+| `final2_nseq.csv` | ESM3Di (inference only), ProstT5, ColabFold | 10–10,000 sequences (ColabFold up to 300; its rows are carried over from `final_nseq.csv`, run on the earlier subsets) | `plot_results.ipynb`, Figure 1d |
+| `final2_nseq_esm3di_cli.csv` | ESM3Di end to end | 10–10,000 sequences | `plot_results.ipynb`, Figure 1d |
 | `final_length_bins.csv` | all three | 32 sequences per length bin | `plot_results.ipynb` |
-| `final_length_bins_plms.csv` | ESM3Di, ProstT5 | length bins upsampled to 512 sequences | `plot_results.ipynb` |
-| `final_nseq_plms.csv`, `new_nseq_esm3di_cli.csv`, `test_nseq_esm3di_cli.csv` | ESM3Di (and ProstT5) | 10–10,000 sequences | not plotted; earlier or repeated runs |
+| `final2_length_bins_plms.csv` | ESM3Di (inference only), ProstT5 | length bins upsampled to 512 sequences | `plot_results.ipynb`, Supplementary Fig. 7 |
+| `final_length_bins_esm3di_cli.csv` | ESM3Di end to end | length bins upsampled to 512 sequences | `plot_results.ipynb`, Supplementary Fig. 7 |
+| `final_length_bins_plms.csv` | ESM3Di (inference only), ProstT5 | length bins upsampled to 512 sequences | not plotted; earlier run, replaced by `final2_length_bins_plms.csv` |
+| `final_nseq.csv`, `final_nseq_esm3di_cli.csv`, `final_nseq_plms.csv`, `new_nseq_esm3di_cli.csv`, `test_nseq_esm3di_cli.csv` | ESM3Di (and ProstT5) | 10–10,000 sequences | not plotted; earlier or repeated runs |
 
-The plots drop the first repetition of ESM3Di and ProstT5 as warm-up.
+The plots drop the first repetition of ESM3Di and ProstT5 as warm-up, except for ESM3Di end to end against the number of sequences (`final2_nseq_esm3di_cli.csv`), which averages all 5 repetitions.
 
 ## Running
 
