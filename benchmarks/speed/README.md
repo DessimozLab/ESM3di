@@ -26,8 +26,8 @@ for `_run_inference` by hand.
 | `final2_nseq.csv` | ESM3Di (inference only), ProstT5, ColabFold | 10–10,000 sequences (ColabFold up to 300; its rows are carried over from `final_nseq.csv`, run on the earlier subsets) | `plot_results.ipynb`, Figure 1d |
 | `final2_nseq_esm3di_cli.csv` | ESM3Di end to end | 10–10,000 sequences | `plot_results.ipynb`, Figure 1d |
 | `final_length_bins.csv` | all three | 32 sequences per length bin | `plot_results.ipynb` |
-| `final2_length_bins_plms.csv` | ESM3Di (inference only), ProstT5 | length bins upsampled to 512 sequences | `plot_results.ipynb`, Supplementary Fig. 7 |
-| `final_length_bins_esm3di_cli.csv` | ESM3Di end to end | length bins upsampled to 512 sequences | `plot_results.ipynb`, Supplementary Fig. 7 |
+| `final2_length_bins_plms.csv` | ESM3Di (inference only), ProstT5 | length bins upsampled to 512 sequences | `plot_results.ipynb`, Supplementary Fig. 3 |
+| `final_length_bins_esm3di_cli.csv` | ESM3Di end to end | length bins upsampled to 512 sequences | `plot_results.ipynb`, Supplementary Fig. 3 |
 | `final_length_bins_plms.csv` | ESM3Di (inference only), ProstT5 | length bins upsampled to 512 sequences | not plotted; earlier run, replaced by `final2_length_bins_plms.csv` |
 | `final_nseq.csv`, `final_nseq_esm3di_cli.csv`, `final_nseq_plms.csv`, `new_nseq_esm3di_cli.csv`, `test_nseq_esm3di_cli.csv` | ESM3Di (and ProstT5) | 10–10,000 sequences | not plotted; earlier or repeated runs |
 

@@ -331,26 +331,37 @@ def column_header(ax, x, y, text, width_mm, rule_above=False):
     ax.add_line(Line2D((x, x + width_mm), (rule_y, rule_y), color=MUTED_TEXT, linewidth=0.4, solid_capstyle="butt"))
 
 
+def score_table(columns, rows):
+    """A table for draw_score_table. columns: (name of the score, "higher" or "lower" as the better direction, number
+    format); rows: (name of the tree, score, ...), with numeric scores. The best score of each column is set in bold."""
+    best = [(max if direction == "higher" else min)(row[i + 1] for row in rows) for i, (_, direction, _) in enumerate(columns)]
+    return dict(columns=tuple(name for name, _, _ in columns),
+                rows=[(row[0], *(format(value, number) for value, (_, _, number) in zip(row[1:], columns))) for row in rows],
+                bold=[tuple(value == top for value, top in zip(row[1:], best)) for row in rows])
+
+
 def score_table_geometry(table):
     """The column widths of a score table, and its total width and height (mm)."""
     names = max(text_width_mm(row[0]) for row in table["rows"])
-    widths = [max(text_width_mm(line[i + 1]) for line in (("", *table["columns"]), *table["rows"]))
+    widths = [max(text_width_mm(table["columns"][i]),
+                  *(text_width_mm(row[i + 1], fontweight="bold") for row in table["rows"]))
               for i in range(len(table["columns"]))]
     width = names + sum(widths) + SCORE_TABLE_GAP_MM * len(widths)
     return names, widths, width, (1 + len(table["rows"])) * SCORE_TABLE_ROW_MM
 
 
 def draw_score_table(ax, table, x, y):
-    """A table with its top left corner at (x, y), in an axes with data units in mm from the top left. ``table`` has
-    columns (the names of the scores) and rows ((name of the tree, score, ...)); the scores are right-aligned."""
+    """A table from score_table with its top left corner at (x, y), in an axes with data units in mm from the top left:
+    the names of the scores above the scores, which are right-aligned."""
     names, widths, _, _ = score_table_geometry(table)
-    for r, row in enumerate((("", *table["columns"]), *table["rows"])):
+    for r, (row, bold) in enumerate(zip((("", *table["columns"]), *table["rows"]), ([False] * len(widths), *table["bold"]))):
         row_y = y + (r + 0.5) * SCORE_TABLE_ROW_MM
         ax.text(x, row_y, row[0], fontsize=LEGEND_FONT, color=MUTED_TEXT, va="center")
         right = x + names
-        for value, width in zip(row[1:], widths):
+        for value, width, is_bold in zip(row[1:], widths, bold):
             right += SCORE_TABLE_GAP_MM + width
-            ax.text(right, row_y, value, fontsize=LEGEND_FONT, color=MUTED_TEXT, va="center", ha="right")
+            ax.text(right, row_y, value, fontsize=LEGEND_FONT, color=MUTED_TEXT, va="center", ha="right",
+                    fontweight="bold" if is_bold else "normal")
 
 
 def rich_text(ax, x, y, parts, **common):
