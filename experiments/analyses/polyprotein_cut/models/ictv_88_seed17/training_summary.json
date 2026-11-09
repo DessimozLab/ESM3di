@@ -1,0 +1,9 @@
+{
+  "training_manifest_sha256": "0045301b2c489075ba07fb3eb2edab815ac99d9053660fcf567feb600b2a5b57",
+  "ffn_checkpoint_sha256": "b9cd30ed0aa6244d21dc83c168bce3498fd005b6fb8d8816130e017ecc6a08d6",
+  "transformer_checkpoint_sha256": "9e821e0fb92bd83e99942678e823c379d2f8bfc5cb939f017b44b287a563ce32",
+  "n_records": 88,
+  "n_residues": 295297,
+  "n_positive_sites": 805,
+  "n_excluded_unlabelled_entries": 35
+}

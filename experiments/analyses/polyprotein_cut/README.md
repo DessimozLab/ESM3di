@@ -5,7 +5,7 @@
 ## Experiment
 
 - **Embeddings:** ESM3Di from `checkpoints/esm3di_from_mlm/epoch_5.pt` versus stock `Synthyra/ESMplusplus_small` at revision `46c5f7d`. The historical checkpoint name is misleading: it was not initialized from MLM weights.
-- **Labels and sequences:** exact protein sequences from the four ICTV flat files, with cut positions parsed by the notebook's original rule (`FT SITE` annotated `/note="Cleavage"`, using the first residue of each range). Only proteins with parsed cleavage labels are included.
+- **Labels and sequences:** exact protein sequences from the four ICTV flat files, with cut positions parsed from `FT SITE` features annotated `/note="Cleavage"`, using the first residue of each feature. Only proteins with parsed cleavage labels are included.
 - **Outer evaluation:** leave one group out across Hepacivirus, Orthoflavivirus, Pegivirus, and Pestivirus. Hyperparameters are fixed before the outer evaluation; no held-out group is used for model selection.
 - **Heads:** the same FFN and sequence Transformer are trained on each representation, with the same fixed random seed (17) for each paired run and eight epochs. The Transformer head is trained on 512-residue chunks with 64-residue overlap; overlap supplies context while its labels are masked from duplicate loss.
 - **Metrics:** ROC AUC, strict residue-level AP, residue-level AP after expanding labels by ±2 and ±5 residues, and macro per-protein top-10 site recovery with non-maximum suppression and one-to-one matching within ±5 residues.
@@ -15,7 +15,38 @@ The summary has one row per held-out group, embedding source, and head. `seed_me
 
 ## Data audit
 
-The former notebook evaluated 231 alignment rows, including repeated protein identifiers and proteins with no parsed cleavage annotations; missing annotations had been converted to all-negative masks. This comparison uses the 86 unique ICTV records with parsed cleavage labels instead. Under the existing label parser these contain 800 unique positive sites and 287,411 residues. This changes the evaluation set from the historical notebook results, which should not be compared directly.
+The former notebook evaluated 231 alignment rows, including repeated protein identifiers and proteins with no parsed cleavage annotations; missing annotations had been converted to all-negative masks. This comparison uses the 86 unique ICTV records with parsed cleavage labels instead. These contain 803 unique positive sites and 287,411 residues. The parser now includes single-residue `SITE` features as well as ranged features; the saved comparison results were generated before that correction and contain 800 positive sites. Rerun the comparison before interpreting or comparing its saved metrics.
+
+## Curated all-data retraining
+
+`train_all_data.py` trains fresh FFN and Transformer heads from the current
+ESM3Di checkpoint on the 86 ICTV records plus the two additional Pestivirus
+entries with explicit `SITE /note="Cleavage"` annotations. This is a new,
+curated 88-record baseline, not a reconstruction of the released 231-record
+training set; the original training records and recipe are unavailable.
+
+The other 35 additional Hepacivirus and Orthoflavivirus entries have no
+explicit cleavage `SITE` annotation and are excluded rather than assigned
+negative labels or inferred from `CHAIN` boundaries. The two added Pestivirus
+sites are at residue 497; one has no evidence qualifier and one is supported
+by sequence similarity (`ECO:0000250`). The training manifest records source
+file hashes, per-sequence hashes, labels, exclusions, and model settings.
+Training outputs go to a new directory and do not overwrite the released
+heads.
+
+```bash
+PYTHONPATH=src CUDA_VISIBLE_DEVICES=0 \
+  /home/dmoi/.venvs/esm3di-blackwell/bin/python \
+  experiments/analyses/polyprotein_cut/train_all_data.py --dry-run
+
+PYTHONPATH=src CUDA_VISIBLE_DEVICES=0 \
+  /home/dmoi/.venvs/esm3di-blackwell/bin/python \
+  experiments/analyses/polyprotein_cut/train_all_data.py
+```
+
+By default, the retrained checkpoints and manifest are written to
+`models/ictv_88_seed17/`. The command refuses to overwrite an existing output
+directory; pass a new `--output-dir` to create another run.
 
 ## Running
 

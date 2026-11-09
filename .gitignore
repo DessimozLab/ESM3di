@@ -88,6 +88,10 @@ ckp/
 data/
 *.json
 !configs/**/*.json
+# Keep the reproducible curated cut-site retraining deliverables visible.
+!experiments/analyses/polyprotein_cut/models/ictv_88_seed17/
+!experiments/analyses/polyprotein_cut/models/ictv_88_seed17/*.pt
+!experiments/analyses/polyprotein_cut/models/ictv_88_seed17/*.json
 
 # Logs
 *.log

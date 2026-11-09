@@ -1,0 +1,2091 @@
+{
+  "dataset": "curated ICTV cut-site records plus explicitly annotated entry records",
+  "label_rule": "UniProt SITE feature with note=Cleavage; use feature start as 1-based cut position",
+  "unlabelled_entry_policy": "exclude entries without an explicit cleavage SITE annotation",
+  "records": [
+    {
+      "identifier": "A0A097NZA3_9FLAV",
+      "accession": "A0A097NZA3",
+      "group": "Hepacivirus-CHH",
+      "sequence_length": 2991,
+      "sequence_sha256": "f125e3a904d589cea947a9d4277f25ab03868e1471be184a38584f91171d222d",
+      "cleavage_sites_1based": [
+        198,
+        253,
+        449,
+        721,
+        776,
+        975,
+        1599,
+        1653,
+        1906,
+        2408
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Hepacivirus-CHH/hpraise_hepacivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0A097NZB6_9FLAV",
+      "accession": "A0A097NZB6",
+      "group": "Hepacivirus-CHH",
+      "sequence_length": 2855,
+      "sequence_sha256": "0fec1070cfb06b986906e53f7a14b5119b1daa6d200a1a5b3de461720dfbf3fe",
+      "cleavage_sites_1based": [
+        151,
+        185,
+        381,
+        653,
+        710,
+        906,
+        1529,
+        1587,
+        1826,
+        2275
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Hepacivirus-CHH/hpraise_hepacivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0A0B5HK21_9FLAV",
+      "accession": "A0A0B5HK21",
+      "group": "Hepacivirus-CHH",
+      "sequence_length": 2942,
+      "sequence_sha256": "14f484a5a8bf88037af93d001c1b09e39c62af020af893afa6e61c9917737ad0",
+      "cleavage_sites_1based": [
+        191,
+        205,
+        391,
+        726,
+        789,
+        1006,
+        1637,
+        1691,
+        1948,
+        2354
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Hepacivirus-CHH/hpraise_hepacivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0A0F7JH93_9FLAV",
+      "accession": "A0A0F7JH93",
+      "group": "Hepacivirus-CHH",
+      "sequence_length": 2779,
+      "sequence_sha256": "298eb7882516eca656956c06063b16aff1ccd6eb9f22f986dd1c9375a36e3e36",
+      "cleavage_sites_1based": [
+        144,
+        164,
+        347,
+        612,
+        674,
+        876,
+        1503,
+        1554,
+        1804,
+        2200
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Hepacivirus-CHH/hpraise_hepacivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0A247ZNN0_9FLAV",
+      "accession": "A0A247ZNN0",
+      "group": "Hepacivirus-CHH",
+      "sequence_length": 2958,
+      "sequence_sha256": "9a3fe9bb2536ce3083f5e7e666fac7d4493359efe8bad527359599e04a580274",
+      "cleavage_sites_1based": [
+        165,
+        220,
+        416,
+        688,
+        743,
+        942,
+        1566,
+        1620,
+        1873,
+        2375
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Hepacivirus-CHH/hpraise_hepacivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A8QPD9_9HEPC",
+      "accession": "A8QPD9",
+      "group": "Hepacivirus-CHH",
+      "sequence_length": 3013,
+      "sequence_sha256": "2d1e33ceab2d76ce037f85699e3c1e864e543089292bcb0cb57db2004d720463",
+      "cleavage_sites_1based": [
+        177,
+        191,
+        383,
+        750,
+        813,
+        1030,
+        1661,
+        1715,
+        1976,
+        2422
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Hepacivirus-CHH/hpraise_hepacivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "D6P446_HCVED",
+      "accession": "D6P446",
+      "group": "Hepacivirus-CHH",
+      "sequence_length": 3008,
+      "sequence_sha256": "7337eea0b9ba3a2f6760f1c103c0cdcc73e5b5e0468b84c8e2248df676378624",
+      "cleavage_sites_1based": [
+        177,
+        191,
+        383,
+        746,
+        809,
+        1026,
+        1657,
+        1711,
+        1972,
+        2417
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Hepacivirus-CHH/hpraise_hepacivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "M9UVS3_9FLAV",
+      "accession": "M9UVS3",
+      "group": "Hepacivirus-CHH",
+      "sequence_length": 2748,
+      "sequence_sha256": "8c43f94f40f9e5c356c6fcac10b8a2e859077d01d13430335b07c6ae1834cd5d",
+      "cleavage_sites_1based": [
+        155,
+        169,
+        353,
+        632,
+        687,
+        885,
+        1509,
+        1564,
+        1811,
+        2165
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Hepacivirus-CHH/hpraise_hepacivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "M9ZRW5_9FLAV",
+      "accession": "M9ZRW5",
+      "group": "Hepacivirus-CHH",
+      "sequence_length": 2901,
+      "sequence_sha256": "b6735ea919cc487dbc447686a156a0c7f23dad9db7645b7d285f53e46c5c9db2",
+      "cleavage_sites_1based": [
+        147,
+        162,
+        363,
+        627,
+        690,
+        900,
+        1528,
+        1586,
+        1849,
+        2304
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Hepacivirus-CHH/hpraise_hepacivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "M9ZZL8_9FLAV",
+      "accession": "M9ZZL8",
+      "group": "Hepacivirus-CHH",
+      "sequence_length": 3024,
+      "sequence_sha256": "8a08cdb4f52889cc0b09a77231ece8ebd5f3f89020896d5e1965f500162a2ffb",
+      "cleavage_sites_1based": [
+        177,
+        194,
+        382,
+        708,
+        771,
+        988,
+        1616,
+        1672,
+        1930,
+        2433
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Hepacivirus-CHH/hpraise_hepacivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "N0A109_9FLAV",
+      "accession": "N0A109",
+      "group": "Hepacivirus-CHH",
+      "sequence_length": 2971,
+      "sequence_sha256": "d8d5e3d7b03f37c47dd5cc611ff3abb2c266f267f07b4a835bf0456e039fcc9d",
+      "cleavage_sites_1based": [
+        177,
+        193,
+        381,
+        703,
+        766,
+        983,
+        1611,
+        1666,
+        1926,
+        2381
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Hepacivirus-CHH/hpraise_hepacivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "R9QT72_9FLAV",
+      "accession": "R9QT72",
+      "group": "Hepacivirus-CHH",
+      "sequence_length": 2781,
+      "sequence_sha256": "2d7d08fe2ed4286b5a7d0223027d741dd92055727a15935b41823ea91043d488",
+      "cleavage_sites_1based": [
+        161,
+        180,
+        368,
+        623,
+        679,
+        881,
+        1506,
+        1559,
+        1810,
+        2195
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Hepacivirus-CHH/hpraise_hepacivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "R9QTE4_9FLAV",
+      "accession": "R9QTE4",
+      "group": "Hepacivirus-CHH",
+      "sequence_length": 3014,
+      "sequence_sha256": "ac25cd83a501a8b67cd68e0499195417a0ffd876dc68517e7468780b7554dfa6",
+      "cleavage_sites_1based": [
+        151,
+        169,
+        348,
+        635,
+        701,
+        915,
+        1541,
+        1598,
+        1861,
+        2411
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Hepacivirus-CHH/hpraise_hepacivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "R9QTQ6_9FLAV",
+      "accession": "R9QTQ6",
+      "group": "Hepacivirus-CHH",
+      "sequence_length": 2855,
+      "sequence_sha256": "7777f81e8f89cc157852db62a51a6a4ad3183b8720e3cf0dfeb647b2f1cbc662",
+      "cleavage_sites_1based": [
+        133,
+        147,
+        332,
+        613,
+        667,
+        866,
+        1490,
+        1545,
+        1795,
+        2271
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Hepacivirus-CHH/hpraise_hepacivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "S5E367_9FLAV",
+      "accession": "S5E367",
+      "group": "Hepacivirus-CHH",
+      "sequence_length": 3335,
+      "sequence_sha256": "8f21685500dd57ef5b7319d090bda16be392db04b9d6b4623202c86830cd8d17",
+      "cleavage_sites_1based": [
+        169,
+        203,
+        391,
+        654,
+        712,
+        927,
+        1553,
+        1613,
+        1865,
+        2745
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Hepacivirus-CHH/hpraise_hepacivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A1BQD2_9FLAV",
+      "accession": "A1BQD2",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3430,
+      "sequence_sha256": "52d95b950d703a0dd98a23f86d848bfe167e314ecfa5985d1009da8c16c6e61f",
+      "cleavage_sites_1based": [
+        103,
+        121,
+        213,
+        288,
+        789,
+        1141,
+        1368,
+        1499,
+        2117,
+        2243,
+        2266,
+        2524
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0A0C4PNF2_9FLAV",
+      "accession": "A0A0C4PNF2",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3427,
+      "sequence_sha256": "5761b70c05f0f65bf34d82790caa33cb4adc760ce6cf9d24c67905c1fccee8b2",
+      "cleavage_sites_1based": [
+        104,
+        121,
+        213,
+        288,
+        789,
+        1141,
+        1368,
+        1499,
+        2118,
+        2244,
+        2267,
+        2522
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "K0BRZ6_9FLAV",
+      "accession": "K0BRZ6",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3427,
+      "sequence_sha256": "cb8e1e02ea4cef5d96aee114f5ffb8ad7b203fe545d65364851f07e4914b3074",
+      "cleavage_sites_1based": [
+        104,
+        120,
+        214,
+        289,
+        790,
+        1142,
+        1369,
+        1500,
+        2119,
+        2245,
+        2268,
+        2522
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "Q32ZD1_9FLAV",
+      "accession": "Q32ZD1",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3426,
+      "sequence_sha256": "b9faf9d705588beb6552aa9832442363b926b52d9087c4b8e82474e623e60a1f",
+      "cleavage_sites_1based": [
+        104,
+        122,
+        214,
+        289,
+        790,
+        1142,
+        1369,
+        1500,
+        2119,
+        2245,
+        2268,
+        2521
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "Q7T918_9FLAV",
+      "accession": "Q7T918",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3425,
+      "sequence_sha256": "57b98a95af90fa88367e29ec0d224e2b0e9c0fa76f56acab72cf13f05ed0aeb4",
+      "cleavage_sites_1based": [
+        109,
+        128,
+        221,
+        296,
+        1139,
+        1366,
+        1496,
+        2116,
+        2242,
+        2265,
+        2519
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0A2H4GY08_ZIKV",
+      "accession": "A0A2H4GY08",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3423,
+      "sequence_sha256": "f7112e12cb5300885b8da05f3f5be4b67185cbb166db12cbfab9ccc406dd57ca",
+      "cleavage_sites_1based": [
+        104,
+        122,
+        215,
+        290,
+        794,
+        1146,
+        1372,
+        1502,
+        2119,
+        2246,
+        2269,
+        2520
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0AA97PZD4_ZIKV",
+      "accession": "A0AA97PZD4",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3423,
+      "sequence_sha256": "51c241f370df30e0ec24cc7111a9fe291c003993cdecec0065f4bc6f8939b087",
+      "cleavage_sites_1based": [
+        104,
+        122,
+        215,
+        290,
+        794,
+        1146,
+        1372,
+        1502,
+        2119,
+        2246,
+        2269,
+        2520
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0EKU7_9FLAV",
+      "accession": "A0EKU7",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3422,
+      "sequence_sha256": "4210d37e97428e4181c8a7ed5841c95f440ef2d8d06fc27f9cbad38e59b1d846",
+      "cleavage_sites_1based": [
+        93,
+        113,
+        201,
+        276,
+        768,
+        1355,
+        1487,
+        2109,
+        2236,
+        2259,
+        2516
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "W5VK97_9FLAV",
+      "accession": "W5VK97",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3422,
+      "sequence_sha256": "303a489077c6eb084f6ed756338fe25a51fe6839426a9667cb8e2266811eb80c",
+      "cleavage_sites_1based": [
+        94,
+        114,
+        202,
+        277,
+        769,
+        1356,
+        1488,
+        2110,
+        2237,
+        2260,
+        2516
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0EKU1_9FLAV",
+      "accession": "A0EKU1",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3421,
+      "sequence_sha256": "63572d3bf050cd50b329b9739bc0d36dfc5072e13242e3b31a2693656006d1b6",
+      "cleavage_sites_1based": [
+        93,
+        108,
+        201,
+        276,
+        768,
+        1353,
+        1485,
+        2107,
+        2234,
+        2257,
+        2515
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0EKU6_9FLAV",
+      "accession": "A0EKU6",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3417,
+      "sequence_sha256": "71c225f1ba22aabc0eab526531c4f0c4f05f34870438049c6158811bac4d496a",
+      "cleavage_sites_1based": [
+        96,
+        116,
+        205,
+        281,
+        777,
+        1360,
+        1491,
+        2112,
+        2238,
+        2261,
+        2514
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0EKU2_9FLAV",
+      "accession": "A0EKU2",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3416,
+      "sequence_sha256": "f9f3fe79be1dd21620097f56744dbf4bf2def20584582f58f4b6d22180e0ea18",
+      "cleavage_sites_1based": [
+        96,
+        116,
+        205,
+        280,
+        777,
+        1360,
+        1491,
+        2112,
+        2238,
+        2261,
+        2513
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "Q8VBK7_9FLAV",
+      "accession": "Q8VBK7",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3415,
+      "sequence_sha256": "7e5cd226558757bde48ffcbc511276dce2e35e6f2b15e959a9164cf98acad434",
+      "cleavage_sites_1based": [
+        94,
+        114,
+        203,
+        278,
+        775,
+        1128,
+        1358,
+        1489,
+        2111,
+        2237,
+        2260,
+        2512
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0EKU8_9FLAV",
+      "accession": "A0EKU8",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3414,
+      "sequence_sha256": "a6b14f31c5f1d1924f52e2acbe032ee9fb1466a69f60eee2789782c4f2cd6af7",
+      "cleavage_sites_1based": [
+        96,
+        116,
+        205,
+        280,
+        776,
+        1128,
+        1358,
+        1488,
+        2110,
+        2236,
+        2259,
+        2511
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "Q9DUT7_9FLAV",
+      "accession": "Q9DUT7",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3414,
+      "sequence_sha256": "3f30a87e73208d8266109fc7077403c2fdbda7923768b381a1b116cdf412378a",
+      "cleavage_sites_1based": [
+        96,
+        117,
+        205,
+        280,
+        776,
+        1128,
+        1358,
+        1489,
+        2110,
+        2236,
+        2259,
+        2511
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "Q9IG40_9FLAV",
+      "accession": "Q9IG40",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3414,
+      "sequence_sha256": "e4aa244e7352facf5e15b1eeecc16424b62f0c0ee9489e1d775af640b32fa7a9",
+      "cleavage_sites_1based": [
+        96,
+        117,
+        205,
+        280,
+        776,
+        1128,
+        1358,
+        1489,
+        2110,
+        2236,
+        2259,
+        2511
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "Q32ZD9_9FLAV",
+      "accession": "Q32ZD9",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3411,
+      "sequence_sha256": "a1fb2e64129318788f7bc2b90b626867a9024c75848ba22dd5fd6fa8e8be4be8",
+      "cleavage_sites_1based": [
+        102,
+        119,
+        212,
+        287,
+        1357,
+        1487,
+        2107,
+        2233,
+        2256,
+        2505
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "Q32ZD6_9FLAV",
+      "accession": "Q32ZD6",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3408,
+      "sequence_sha256": "0d6e52c5a8c46c4a89e5a19576012164d3539a38c6668af8ecd080a36b8cd19b",
+      "cleavage_sites_1based": [
+        97,
+        114,
+        207,
+        282,
+        1135,
+        1359,
+        1489,
+        2105,
+        2232,
+        2255,
+        2507
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A1Y2M8_9FLAV",
+      "accession": "A1Y2M8",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3405,
+      "sequence_sha256": "ec4b1c25818d7ef5c20bbb85a804e4acb323676e370e061b516eb873f8debff8",
+      "cleavage_sites_1based": [
+        99,
+        114,
+        205,
+        280,
+        1349,
+        1479,
+        2102,
+        2228,
+        2251,
+        2499
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0EKU3_9FLAV",
+      "accession": "A0EKU3",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3404,
+      "sequence_sha256": "b7918d8e8864736202e872ff4573d692c426ff159c58f47abb93778a45981cab",
+      "cleavage_sites_1based": [
+        90,
+        109,
+        197,
+        272,
+        763,
+        1116,
+        1346,
+        1477,
+        2099,
+        2225,
+        2248,
+        2499
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "C8XPB7_9FLAV",
+      "accession": "C8XPB7",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3393,
+      "sequence_sha256": "6474044dc23c573a882004efd4d12ebab71d7cb3fc618fb43ca9698a2832a728",
+      "cleavage_sites_1based": [
+        90,
+        104,
+        197,
+        272,
+        1115,
+        1340,
+        1469,
+        2089,
+        2213,
+        2236,
+        2488
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "O09234_DEN26",
+      "accession": "O09234",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3391,
+      "sequence_sha256": "e1d4229cf47ea2469a041b132f8764d7bf107d4dab3d1111dd8c0a0c9d0c203c",
+      "cleavage_sites_1based": [
+        100,
+        114,
+        205,
+        280,
+        775,
+        1127,
+        1345,
+        1475,
+        2093,
+        2220,
+        2243,
+        2491
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "C8XPA9_9FLAV",
+      "accession": "C8XPA9",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3390,
+      "sequence_sha256": "202447bded8cc6f14075e1bd67e98f668d0eee4e93406f558dfcd291a4407b85",
+      "cleavage_sites_1based": [
+        90,
+        108,
+        197,
+        272,
+        763,
+        1115,
+        1340,
+        1469,
+        2089,
+        2213,
+        2236,
+        2487
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "C8XPB4_9FLAV",
+      "accession": "C8XPB4",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3390,
+      "sequence_sha256": "4c4d64290102e8b63859840d8ec9f9d9427f18968e4160ba268bacf481c4273c",
+      "cleavage_sites_1based": [
+        90,
+        107,
+        196,
+        271,
+        1114,
+        1339,
+        1468,
+        2088,
+        2214,
+        2237,
+        2486
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "C8XPB8_9FLAV",
+      "accession": "C8XPB8",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3390,
+      "sequence_sha256": "373da94e56d5e59e986efb2152d7cbc86f1ab819497948c5e958703426bc29cb",
+      "cleavage_sites_1based": [
+        90,
+        107,
+        196,
+        271,
+        1114,
+        1339,
+        1468,
+        2088,
+        2214,
+        2237,
+        2486
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "C8XPB9_9FLAV",
+      "accession": "C8XPB9",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3390,
+      "sequence_sha256": "09eb33381b1bc7c41209151555dc5e722c177d7a1ca2791650190fbaf23bc3ab",
+      "cleavage_sites_1based": [
+        90,
+        107,
+        196,
+        271,
+        1114,
+        1339,
+        1468,
+        2088,
+        2214,
+        2237,
+        2486
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "Q9JAD5_9FLAV",
+      "accession": "Q9JAD5",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3379,
+      "sequence_sha256": "c3d2f5b5dc8ef6a3e897ba50aa1169662d690aca657af5415661f620e79f1796",
+      "cleavage_sites_1based": [
+        88,
+        105,
+        192,
+        267,
+        1104,
+        1333,
+        1463,
+        2080,
+        2201,
+        2224,
+        2482
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0A0C4W3V9_9FLAV",
+      "accession": "A0A0C4W3V9",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3374,
+      "sequence_sha256": "8e121a85a40f5278e547dc8528c20c0897500b0c74813f29fd2bc7df2275cd08",
+      "cleavage_sites_1based": [
+        93,
+        106,
+        197,
+        272,
+        1324,
+        1459,
+        2076,
+        2196,
+        2219,
+        2475
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "Q8JJZ3_9FLAV",
+      "accession": "Q8JJZ3",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3374,
+      "sequence_sha256": "db134f6afd2d621cf5dce6c9c3c679c8d6e98367f60435d2474f31ed7e19c531",
+      "cleavage_sites_1based": [
+        90,
+        107,
+        194,
+        269,
+        1463,
+        2079,
+        2200,
+        2223,
+        2477
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "Q8QL64_9FLAV",
+      "accession": "Q8QL64",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3374,
+      "sequence_sha256": "587f4df53980c6d35cea950163c1bedb4683a342e0914bcf7eb87cd0304791c8",
+      "cleavage_sites_1based": [
+        91,
+        106,
+        197,
+        272,
+        1460,
+        2078,
+        2199,
+        2222,
+        2476
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "Q9J9C2_9FLAV",
+      "accession": "Q9J9C2",
+      "group": "Orthoflavivirus-CHH",
+      "sequence_length": 3371,
+      "sequence_sha256": "1172882981e890d777a6678d85eb9b47de94970d922ff2012e346668d1714e9c",
+      "cleavage_sites_1based": [
+        93,
+        110,
+        196,
+        271,
+        1109,
+        1334,
+        1464,
+        2080,
+        2199,
+        2222,
+        2474
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "POLG_HPGV1",
+      "accession": "Q69431",
+      "group": "Pegivirus-CHH",
+      "sequence_length": 2842,
+      "sequence_sha256": "9c46a6b50ebb7f0084765f735c75ff61f4cc81f793455982df38085c25686a0b",
+      "cleavage_sites_1based": [
+        19,
+        204,
+        590,
+        667,
+        894,
+        1522,
+        1576,
+        1867,
+        2279
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pegivirus-CHH/hpraise_Pegivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "POLG_HHPGV",
+      "accession": "A0A0M4NCP8",
+      "group": "Pegivirus-CHH",
+      "sequence_length": 3057,
+      "sequence_sha256": "d3ae6634dfd8161b430fb0c9c296dcb6b2213c7777f8e7c5e42fb341b6e7340f",
+      "cleavage_sites_1based": [
+        65,
+        270,
+        795,
+        873,
+        1731,
+        1790,
+        2032,
+        2490
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pegivirus-CHH/hpraise_Pegivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "POLG_9FLAV",
+      "accession": "Q96898",
+      "group": "Pegivirus-CHH",
+      "sequence_length": 2954,
+      "sequence_sha256": "4a357930cb61b8bef7ab229c594bd139801f94e599e602dfb3aa6eb55c1a04f7",
+      "cleavage_sites_1based": [
+        16,
+        199,
+        658,
+        735,
+        963,
+        1590,
+        1645,
+        1938,
+        2393
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pegivirus-CHH/hpraise_Pegivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "O41892_9FLAV",
+      "accession": "O41892",
+      "group": "Pegivirus-CHH",
+      "sequence_length": 2967,
+      "sequence_sha256": "80184e7eb73d33e09e3702c5bb81705f951d8e895d46d08c0626d6b7e58e89d3",
+      "cleavage_sites_1based": [
+        658,
+        962,
+        1589,
+        1646
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pegivirus-CHH/hpraise_Pegivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "Q80PW6_9FLAV",
+      "accession": "Q80PW6",
+      "group": "Pegivirus-CHH",
+      "sequence_length": 2842,
+      "sequence_sha256": "a1447d25f2501946a3b94bfe67f877d5768eb2709bac488d3ad0aace8258eb39",
+      "cleavage_sites_1based": [
+        19,
+        204,
+        590,
+        667,
+        894,
+        1522,
+        1576,
+        1867,
+        2279
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pegivirus-CHH/hpraise_Pegivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "Q96901_9FLAV",
+      "accession": "Q96901",
+      "group": "Pegivirus-CHH",
+      "sequence_length": 2842,
+      "sequence_sha256": "be18531e5f6812f722a155009ad9a1feb53ae7ff54392a48c96ea170904349b4",
+      "cleavage_sites_1based": [
+        19,
+        204,
+        590,
+        667,
+        894,
+        1522,
+        1576,
+        1867,
+        2279
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pegivirus-CHH/hpraise_Pegivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "O36177_9FLAV",
+      "accession": "O36177",
+      "group": "Pegivirus-CHH",
+      "sequence_length": 2842,
+      "sequence_sha256": "b4249a4ab4b6ceb3516b04f6a531bffae7ea824e0b0e10b6f6500ef2d6ca938f",
+      "cleavage_sites_1based": [
+        19,
+        204,
+        590,
+        667,
+        894,
+        1522,
+        1576,
+        1867,
+        2279
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pegivirus-CHH/hpraise_Pegivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "O36180_9FLAV",
+      "accession": "O36180",
+      "group": "Pegivirus-CHH",
+      "sequence_length": 2842,
+      "sequence_sha256": "572f8b5f47a027c782998749a2da1503d44748ed728d7ca3810ec27c5c7bc75d",
+      "cleavage_sites_1based": [
+        19,
+        204,
+        590,
+        667,
+        894,
+        1522,
+        1576,
+        1867,
+        2279
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pegivirus-CHH/hpraise_Pegivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "Q56IH8_9FLAV",
+      "accession": "Q56IH8",
+      "group": "Pegivirus-CHH",
+      "sequence_length": 2842,
+      "sequence_sha256": "0cc93b6b3d431038095dc72be93578dd023815fbc3deeb74c0438d701c57a60b",
+      "cleavage_sites_1based": [
+        19,
+        204,
+        590,
+        667,
+        894,
+        1522,
+        1576,
+        1867,
+        2279
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pegivirus-CHH/hpraise_Pegivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "Q69433_9FLAV",
+      "accession": "Q69433",
+      "group": "Pegivirus-CHH",
+      "sequence_length": 2910,
+      "sequence_sha256": "cff5a05d17c069344a92ba67dab2486a4c18cffde55c34f1c5147d599279633e",
+      "cleavage_sites_1based": [
+        87,
+        272,
+        658,
+        735,
+        962,
+        1590,
+        1644,
+        1935,
+        2347
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pegivirus-CHH/hpraise_Pegivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "Q9WM98_9FLAV",
+      "accession": "Q9WM98",
+      "group": "Pegivirus-CHH",
+      "sequence_length": 2842,
+      "sequence_sha256": "9f1d22a1812904eaa766b5b85b8a0e16403c249226184104d7693677cc6ca453",
+      "cleavage_sites_1based": [
+        19,
+        204,
+        590,
+        667,
+        894,
+        1522,
+        1576,
+        1867,
+        2279
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pegivirus-CHH/hpraise_Pegivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "Q9WBT6_9FLAV",
+      "accession": "Q9WBT6",
+      "group": "Pegivirus-CHH",
+      "sequence_length": 2942,
+      "sequence_sha256": "e065eede7139437c1bac30b448c23b3ff9ad4bdeb538adcd43e908ec85205b38",
+      "cleavage_sites_1based": [
+        996,
+        1624,
+        1678,
+        1965
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pegivirus-CHH/hpraise_Pegivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "N0A118_9FLAV",
+      "accession": "N0A118",
+      "group": "Pegivirus-CHH",
+      "sequence_length": 3036,
+      "sequence_sha256": "5cd9e0b8ac6b702a5a61a71903e7cabc7c33ec8c4840d2658e7ffefb9ffca75e",
+      "cleavage_sites_1based": [
+        206,
+        1652
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pegivirus-CHH/hpraise_Pegivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "D8X148_9FLAV",
+      "accession": "D8X148",
+      "group": "Pegivirus-CHH",
+      "sequence_length": 3106,
+      "sequence_sha256": "3c4d2bd32b9b77500ddadf5d23e4a7877dae68f72208934544cdfb19843b409b",
+      "cleavage_sites_1based": [
+        838,
+        1067
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pegivirus-CHH/hpraise_Pegivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "D8X149_9FLAV",
+      "accession": "D8X149",
+      "group": "Pegivirus-CHH",
+      "sequence_length": 3101,
+      "sequence_sha256": "04d81621197b9ea70980d933ec8424f09a5e3f0757014545add01f80d05721f3",
+      "cleavage_sites_1based": [
+        833,
+        1062
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pegivirus-CHH/hpraise_Pegivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "M9ZU32_9FLAV",
+      "accession": "M9ZU32",
+      "group": "Pegivirus-CHH",
+      "sequence_length": 3469,
+      "sequence_sha256": "a41ba5db7a7e4e8d7de02804fc5c16e0a0224f622730280ec31d13ce9e9d31bf",
+      "cleavage_sites_1based": [
+        1321
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pegivirus-CHH/hpraise_Pegivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "M9ZVI1_9FLAV",
+      "accession": "M9ZVI1",
+      "group": "Pegivirus-CHH",
+      "sequence_length": 3325,
+      "sequence_sha256": "d18510f8d2e30a54a2b722c50556d2f8fd4440bad6140888575f283a4e0df41e",
+      "cleavage_sites_1based": [
+        1204
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pegivirus-CHH/hpraise_Pegivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "M9V357_9FLAV",
+      "accession": "M9V357",
+      "group": "Pegivirus-CHH",
+      "sequence_length": 3484,
+      "sequence_sha256": "6e56635a441334a0636968fad086b72dcaf32e8116eef2f038dac2bdcc2ecb2b",
+      "cleavage_sites_1based": [
+        1274
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pegivirus-CHH/hpraise_Pegivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "M4TAM3_9FLAV",
+      "accession": "M4TAM3",
+      "group": "Pegivirus-CHH",
+      "sequence_length": 3189,
+      "sequence_sha256": "e60b47fc7788ce51bbd2c7ddab3440e4fc20578547fd62de6359441ddda85c69",
+      "cleavage_sites_1based": [
+        627,
+        944,
+        1637
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pegivirus-CHH/hpraise_Pegivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "M4VPD4_9FLAV",
+      "accession": "M4VPD4",
+      "group": "Pegivirus-CHH",
+      "sequence_length": 3344,
+      "sequence_sha256": "5c0a62379ad21774d3cbfca9bff5abac86b02a765ffe0e3618adf8affd94ac9d",
+      "cleavage_sites_1based": [
+        785,
+        1647
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pegivirus-CHH/hpraise_Pegivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0A1B0Z5J8_9FLAV",
+      "accession": "A0A1B0Z5J8",
+      "group": "Pegivirus-CHH",
+      "sequence_length": 2972,
+      "sequence_sha256": "cd0fc330ab36cc03725f36f046da8de68af0ac4f6d1dfb110e63188113b0cbd9",
+      "cleavage_sites_1based": [
+        1681
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pegivirus-CHH/hpraise_Pegivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0A097NZ77_9FLAV",
+      "accession": "A0A097NZ77",
+      "group": "Pestivirus-CHH",
+      "sequence_length": 3993,
+      "sequence_sha256": "d5eacaa78d3e6b7f2bcdfdb02d849ef7b38a72f8e7e3004ef6b2d8e72238b6cd",
+      "cleavage_sites_1based": [
+        373,
+        600,
+        802,
+        1180,
+        1250,
+        1702,
+        2385,
+        2448,
+        2791,
+        3276
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pestivirus-CHH/hpraise_pestivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0A0K0WRN6_9FLAV",
+      "accession": "A0A0K0WRN6",
+      "group": "Pestivirus-CHH",
+      "sequence_length": 3635,
+      "sequence_sha256": "2007a1b2fd3c85a70779e4907a5f1548267356837fe7e47aabcf3b9de624f9bb",
+      "cleavage_sites_1based": [
+        180,
+        291,
+        501,
+        700,
+        944,
+        1009,
+        1319,
+        2006,
+        2073,
+        2412,
+        2913
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pestivirus-CHH/hpraise_pestivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0A1Z3MI02_9FLAV",
+      "accession": "A0A1Z3MI02",
+      "group": "Pestivirus-CHH",
+      "sequence_length": 3923,
+      "sequence_sha256": "4d2d5375474f78efd66678edb06f2ad8146cf704ed5df74eb49eff7d61c97468",
+      "cleavage_sites_1based": [
+        283,
+        505,
+        702,
+        1076,
+        1149,
+        1608,
+        2291,
+        2354,
+        2701,
+        3205
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pestivirus-CHH/hpraise_pestivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0A2H4MX92_9FLAV",
+      "accession": "A0A2H4MX92",
+      "group": "Pestivirus-CHH",
+      "sequence_length": 4023,
+      "sequence_sha256": "6e7e0d153ba98bb745126d4fa2b2683e897c3ff056b842a45c889d0fd61bae71",
+      "cleavage_sites_1based": [
+        402,
+        627,
+        832,
+        1210,
+        1280,
+        1733,
+        2416,
+        2479,
+        2822,
+        3308
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pestivirus-CHH/hpraise_pestivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0A2H4N061_9FLAV",
+      "accession": "A0A2H4N061",
+      "group": "Pestivirus-CHH",
+      "sequence_length": 3989,
+      "sequence_sha256": "1b92f20d4ff4643df5b7696d8bc00937e079dd9317f43b9d9c2b04549df82d42",
+      "cleavage_sites_1based": [
+        390,
+        617,
+        820,
+        1195,
+        1264,
+        1713,
+        2395,
+        2457,
+        2801,
+        3286
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pestivirus-CHH/hpraise_pestivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0A3G5BHF3_9FLAV",
+      "accession": "A0A3G5BHF3",
+      "group": "Pestivirus-CHH",
+      "sequence_length": 3663,
+      "sequence_sha256": "83f0064a61b851c9eb59ce7d914fd3bd8567ab63a62262ea97367172f54160b3",
+      "cleavage_sites_1based": [
+        176,
+        292,
+        504,
+        702,
+        952,
+        1017,
+        1329,
+        2013,
+        2085,
+        2425,
+        2940
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pestivirus-CHH/hpraise_pestivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0A514TR60_9FLAV",
+      "accession": "A0A514TR60",
+      "group": "Pestivirus-CHH",
+      "sequence_length": 3894,
+      "sequence_sha256": "3b41af722d81e30ca6a12a05762778de356e64748c218ff9f6cd83124012e341",
+      "cleavage_sites_1based": [
+        267,
+        494,
+        689,
+        1062,
+        1132,
+        1585,
+        2268,
+        2332,
+        2679,
+        3176
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pestivirus-CHH/hpraise_pestivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0A5P8HZL6_9FLAV",
+      "accession": "A0A5P8HZL6",
+      "group": "Pestivirus-CHH",
+      "sequence_length": 3761,
+      "sequence_sha256": "3f09de46ff8ec41a8310ae6de771ef381f4099949102a7a43afc9270b334d342",
+      "cleavage_sites_1based": [
+        13,
+        116,
+        339,
+        536,
+        918,
+        989,
+        1448,
+        2131,
+        2194,
+        2541,
+        3041
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pestivirus-CHH/hpraise_pestivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0A6G6CUL0_9FLAV",
+      "accession": "A0A6G6CUL0",
+      "group": "Pestivirus-CHH",
+      "sequence_length": 3870,
+      "sequence_sha256": "efecd9602e08050aacefc06696e7b24b1edd3d7ac1127ee37ecaf2d82c78f41e",
+      "cleavage_sites_1based": [
+        256,
+        476,
+        674,
+        1052,
+        1122,
+        1569,
+        2252,
+        2315,
+        2662,
+        3158
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pestivirus-CHH/hpraise_pestivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "A0A8G1H4Y3_9VIRU",
+      "accession": "A0A8G1H4Y3",
+      "group": "Pestivirus-CHH",
+      "sequence_length": 3894,
+      "sequence_sha256": "4ef2b8eedb37bafd9b3f78d5c4fbdc3b7263ff1e38d65f1f5e0728686488ea10",
+      "cleavage_sites_1based": [
+        168,
+        267,
+        494,
+        689,
+        1062,
+        1132,
+        1585,
+        2268,
+        2332,
+        2679,
+        3176
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pestivirus-CHH/hpraise_pestivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "C4NF75_9FLAV",
+      "accession": "C4NF75",
+      "group": "Pestivirus-CHH",
+      "sequence_length": 3897,
+      "sequence_sha256": "b4c43ff54c16ca22f7aa8cccb7907352bf4be99f74c05845e198d6fc08d80cbd",
+      "cleavage_sites_1based": [
+        270,
+        497,
+        692,
+        1064,
+        1134,
+        1587,
+        2270,
+        2334,
+        2681,
+        3178
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pestivirus-CHH/hpraise_pestivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "C5H8E4_9FLAV",
+      "accession": "C5H8E4",
+      "group": "Pestivirus-CHH",
+      "sequence_length": 3899,
+      "sequence_sha256": "1567219993e663ebd2ced4ab563ccf37ea9ce5cb3c98759ec6dbcd743759492d",
+      "cleavage_sites_1based": [
+        269,
+        496,
+        691,
+        1064,
+        1134,
+        1587,
+        2270,
+        2334,
+        2681,
+        3178
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pestivirus-CHH/hpraise_pestivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "D2CGF5_9FLAV",
+      "accession": "D2CGF5",
+      "group": "Pestivirus-CHH",
+      "sequence_length": 3918,
+      "sequence_sha256": "b2f13033ce5b2a39c876c4b139d4851ce0fe79d2a05b82e3f71cbf95560bf1f2",
+      "cleavage_sites_1based": [
+        276,
+        498,
+        694,
+        1071,
+        1143,
+        1603,
+        2286,
+        2349,
+        2696,
+        3201
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pestivirus-CHH/hpraise_pestivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "J9ZZK6_9FLAV",
+      "accession": "J9ZZK6",
+      "group": "Pestivirus-CHH",
+      "sequence_length": 3895,
+      "sequence_sha256": "5c45447ebc8a8fb50d317fa712484af372a74701d121371f6c0b9d68db145a14",
+      "cleavage_sites_1based": [
+        268,
+        495,
+        690,
+        1063,
+        1133,
+        1586,
+        2269,
+        2333,
+        2680,
+        3177
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pestivirus-CHH/hpraise_pestivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "Q533M7_9FLAV",
+      "accession": "Q533M7",
+      "group": "Pestivirus-CHH",
+      "sequence_length": 3897,
+      "sequence_sha256": "ddba0e08f4622e9dd37551a37f327120d04738c5cd2abb6463963996d2a911d9",
+      "cleavage_sites_1based": [
+        265,
+        492,
+        687,
+        1058,
+        1128,
+        1587,
+        2270,
+        2332,
+        2679,
+        3179
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pestivirus-CHH/hpraise_pestivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "Q65464_9FLAV",
+      "accession": "Q65464",
+      "group": "Pestivirus-CHH",
+      "sequence_length": 3895,
+      "sequence_sha256": "986866bb2efdf1ad50be7365e984b3900d89ad8586f7373f98fd1ca31eab0d27",
+      "cleavage_sites_1based": [
+        268,
+        495,
+        690,
+        1063,
+        1133,
+        1586,
+        2269,
+        2333,
+        2680,
+        3177
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pestivirus-CHH/hpraise_pestivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "Q65786_9FLAV",
+      "accession": "Q65786",
+      "group": "Pestivirus-CHH",
+      "sequence_length": 3973,
+      "sequence_sha256": "b68d66cc0571ba9c04361f91d5b60af875576a7641a1c10f65075f4087b2587d",
+      "cleavage_sites_1based": [
+        270,
+        497,
+        692,
+        1064,
+        1134,
+        1663,
+        2346,
+        2410,
+        2757,
+        3254
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pestivirus-CHH/hpraise_pestivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "Q68871_9FLAV",
+      "accession": "Q68871",
+      "group": "Pestivirus-CHH",
+      "sequence_length": 3898,
+      "sequence_sha256": "93a849a285a6cf134e25d615de4acd8bb8782899629a1c285291cdfa3d8aaf94",
+      "cleavage_sites_1based": [
+        267,
+        494,
+        689,
+        1062,
+        1132,
+        1589,
+        2272,
+        2336,
+        2683,
+        3180
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pestivirus-CHH/hpraise_pestivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "Q9PYB2_9FLAV",
+      "accession": "Q9PYB2",
+      "group": "Pestivirus-CHH",
+      "sequence_length": 3989,
+      "sequence_sha256": "1b0e9bc95a2854898e70792ae46f4a6ffdb0ae275e42f86e5af168be1b71896f",
+      "cleavage_sites_1based": [
+        266,
+        493,
+        688,
+        1062,
+        1132,
+        1679,
+        2362,
+        2426,
+        2773,
+        3270
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pestivirus-CHH/hpraise_pestivirus_ICTV",
+      "source_kind": "ictv"
+    },
+    {
+      "identifier": "POLG_BVDVN",
+      "accession": "P19711",
+      "group": "Pestivirus-CHH",
+      "sequence_length": 3988,
+      "sequence_sha256": "dff46b86dbf190dc6ffc941a2ce6694b322f2912f96702262abb05541fbe290c",
+      "cleavage_sites_1based": [
+        497
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pestivirus-CHH/entries_fasta_pestivirus.txt",
+      "source_kind": "additional_entry",
+      "site_evidence": [
+        {
+          "position": 497,
+          "evidence": "not supplied"
+        }
+      ]
+    },
+    {
+      "identifier": "POLG_BVDVS",
+      "accession": "Q01499",
+      "group": "Pestivirus-CHH",
+      "sequence_length": 3898,
+      "sequence_sha256": "5a26b6c4b0ad92701a9725c4c4073e6979933dff3e88d9754c328a46ad7b127a",
+      "cleavage_sites_1based": [
+        497
+      ],
+      "source_file": "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pestivirus-CHH/entries_fasta_pestivirus.txt",
+      "source_kind": "additional_entry",
+      "site_evidence": [
+        {
+          "position": 497,
+          "evidence": "ECO:0000250|UniProtKB:P19712"
+        }
+      ]
+    }
+  ],
+  "excluded_entries": [
+    {
+      "accession": "Q69422",
+      "identifier": "POLG_GBVB",
+      "group": "Hepacivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Hepacivirus-CHH/entries_fasta_hepacivirus.txt"
+    },
+    {
+      "accession": "Q68801",
+      "identifier": "POLG_HCVJK",
+      "group": "Hepacivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Hepacivirus-CHH/entries_fasta_hepacivirus.txt"
+    },
+    {
+      "accession": "Q68798",
+      "identifier": "POLG_HCVJL",
+      "group": "Hepacivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Hepacivirus-CHH/entries_fasta_hepacivirus.txt"
+    },
+    {
+      "accession": "P26664",
+      "identifier": "POLG_HCV1",
+      "group": "Hepacivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Hepacivirus-CHH/entries_fasta_hepacivirus.txt"
+    },
+    {
+      "accession": "P26662",
+      "identifier": "POLG_HCVJA",
+      "group": "Hepacivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Hepacivirus-CHH/entries_fasta_hepacivirus.txt"
+    },
+    {
+      "accession": "P26661",
+      "identifier": "POLG_HCVJ8",
+      "group": "Hepacivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Hepacivirus-CHH/entries_fasta_hepacivirus.txt"
+    },
+    {
+      "accession": "O39928",
+      "identifier": "POLG_HCVEV",
+      "group": "Hepacivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Hepacivirus-CHH/entries_fasta_hepacivirus.txt"
+    },
+    {
+      "accession": "P26660",
+      "identifier": "POLG_HCVJ6",
+      "group": "Hepacivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Hepacivirus-CHH/entries_fasta_hepacivirus.txt"
+    },
+    {
+      "accession": "O39927",
+      "identifier": "POLG_HCVEU",
+      "group": "Hepacivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Hepacivirus-CHH/entries_fasta_hepacivirus.txt"
+    },
+    {
+      "accession": "P27958",
+      "identifier": "POLG_HCV77",
+      "group": "Hepacivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Hepacivirus-CHH/entries_fasta_hepacivirus.txt"
+    },
+    {
+      "accession": "A0A024B7W1",
+      "identifier": "POLG_ZIKVF",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    },
+    {
+      "accession": "C5H431",
+      "identifier": "POLG_WSLV",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    },
+    {
+      "accession": "C8XPA8",
+      "identifier": "POLG_BANV",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    },
+    {
+      "accession": "C8XPB2",
+      "identifier": "POLG_EHV",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    },
+    {
+      "accession": "D7RF80",
+      "identifier": "POLG_KFDV",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    },
+    {
+      "accession": "G1CRV4",
+      "identifier": "POLG_TMUV",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    },
+    {
+      "accession": "P03314",
+      "identifier": "POLG_YEFV1",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    },
+    {
+      "accession": "P05769",
+      "identifier": "POLG_MVEV5",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    },
+    {
+      "accession": "P06935",
+      "identifier": "POLG_WNV",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    },
+    {
+      "accession": "P07720",
+      "identifier": "POLG_TBEVS",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    },
+    {
+      "accession": "P09866",
+      "identifier": "POLG_DEN4D",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    },
+    {
+      "accession": "P14335",
+      "identifier": "POLG_KUNJM",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    },
+    {
+      "accession": "P14336",
+      "identifier": "POLG_TBEVW",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    },
+    {
+      "accession": "P17763",
+      "identifier": "POLG_DEN1W",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    },
+    {
+      "accession": "P22338",
+      "identifier": "POLG_LIV",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    },
+    {
+      "accession": "P27915",
+      "identifier": "POLG_DEN3P",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    },
+    {
+      "accession": "P32886",
+      "identifier": "POLG_JAEVJ",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    },
+    {
+      "accession": "Q04538",
+      "identifier": "POLG_POWVL",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    },
+    {
+      "accession": "Q32ZD5",
+      "identifier": "POLG_KOKV",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    },
+    {
+      "accession": "Q32ZD7",
+      "identifier": "POLG_ILHV",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    },
+    {
+      "accession": "Q32ZE0",
+      "identifier": "POLG_BUSV",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    },
+    {
+      "accession": "Q32ZE1",
+      "identifier": "POLG_ZIKV",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    },
+    {
+      "accession": "Q5WPU5",
+      "identifier": "POLG_USUV",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    },
+    {
+      "accession": "Q7T6D2",
+      "identifier": "POLG_OHFV",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    },
+    {
+      "accession": "Q91B85",
+      "identifier": "POLG_ALKV",
+      "group": "Orthoflavivirus-CHH",
+      "reason": "no explicit SITE /note=\"Cleavage\" feature",
+      "source_file": "Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt"
+    }
+  ],
+  "source_files": {
+    "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Hepacivirus-CHH/entries_fasta_hepacivirus.txt": "3893bb049cb20b4484d8cfccfba00bfcb6bf8e858358815d97b494d49507c149",
+    "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Hepacivirus-CHH/hpraise_hepacivirus_ICTV": "adf834dbba660561c8b042caf05fca4bb9f9dd8567e211e0eb0d6791fe70b27f",
+    "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/entries_fasta_orthoflavivirus.txt": "c9c718d4ce3b75bf62e97f145b9ad45e66064e9a82c797e32bdd15953b0d6982",
+    "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Orthoflavivirus-CHH/hpraise_orthoflavivirus_ICTV": "b7ce1fb14652cdc59648af518b354702d23c0b83a2c6e8b6ec45df7a61b3373d",
+    "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pegivirus-CHH/hpraise_Pegivirus_ICTV": "d3c1b0d42d8a5b54429bfc9089f19b07c9a2f416ec31f7ba00fc040eac9772e6",
+    "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pestivirus-CHH/entries_fasta_pestivirus.txt": "7253b16c7e70d709fd74218933021e4f16586c21bc259bfe13f63c2c0d3ec6e1",
+    "experiments/analyses/polyprotein_cut/dataset/Amarillovirales/Pestivirus-CHH/hpraise_pestivirus_ICTV": "36d99636755a880a9a757081f9f676dcc5462429c381841707fb47fa5f03775b"
+  },
+  "embedding_checkpoint": {
+    "path": "/home/dmoi/projects/ESM3di/checkpoints/esm3di_from_mlm/epoch_5.pt",
+    "sha256": "4e8143a48b6e31975aa75e6d1f4074e7895e968d3df64b8de2a1301127d62ac9"
+  },
+  "counts": {
+    "records": 88,
+    "residues": 295297,
+    "positive_sites": 805,
+    "groups": {
+      "Hepacivirus-CHH": 15,
+      "Orthoflavivirus-CHH": 31,
+      "Pegivirus-CHH": 21,
+      "Pestivirus-CHH": 21
+    }
+  },
+  "training": {
+    "seed": 17,
+    "epochs": 16,
+    "device": "cuda",
+    "ffn": {
+      "dropout": 0.45,
+      "input_dropout": 0.1,
+      "weight_decay": 0.0001,
+      "oscar_l1": 0.0,
+      "oscar_pair": 0.0,
+      "learning_rate": 0.001,
+      "batch_size": 2048
+    },
+    "transformer": {
+      "d_model": 256,
+      "nhead": 8,
+      "num_layers": 2,
+      "dropout": 0.35,
+      "input_dropout": 0.08,
+      "weight_decay": 0.0003,
+      "oscar_l1": 3e-06,
+      "oscar_pair": 6e-07,
+      "learning_rate": 0.001,
+      "batch_size": 4,
+      "classifier_window": 512,
+      "classifier_overlap": 64
+    }
+  }
+}

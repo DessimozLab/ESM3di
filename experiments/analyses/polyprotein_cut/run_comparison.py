@@ -59,25 +59,25 @@ def parse_cut_sites(path: Path) -> dict[str, list[int]]:
                 commit()
                 current_id = None
             elif current_id is not None:
-                match = re.match(r"^FT\s+SITE\s+(\d+)\.\.(\d+)", line)
+                match = re.match(r"^FT\s+SITE\s+(\d+)(?:\.\.(\d+))?", line)
                 if match:
                     commit()
                     pending_start = int(match.group(1))
                 elif pending_start is not None and '/note="Cleavage"' in line:
                     pending_cleavage = True
-                elif pending_start is not None and line.startswith("FT") and not line.startswith("FT                   "):
+                elif pending_start is not None and re.match(r"^FT\s{3}[A-Z]", line):
                     commit()
     commit()
     return {key: sorted(values) for key, values in by_id.items() if values}
 
 
-def load_records() -> list[dict]:
+def load_records(data_dir: Path = DATA_DIR) -> list[dict]:
     records = []
     seen = set()
     sites_by_id: dict[str, list[int]] = {}
-    files = sorted(DATA_DIR.glob("*/hpraise*_ICTV"))
+    files = sorted(data_dir.glob("*/hpraise*_ICTV"))
     if len(files) != 4:
-        raise RuntimeError(f"Expected 4 ICTV files under {DATA_DIR}, found {len(files)}")
+        raise RuntimeError(f"Expected 4 ICTV files under {data_dir}, found {len(files)}")
     for path in files:
         sites_by_id.update(parse_cut_sites(path))
         for block in path.read_text(encoding="utf-8", errors="replace").split("//"):
@@ -90,7 +90,13 @@ def load_records() -> list[dict]:
             seen.add(identifier)
             sequence = str(record.seq).upper()
             # The full label map is applied after all source files have been parsed.
-            records.append({"identifier": identifier, "group": path.parent.name, "sequence": sequence})
+            records.append({
+                "identifier": identifier,
+                "accession": record.id,
+                "group": path.parent.name,
+                "sequence": sequence,
+                "source_path": str(path),
+            })
     for record in records:
         record["sites"] = sites_by_id.get(record["identifier"], [])
         if not record["sites"]:
