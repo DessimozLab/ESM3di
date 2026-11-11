@@ -36,11 +36,11 @@ def plot_method_scatter(ax, df, x_col, y_col, x_label, y_label, title=None, log_
     identity of the random baseline) is drawn as dashed guides on both axes.
     """
     values = df[[x_col, y_col]].replace([np.inf, -np.inf], np.nan).dropna()
-    if log_scale:
-        # A bitscore of 0 cannot be shown on log axes
-        values = values[(values[x_col] > 0) & (values[y_col] > 0)]
     x = values[x_col].to_numpy()
     y = values[y_col].to_numpy()
+    # Win rates and n count every protein; only the drawing skips points a log axis
+    # cannot show (a bitscore of 0)
+    drawn = (x > 0) & (y > 0) if log_scale else np.ones_like(x, dtype=bool)
 
     groups = {
         "ESM3Di": (y > x, METHOD_COLOURS["ESM3Di"]),
@@ -49,11 +49,12 @@ def plot_method_scatter(ax, df, x_col, y_col, x_label, y_label, title=None, log_
     }
     for mask, colour in groups.values():
         # Unclipped, so points at 0 or 100 % are drawn whole rather than cut at the axes edge
-        ax.scatter(x[mask], y[mask], s=2, alpha=0.35, color=colour,
+        ax.scatter(x[mask & drawn], y[mask & drawn], s=2, alpha=0.35, color=colour,
                    edgecolors="none", rasterized=True, clip_on=False)
 
     if log_scale:
-        lims = (min(x.min(), y.min()) / 1.3, max(x.max(), y.max()) * 1.3)
+        xd, yd = x[drawn], y[drawn]
+        lims = (min(xd.min(), yd.min()) / 1.3, max(xd.max(), yd.max()) * 1.3)
         ax.set_xscale("log")
         ax.set_yscale("log")
         for axis in (ax.xaxis, ax.yaxis):

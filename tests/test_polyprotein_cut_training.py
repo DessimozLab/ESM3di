@@ -1,4 +1,5 @@
-from experiments.analyses.polyprotein_cut import run_comparison, train_all_data
+from experiments.analyses.polyprotein_cut import train_all_data
+from experiments.analyses.polyprotein_cut.scripts import run_comparison
 
 
 def test_cut_site_parser_accepts_single_residue_and_range_annotations(tmp_path):

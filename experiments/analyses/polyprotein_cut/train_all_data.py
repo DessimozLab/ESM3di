@@ -19,7 +19,7 @@ from Bio import SeqIO
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT))
 
-from experiments.analyses.polyprotein_cut import run_comparison as comparison
+from experiments.analyses.polyprotein_cut.scripts import run_comparison as comparison
 from esm3di.inference.cutting import SmallCutSiteFFN, SmallCutSiteTransformer
 
 DATA_DIR = Path(__file__).resolve().parent / "dataset" / "Amarillovirales"

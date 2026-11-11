@@ -196,7 +196,7 @@ FoldMason uses `structuremsa --fast 1 --refine-iters 0`. FastTree uses the
 **amino-acid alignment**, with `-fastest -noml -spr 0 -nosupport`: approximate
 neighbor joining and minimum-evolution NNI, not maximum-likelihood refinement.
 The tree is unrooted and has no support values. See the
-[tree-building methods](experiments/analyses/fasttree_NJ/README.md) for limitations.
+[tree-building methods](experiments/analyses/phylogeny/metagenomic_trees/README.md) for limitations.
 
 ## Train on your own sequences and structures
 

@@ -6,7 +6,7 @@ import subprocess
 import pytest
 
 
-SCRIPTS = Path(__file__).resolve().parents[1] / "experiments/analyses/fasttree_NJ"
+SCRIPTS = Path(__file__).resolve().parents[1] / "experiments/analyses/phylogeny/metagenomic_trees"
 
 
 @pytest.fixture

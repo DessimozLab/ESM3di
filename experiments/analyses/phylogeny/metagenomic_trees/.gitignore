@@ -1,0 +1,8 @@
+/FastTreeMP
+/src/
+/tools/
+/results/
+*.nwk
+*.log
+*.tmp.*
+/rendered/

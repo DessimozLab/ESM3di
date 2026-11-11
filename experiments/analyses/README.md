@@ -15,7 +15,7 @@ saved notebook figures or attempting a rerun.
 | Ebola protein analyses | [ebola_data](ebola_data/README.md) |
 | Flavivirus analyses | [flavi_redo](flavi_redo/README.md) |
 | Polyprotein cleavage prediction | [polyprotein_cut](polyprotein_cut/README.md) |
-| Fast structure-aware alignment and tree construction | [fasttree_NJ](fasttree_NJ/README.md) |
+| Metagenomic structural trees: fast structure-aware alignment, tree construction and drawing | [phylogeny/metagenomic_trees](phylogeny/metagenomic_trees/README.md) |
 | PDN data archive | [PDN_Data](PDN_Data/README.md) |
 | Historical training configurations | [legacy_configs](legacy_configs/README.md) |
 | Batch training and evaluation launchers | [scripts](scripts/README.md) |
