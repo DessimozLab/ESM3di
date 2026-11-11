@@ -200,7 +200,9 @@ def plot_identity_density(ax, df, title=None):
 SCOPE_METHODS = {"MMseqs2": "mmseqs", "Foldseek": "foldseek", "ProstT5": "prostt5", "ESM3Di": "esm3di"}
 SCOPE_LEVELS = {"Family": "fam", "Superfamily": "sup", "Fold": "fol"}
 # Top-left corner of the AUC table, in an empty part of each panel
-TABLE_XY = {"Family": (0.05, 0.8), "Superfamily": (0.58, 0.97), "Fold": (0.58, 0.97)}
+TABLE_XY = {"Family": (0.05, 0.8), "Superfamily": (0.5, 0.97), "Fold": (0.5, 0.97)}
+# How each method is named in the AUC table: what is searched, and where its 3Di come from
+SCOPE_LABELS = {"Foldseek": "3Di (PDB)", "ESM3Di": "3Di (ESM3Di)", "ProstT5": "3Di (ProstT5)", "MMseqs2": "AA (MMseqs2)"}
 
 
 def load_scope_sensitivity(datapath):
@@ -241,7 +243,7 @@ def plot_scope_level(ax, sensitivity_df, level, show_ylabel=True, show_title=Tru
     # table_xy is the top-left corner in axes coordinates; column and row offsets are in
     # points, so the table keeps its spacing at any panel size.
     table_xy = table_xy or TABLE_XY[level]
-    value_dx, row_dy = 46, 7.5
+    value_dx, row_dy = 60, 7.5
 
     def table_cell(text, dx, row, ha, **kwargs):
         ax.annotate(text, table_xy, xycoords="axes fraction", xytext=(dx, -row_dy * row),
@@ -250,7 +252,7 @@ def plot_scope_level(ax, sensitivity_df, level, show_ylabel=True, show_title=Tru
     table_cell("AUC", value_dx, 0, "right", color="0.35")
     for row, method in enumerate(sorted(aucs, key=aucs.get, reverse=True), start=1):
         colour = METHOD_COLOURS[method]
-        table_cell(method, 0, row, "left", color=colour)
+        table_cell(SCOPE_LABELS[method], 0, row, "left", color=colour)
         table_cell(f"{aucs[method]:.3f}", value_dx, row, "right", color=colour,
                    fontweight="bold" if method == "ESM3Di" else "normal")
     return aucs
@@ -444,7 +446,7 @@ def plot_runtime_vs_length_end_to_end_and_inference(ax, length_df, esm3di_cli_le
     key_colour = "0.45"
     ax.legend(
         handles=[
-            Line2D([], [], color=key_colour, lw=0.8, marker="o", ms=3, mew=0, label="End to end"),
+            Line2D([], [], color=key_colour, lw=0.8, marker="o", ms=3, mew=0, label="Including model loading"),
             Line2D([], [], color=key_colour, lw=0.8, marker="o", ms=3, mfc="white", mec=key_colour, mew=0.8,
                    label="Inference only"),
         ],
@@ -483,11 +485,11 @@ def plot_esm3di_runtime_modes(ax, nseq_df, esm3di_cli_df):
 
     # Both ESM3Di labels where the two curves are a decade apart: end to end above its flat
     # (start-up dominated) part, inference only below-right of its line; ProstT5 above-left
-    label_line(ax, 10, end_to_end.loc[10, "mean"], "ESM3Di\n(end to end)", "esm3di", dy=5,
+    label_line(ax, 10, end_to_end.loc[10, "mean"], "ESM3Di\n(with model loading)", "esm3di", dy=5,
                linespacing=1.1)
     label_line(ax, 100, inference.loc[100, "mean"], "ESM3Di\n(inference only)", "esm3di",
                dx=4, dy=-4, va="top", linespacing=1.1)
-    label_line(ax, 1000, prostt5.loc[1000, "mean"], "ProstT5\n(end to end)", "prostt5", dx=-3, dy=4, ha="right", linespacing=1.1)
+    label_line(ax, 1000, prostt5.loc[1000, "mean"], "ProstT5\n(with model loading)", "prostt5", dx=-3, dy=4, ha="right", linespacing=1.1)
     return {"end to end": end_to_end, "inference only": inference, "ProstT5": prostt5}
 
 
@@ -544,7 +546,7 @@ def plot_runtime_end_to_end_and_inference(ax, nseq_df, esm3di_cli_df):
     key_colour = "0.45"
     ax.legend(
         handles=[
-            Line2D([], [], color=key_colour, lw=0.8, marker="o", ms=3, mew=0, label="End to end"),
+            Line2D([], [], color=key_colour, lw=0.8, marker="o", ms=3, mew=0, label="Including model loading"),
             Line2D([], [], color=key_colour, lw=0.8, marker="o", ms=3, mfc="white", mec=key_colour, mew=0.8,
                    label="Inference only"),
             Line2D([], [], color=key_colour, lw=0.8, ls=(0, (3, 2)), label="Extrapolated"),

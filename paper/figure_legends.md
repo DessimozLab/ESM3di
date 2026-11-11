@@ -4,8 +4,8 @@ Names used throughout: ESM3Di; ProstT5; *Filoviridae* glycoprotein (GP); *Flaviv
 
 **Figure 1 | ESM3Di architecture and benchmarks.** **a**, Model architecture. **b**, 3Di sequence identity of ESM3Di vs
 ProstT5 predictions to AlphaFold3-derived 3Di (MetaVR subset). Dashed lines: random baseline median. **c**, Sensitivity up
-to the first false positive at SCOPe family level (viral subset), with Foldseek and MMseqs2 as references. **d**, Runtime vs
-number of sequences on one A100 GPU. Filled markers: end to end, through a CLI call including model loading. Open markers:
+to the first false positive at SCOPe family level (viral subset), with 3Di of the experimental structures (PDB, Foldseek) and amino-acid search (MMseqs2) as references. **d**, Runtime vs
+number of sequences on one A100 GPU. Filled markers: including model loading, timed as one CLI call. Open markers:
 inference only, with the model already loaded (measured for ESM3Di only). ColabFold ran up to 300 sequences; the dashed line
 extrapolates a power-law fit to 10,000 sequences.
 
@@ -25,12 +25,12 @@ ultrametricity (lower is better; Methods); the better score of each comparison i
 **Supplementary Fig. 2 | Additional 3Di and SCOPe benchmarks.** **a**, Foldseek alignment bitscores of ESM3Di vs ProstT5
 predictions against AlphaFold3-derived 3Di (MetaVR subset, n = 10,000). **b**, Distributions of 3Di identity to
 AlphaFold3-derived 3Di for ESM3Di, ProstT5 and the random baseline; dashed lines show medians. **c**, Sensitivity up to the
-first false positive at SCOPe superfamily (left) and fold (right) level (viral subset; Foldseek: experimental structures).
+first false positive at SCOPe superfamily (left) and fold (right) level (viral subset; 3Di (PDB): Foldseek on the experimental structures; AA: amino-acid search with MMseqs2).
 The fold panel shows the first 10% of queries; the AUC is over all queries.
 
 **Supplementary Fig. 3 | Runtime vs sequence length.** Runtime of ESM3Di and ProstT5 on one A100 GPU for 512 sequences
 per length bin: 32 Swiss-Prot viral proteins of about 100 to 1,000 residues per bin, each repeated 16 times. Mean ± s.d.
-over five repetitions after a warm-up run. Filled markers: end to end, through a CLI call including model loading. Open markers: inference only, with the
+over five repetitions after a warm-up run. Filled markers: including model loading, timed as one CLI call. Open markers: inference only, with the
 model already loaded (measured for ESM3Di only), as in Fig. 1d.
 
 **Supplementary Fig. 4 | *Filoviridae* glycoprotein (GP) trees without X-rich sequences.** Trees from ESM3Di (left) and ProstT5 (right) 3Di of the 417 of 550 unique GP sequences with at most 5% unknown residues (X), coloured by species as shades of one hue per genus. The two trees share one scale. Monophyly as in Fig. 2.
