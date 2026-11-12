@@ -114,18 +114,23 @@ def _replicate(replicate):
     return rows
 
 
-def jackknife(allvall_by_method, labels, quicktree, replicates=100, fraction=0.9, seed=0, workers=8):
+def jackknife(allvall_by_method, labels, quicktree, replicates=100, fraction=0.9, seed=0, workers=8, progress=None):
     """Score trees built from random subsets of the sequences.
 
     Each replicate keeps the same random ``fraction`` of the sequences for every
     method, so the methods are compared on identical subsets (paired). Replicate
     ``r`` always draws the same subset for a given ``seed``. Returns one row per
-    replicate and method.
+    replicate and method. ``progress``, if given, is called with the number of
+    finished replicates after each one.
     """
     ids = sorted(set.intersection(*(set(table["query"]) for table in allvall_by_method.values())))
     _STATE.update(allvall=allvall_by_method, labels=labels, quicktree=quicktree,
                   ids=ids, fraction=fraction, seed=seed)
+    rows = []
     # fork: workers share the all-vs-all tables instead of receiving copies
     with multiprocessing.get_context("fork").Pool(workers) as pool:
-        rows = [row for result in pool.imap_unordered(_replicate, range(replicates)) for row in result]
+        for done, result in enumerate(pool.imap_unordered(_replicate, range(replicates)), start=1):
+            rows.extend(result)
+            if progress:
+                progress(done)
     return pd.DataFrame(rows).sort_values(["replicate", "method"], ignore_index=True)

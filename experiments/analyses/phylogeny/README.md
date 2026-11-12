@@ -23,6 +23,7 @@ written relative to its folder, so run a notebook from the folder that holds it.
 | Notebook | Contents | Figures |
 |---|---|---|
 | `filoviridae/filoviridae_trees.ipynb` | GP and NP trees, scores, species clades, jackknife, trees without X-rich sequences, trees of one representative per species with an amino-acid baseline | `filoviridae_gp_species_trees`, `filoviridae_gp_full_trees` (Figure 2a), `filoviridae_gp_filtered_trees` (Supplementary Fig. 4) |
+| `filoviridae/filoviridae_jackknife.ipynb` | Paired jackknife of monophyly and ultrametricity, ESM3Di against ProstT5 (GP, NP); no difference is significant and the replicate spread is large, so it is not in the paper. Run with `filoviridae/run_jackknife.sh` (Slurm) | `filoviridae_jackknife_difference` (not in the paper); tables `results/filoviridae_jackknife*.csv` |
 | `flaviviridae/flaviviridae_trees.ipynb` | E, E1 and E2 trees (ESM3Di, AlphaFold2), monophyly and ultrametricity, agreement of ESM3Di 3Di with the structures | `flaviviridae_e2_trees` (Figure 2b), `flaviviridae_glycoprotein_trees` (Supplementary Fig. 5) |
 | `flaviviridae/flaviviridae_jackknife.ipynb` | Paired jackknife of the monophyly scores and ultrametricity | `flaviviridae_jackknife_difference` (Supplementary Fig. 6); table `results/flaviviridae_jackknife_summary.csv` |
 | `flaviviridae/flaviviridae_ultrametricity.ipynb` | Robustness of the ultrametricity of ESM3Di and AlphaFold2 trees (jackknife, root, clades, distance, structure quality) | `flaviviridae_jackknife` (not in the paper) |

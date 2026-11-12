@@ -19,6 +19,7 @@ import sys
 from matplotlib.collections import LineCollection
 from matplotlib.colors import to_rgb
 from matplotlib.lines import Line2D
+from matplotlib.patches import Rectangle
 import matplotlib.patheffects as patheffects
 import matplotlib.pyplot as plt
 import numpy as np
@@ -41,6 +42,10 @@ LEGEND_FONT = 5          # points; the smallest size journals accept
 LEGEND_MARKER = 2.4      # points
 LEGEND_ROW_MM = 2.0
 LEGEND_TEXT_MM = 1.8     # from the left of a legend entry to its text
+SWATCH_MM = 3.0          # width of a Swatch: the shades of one genus, side by side
+SWATCH_HEIGHT_MM = 1.0
+SWATCH_TEXT_MM = SWATCH_MM + 1.0   # from the left of a Swatch entry to its text
+SWATCH_MIN_SEGMENT_MM = 0.35       # a Swatch grows rather than let its shades get thinner than this
 BLOCK_GAP = 0.4          # legend rows between genera
 TITLE_MM = 3.2           # above each tree
 TITLE_BASELINE_MM = 2.5
@@ -114,6 +119,33 @@ def group_colors(keys):
         colors.update(zip(named, GROUP_COLORS))
     colors.update({key: UNCLASSIFIED_COLOR for key in keys if key[2] == "UN"})
     return colors
+
+
+class Swatch(tuple):
+    """The colours of a legend entry shown side by side in one block, rather than as a single dot: the shades a
+    genus covers, so that every shade on the tree can be read back to its genus."""
+
+
+def swatch_width_mm(swatch):
+    return max(SWATCH_MM, len(swatch) * SWATCH_MIN_SEGMENT_MM)
+
+
+def entry_text_mm(color):
+    """Where the text of a legend entry starts: after its Swatch, or after its dot."""
+    return swatch_width_mm(color) + (SWATCH_TEXT_MM - SWATCH_MM) if isinstance(color, Swatch) else LEGEND_TEXT_MM
+
+
+def draw_entry_mark(ax, color, x, y):
+    """The mark of a legend entry, vertically centred on y: a Swatch of its shades, or a dot."""
+    if not isinstance(color, Swatch):
+        ax.scatter(x + 0.5, y, s=LEGEND_MARKER ** 2, color=color, linewidths=0, gid="legend_dot")
+        return
+    width = swatch_width_mm(color)
+    segment = width / len(color)
+    for i, shade in enumerate(color):
+        # a hairline overlap, so that neighbouring shades meet without a seam of background showing through
+        ax.add_patch(Rectangle((x + i * segment, y - SWATCH_HEIGHT_MM / 2), segment + 0.02, SWATCH_HEIGHT_MM,
+                               facecolor=shade, edgecolor="none", gid="legend_swatch"))
 
 
 def species_legend(colors, keys=None):
@@ -290,8 +322,8 @@ def legend_geometry(blocks, columns=1, title=(), row_mm=LEGEND_ROW_MM):
         for name, entries, italic in part:
             if name is not None:
                 widest = max(widest, text_width_mm(name, fontweight="bold", fontstyle="italic"))
-            for label, _ in entries:
-                widest = max(widest, LEGEND_TEXT_MM + text_width_mm(label, fontstyle="italic" if italic else "normal"))
+            for label, color in entries:
+                widest = max(widest, entry_text_mm(color) + text_width_mm(label, fontstyle="italic" if italic else "normal"))
         widths.append(widest + 0.8)
     width = max([sum(widths)] + [text_width_mm(line, fontweight="bold") + 0.5 for line in title])
     rows = max(sum(block_rows(block) for block in part) for part in parts)
@@ -314,9 +346,9 @@ def draw_legend(ax, blocks, x, y, columns=1, title=(), row_mm=LEGEND_ROW_MM):
                         color=TEXT_COLOR, va="center")
                 row_y += row_mm
             for label, color in entries:
-                ax.scatter(x + 0.5, row_y + row_mm / 2, s=LEGEND_MARKER ** 2, color=color, linewidths=0, gid="legend_dot")
-                ax.text(x + LEGEND_TEXT_MM, row_y + row_mm / 2, label, fontsize=LEGEND_FONT, color=TEXT_COLOR, va="center",
-                        fontstyle="italic" if italic else "normal")
+                draw_entry_mark(ax, color, x, row_y + row_mm / 2)
+                ax.text(x + entry_text_mm(color), row_y + row_mm / 2, label, fontsize=LEGEND_FONT, color=TEXT_COLOR,
+                        va="center", fontstyle="italic" if italic else "normal")
                 row_y += row_mm
             if name is not None:
                 row_y += BLOCK_GAP * row_mm
@@ -616,9 +648,16 @@ def tree_grid(trees, output, *, mode, colors, genus_colors=None, legend_blocks, 
     plt.show()   # in a notebook: the figure in the output cell
 
 
-def genus_legend(genus_colors, genera):
-    """Legend blocks with one entry per genus, in alphabetical order."""
-    return [(None, [(genus, genus_colors[genus])], True) for genus in sorted(genera)]
+def genus_legend(genus_colors, genera, colors=None, keys=None):
+    """Legend blocks with one entry per genus, in alphabetical order. With ``colors`` (the species colours of the
+    figure) each genus carries every shade it covers, in the order of its species, rather than its base hue alone,
+    so that a reader can tell that all the shades of one hue are one genus. ``keys`` restricts the shades to the
+    species the figure actually shows."""
+    marks = {}
+    for genus in sorted(genera):
+        shades = sorted(key for key in (colors or ()) if key[0] == genus and (keys is None or key in keys))
+        marks[genus] = Swatch(colors[key] for key in shades) if shades else genus_colors[genus]
+    return [(None, [(genus, marks[genus])], True) for genus in sorted(genera)]
 
 
 def species_tree_grid(rows, output, *, colors, legend_blocks, width_mm, row_mm, tip_mm=None, legend_columns=2,
