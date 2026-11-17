@@ -14,32 +14,49 @@ for ProstT5. Validate predictions on your target dataset.
 
 ## Installation
 
-From a checkout of this repository:
-
 ```bash
-git clone https://github.com/DessimozLab/ESM3di.git
-cd ESM3di
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .
+pip install esm3di
 ```
 
 Use Python 3.10–3.12. CPU inference works; compatible NVIDIA GPUs are used
 automatically. The first prediction needs internet access to download weights.
 
-For Conda installations including FoldSeek, FoldMason and FastTree:
+That gives you 3Di prediction, cleavage prediction and FoldSeek database
+building. The rest is optional:
+
+| You also want | Install |
+|---|---|
+| Alignments and trees | `conda install -c conda-forge -c bioconda foldseek foldmason=4.dd3c235 'fasttree>=2.2.0'` |
+| Training on your own data | `pip install 'esm3di[training]'` (adds the `esm3di-learn`, `esm3di-prepare`, `esm3di-train-mlm`, `esm3di-train` commands) |
+| The Snakemake FoldTree workflow | `pip install 'esm3di[workflow]'`, plus Conda for its external tools |
+
+A Conda environment with FoldSeek, FoldMason and FastTree already in it:
 
 ```bash
-conda env create -f environment_inference.yml
+conda env create -f environment_inference.yml   # from a clone; see below
 conda activate esm3di_inference
 ```
 
-For training, install `pip install -e . -e ./training`, or use
-[environment.yml](environment.yml). Blackwell GPU users can use
-[environment_blackwell.yml](environment_blackwell.yml). The Conda environments
-use PyTorch with CUDA 12.8; a compatible NVIDIA driver is required
-(Linux driver 570 or newer recommended). Keep the installed
-`transformers` and `peft` versions within the supplied dependency ranges.
+[environment.yml](environment.yml) adds the training stack, and Blackwell GPU
+users can use [environment_blackwell.yml](environment_blackwell.yml). The Conda
+environments use PyTorch with CUDA 12.8; a compatible NVIDIA driver is required
+(Linux driver 570 or newer recommended). Keep the installed `transformers` and
+`peft` versions within the supplied dependency ranges.
+
+<details>
+<summary><b>Developing ESM3Di, or reproducing the paper</b></summary>
+
+```bash
+git clone https://github.com/DessimozLab/ESM3di.git
+cd ESM3di
+pip install -e '.[dev]' -e ./training
+```
+
+You only need a clone to change the code or rerun the analyses. It also carries
+the benchmarks, paper figures and experiment notebooks, so it is a few hundred
+megabytes; the data behind the figures is deposited separately at
+[doi.org/10.5281/zenodo.24082798](https://doi.org/10.5281/zenodo.24082798).
+</details>
 
 ## Predict 3Di or build a FoldSeek database
 
@@ -137,7 +154,7 @@ precomputed AA/3Di FASTAs.
 - **Prediction confidence:** `esm3di-infer perplexity --help`.
 - **Training:** `esm3di-learn` provides `prepare`, `mlm`, `train` and `pipeline`.
 - **FoldTree workflow:** `esm3di-infer foldtree --help`; requires
-  `pip install -e '.[workflow]'` and Conda for its external tools.
+  `pip install 'esm3di[workflow]'` and Conda for its external tools.
 
 ## Polyprotein cleavage prediction
 
@@ -203,7 +220,7 @@ The tree is unrooted and has no support values. See the
 Install the training component first:
 
 ```bash
-pip install -e . -e ./training
+pip install 'esm3di[training]'
 ```
 
 The supported recipe uses **ESM++**, unsupervised MLM fine-tuning, then
@@ -285,7 +302,15 @@ do not interpret their results as evidence of an MLM benefit.
 
 ## Citation
 
-If you use this code, please cite the underlying methods:
+If you use ESM3Di, please cite:
+
+- Kim, D.\*, Weikert, F.\*, Hulo, C., Le Mercier, P., Dessimoz, C. & Moi, D.
+  *Protein language model enables metagenomic-scale reconstruction of viral
+  structural evolution.* (\*equal contribution) — in preparation.
+- The data behind the figures:
+  [doi.org/10.5281/zenodo.24082798](https://doi.org/10.5281/zenodo.24082798)
+
+And the underlying methods:
 
 - ESM++: [Synthyra](https://huggingface.co/Synthyra)
 - LoRA: Hu et al., 2021
