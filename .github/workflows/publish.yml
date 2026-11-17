@@ -136,13 +136,24 @@ jobs:
           python -m pytest -q -c /dev/null --rootdir "$RUNNER_TEMP" \
             --import-mode=importlib "$GITHUB_WORKSPACE/tests"
 
+  # One upload per distribution, each in its own environment. PyPI allows only one PENDING trusted
+  # publisher per (owner, repository, workflow, environment), so the two packages cannot share one:
+  # register esm3di against pypi/testpypi and esm3di-training against pypi-training/testpypi-training.
   publish-testpypi:
-    name: Publish both distributions to TestPyPI
+    name: Publish ${{ matrix.package }} to TestPyPI
     if: github.event_name == 'workflow_dispatch' && vars.PACKAGE_PUBLISHING_ENABLED == 'true'
     needs: [build, test]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: esm3di
+            environment: testpypi
+          - package: esm3di-training
+            environment: testpypi-training
     environment:
-      name: testpypi
+      name: ${{ matrix.environment }}
     permissions:
       id-token: write
     steps:
@@ -150,17 +161,38 @@ jobs:
         with:
           name: python-distributions
           path: dist
+      - name: Keep only the files of this distribution
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          mkdir -p upload
+          for file in dist/*; do
+            case "$(basename -- "$file")" in
+              "${PACKAGE//-/_}-"[0-9]*|"$PACKAGE-"[0-9]*) mv -- "$file" upload/ ;;
+            esac
+          done
+          ls -l upload
+          test -n "$(ls -A upload)"
       - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+          packages-dir: upload
 
   publish-pypi:
-    name: Publish both distributions to PyPI
+    name: Publish ${{ matrix.package }} to PyPI
     if: github.event_name == 'release' && vars.PACKAGE_PUBLISHING_ENABLED == 'true'
     needs: [build, test]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: esm3di
+            environment: pypi
+          - package: esm3di-training
+            environment: pypi-training
     environment:
-      name: pypi
+      name: ${{ matrix.environment }}
     permissions:
       id-token: write
     steps:
@@ -168,4 +200,18 @@ jobs:
         with:
           name: python-distributions
           path: dist
+      - name: Keep only the files of this distribution
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          mkdir -p upload
+          for file in dist/*; do
+            case "$(basename -- "$file")" in
+              "${PACKAGE//-/_}-"[0-9]*|"$PACKAGE-"[0-9]*) mv -- "$file" upload/ ;;
+            esac
+          done
+          ls -l upload
+          test -n "$(ls -A upload)"
       - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
+        with:
+          packages-dir: upload
