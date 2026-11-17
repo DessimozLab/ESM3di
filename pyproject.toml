@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "esm3di"
-version = "0.2.0"
+version = "0.2.1"
 description = "Lightweight ESM3Di inference, cleavage prediction, and FoldSeek database tools"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
-    {name = "David Moi", email = "dmoi@unil.ch"},
-    {name = "Dongwook Kim", email = "dongwook.kim@unil.ch"},
+    {name = "David Moi"},
+    {name = "Dongwook Kim"},
     {name = "Finn Weikert"},
     {name = "Philippe Le Mercier"},
     {name = "Christophe Dessimoz"},
@@ -54,7 +54,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-training = ["esm3di-training==0.2.0"]
+training = ["esm3di-training==0.2.1"]
 workflow = [
     "snakemake>=7.8.0",
     "pulp<2.8.0",

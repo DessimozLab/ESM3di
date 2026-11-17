@@ -1,6 +1,6 @@
 # ESM3Di
 
-<p align="center"><img src="logo_ESM3Di_transparent.png" alt="ESM3Di logo: viral protLLM" width="50%"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/DessimozLab/ESM3di/master/logo_ESM3Di_transparent.png" alt="ESM3Di logo: viral protLLM" width="50%"></p>
 
 Predict per-residue **3Di structural tokens** from amino-acid sequences, build
 FoldSeek search databases, and predict polyprotein cleavage sites.
@@ -37,8 +37,8 @@ conda env create -f environment_inference.yml   # from a clone; see below
 conda activate esm3di_inference
 ```
 
-[environment.yml](environment.yml) adds the training stack, and Blackwell GPU
-users can use [environment_blackwell.yml](environment_blackwell.yml). The Conda
+[environment.yml](https://github.com/DessimozLab/ESM3di/blob/master/environment.yml) adds the training stack, and Blackwell GPU
+users can use [environment_blackwell.yml](https://github.com/DessimozLab/ESM3di/blob/master/environment_blackwell.yml). The Conda
 environments use PyTorch with CUDA 12.8; a compatible NVIDIA driver is required
 (Linux driver 570 or newer recommended). Keep the installed `transformers` and
 `peft` versions within the supplied dependency ranges.
@@ -141,7 +141,7 @@ does not truncate. Use `esm3di-infer perplexity --input-fasta proteins.fasta
 --output-tsv confidence.tsv` for full-length entropy-derived confidence from
 the default Hub model (lower perplexity means a more concentrated prediction).
 
-See the [database wrapper guide](fastas2foldseekdb_README.md) for working with
+See the [database wrapper guide](https://github.com/DessimozLab/ESM3di/blob/master/fastas2foldseekdb_README.md) for working with
 precomputed AA/3Di FASTAs.
 
 ### Other interfaces
@@ -192,7 +192,7 @@ The matching embedding model is already pinned in its configuration.
 
 **Interpretation:** these classifiers have limited held-out-group performance.
 A predicted cut is not experimental evidence of biological cleavage.
-See [cut-site methods and validation](experiments/analyses/polyprotein_cut/README.md).
+See [cut-site methods and validation](https://github.com/DessimozLab/ESM3di/blob/master/experiments/analyses/polyprotein_cut/README.md).
 
 ## Align sequences and infer a tree
 
@@ -213,7 +213,7 @@ FoldMason uses `structuremsa --fast 1 --refine-iters 0`. FastTree uses the
 **amino-acid alignment**, with `-fastest -noml -spr 0 -nosupport`: approximate
 neighbor joining and minimum-evolution NNI, not maximum-likelihood refinement.
 The tree is unrooted and has no support values. See the
-[tree-building methods](experiments/analyses/phylogeny/metagenomic_trees/README.md) for limitations.
+[tree-building methods](https://github.com/DessimozLab/ESM3di/blob/master/experiments/analyses/phylogeny/metagenomic_trees/README.md) for limitations.
 
 ## Train on your own sequences and structures
 
@@ -274,31 +274,31 @@ loss. Otherwise, `X` can mark ignored labels. Training defaults use LoRA rank
 16, a two-layer CNN, AdamW and mixed precision.
 
 Both trainers accept JSON configs; explicit CLI flags override config values.
-Recipes are in [configs/](configs), including
-[small MLM](configs/mlm_esmpp_small.json) and
-[small supervised](configs/3di_esmpp_small_from_mlm.json).
+Recipes are in [configs/](https://github.com/DessimozLab/ESM3di/tree/master/configs), including
+[small MLM](https://github.com/DessimozLab/ESM3di/blob/master/configs/mlm_esmpp_small.json) and
+[small supervised](https://github.com/DessimozLab/ESM3di/blob/master/configs/3di_esmpp_small_from_mlm.json).
 Use `esm3di-learn mlm --help` or `esm3di-learn train --help` for options.
 Individual stages support `--resume auto`; supervised `--init-from model.pt`
 starts a new fine-tune rather than restoring optimizer state.
 
 **Evidence:** MLM initialization is supported, but is not guaranteed to improve
-your results. The [paired MetaVR comparison](benchmarks/quality/README.md#mlm-versus-3di-only-fine-tuning--3di_alignment_mlm_vs_3di_onlyipynb)
+your results. The [paired MetaVR comparison](https://github.com/DessimozLab/ESM3di/blob/master/benchmarks/quality/README.md#mlm-versus-3di-only-fine-tuning--3di_alignment_mlm_vs_3di_onlyipynb)
 did not show an aggregate improvement for the evaluated epoch-5 checkpoints.
 Historical checkpoints named `esm3di_from_mlm` did not receive MLM weights;
 do not interpret their results as evidence of an MLM benefit.
 
 ## Research and benchmarks
 
-- [Benchmarks](benchmarks/README.md): 3Di accuracy on MetaVR and SCOPe40,
+- [Benchmarks](https://github.com/DessimozLab/ESM3di/blob/master/benchmarks/README.md): 3Di accuracy on MetaVR and SCOPe40,
   speed against ProstT5 and ColabFold, MLM versus 3Di-only fine-tuning, and
   the brief communication figures.
-- [Phylogeny experiments](experiments/analyses/phylogeny/README.md): monophyly
+- [Phylogeny experiments](https://github.com/DessimozLab/ESM3di/blob/master/experiments/analyses/phylogeny/README.md): monophyly
   scoring and tree visualization.
-- [Flavivirus](experiments/analyses/flavi_redo/README.md),
-  [Ebola](experiments/analyses/ebola_data/README.md), and
-  [HIV](experiments/analyses/HIV_mutations/README.md) analyses.
-- [Experiment overview](experiments/README.md) and
-  [training reports](experiments/reports/README.md).
+- [Flavivirus](https://github.com/DessimozLab/ESM3di/blob/master/experiments/analyses/flavi_redo/README.md),
+  [Ebola](https://github.com/DessimozLab/ESM3di/blob/master/experiments/analyses/ebola_data/README.md), and
+  [HIV](https://github.com/DessimozLab/ESM3di/blob/master/experiments/analyses/HIV_mutations/README.md) analyses.
+- [Experiment overview](https://github.com/DessimozLab/ESM3di/blob/master/experiments/README.md) and
+  [training reports](https://github.com/DessimozLab/ESM3di/blob/master/experiments/reports/README.md).
 
 ## Citation
 
