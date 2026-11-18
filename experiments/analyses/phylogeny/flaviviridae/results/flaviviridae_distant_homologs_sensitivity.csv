@@ -1,0 +1,5 @@
+method,queries,mean sensitivity,CI low,CI high
+AlphaFold2,613,0.8479,0.8329,0.8631
+ESM3Di,613,0.4613,0.4356,0.4852
+ProstT5,613,0.3418,0.3197,0.3596
+MMseqs2,613,0.345,0.3217,0.3625

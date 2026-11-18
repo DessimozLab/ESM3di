@@ -27,7 +27,7 @@ written relative to its folder, so run a notebook from the folder that holds it.
 | `flaviviridae/flaviviridae_trees.ipynb` | E, E1 and E2 trees (ESM3Di, AlphaFold2), monophyly and ultrametricity, agreement of ESM3Di 3Di with the structures | `flaviviridae_e2_trees` (Figure 2b), `flaviviridae_glycoprotein_trees` (Supplementary Fig. 5) |
 | `flaviviridae/flaviviridae_jackknife.ipynb` | Paired jackknife of the monophyly scores and ultrametricity | `flaviviridae_jackknife_difference` (Supplementary Fig. 6); table `results/flaviviridae_jackknife_summary.csv` |
 | `flaviviridae/flaviviridae_ultrametricity.ipynb` | Robustness of the ultrametricity of ESM3Di and AlphaFold2 trees (jackknife, root, clades, distance, structure quality) | `flaviviridae_jackknife` (not in the paper) |
-| `flaviviridae/flaviviridae_group_auc.ipynb` | Separation of the annotated groups by pairwise scores | `flaviviridae_group_roc` (not in the paper) |
+| `flaviviridae/flaviviridae_group_auc.ipynb` | Pairwise identity within and between the viral groups (twilight zone), and recognition of distant homologues (same protein, other group) against other proteins by ESM3Di, ProstT5, AlphaFold2 and MMseqs2; needs the MAFFT alignments of `pairwise_identity/` | `flaviviridae_distant_homologs` (not in the paper); tables `results/flaviviridae_distant_homologs_*.csv` |
 | `pairwise_identity/pairwise_identity.ipynb` | Pairwise amino-acid identity of the sequences behind the trees, from MAFFT alignments; reads the accession table of `filoviridae/` | `pairwise_identity` (not in the paper) |
 
 `flaviviridae/figures/parts/` holds each tree and legend of Figure 2b separately; it is not tracked (`parts/` is in `.gitignore`).
